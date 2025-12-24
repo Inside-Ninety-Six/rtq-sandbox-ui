@@ -1,0 +1,1161 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RTQ – Maths Paper Solution Viewer (Stress-Test Harness)</title>
+
+    <!-- KaTeX (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
+        crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --bg: #fff;
+            --fg: #111;
+            --muted: #666;
+            --hairline: #d9d9d9;
+
+            --frame-max: 1120px;
+            --frame-pad: 20px;
+
+            --nav-w: 140px;
+            --gap: 22px;
+
+            --q-gap: 30px;
+            /* largest unit: between top-level questions */
+            --in-gap: 10px;
+            /* tighter: within question */
+            --nest-indent: 18px;
+
+            --tap: 44px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            line-height: 1.35;
+            overflow-x: hidden;
+            /* never allow page-level horizontal scroll */
+        }
+
+        /* ===== Page shell (CANONICAL centered frame) ===== */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: var(--bg);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .topbar__inner {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 10px var(--frame-pad);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 54px;
+        }
+
+        .control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: nowrap;
+            min-width: 0;
+        }
+
+        .control label {
+            color: var(--muted);
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .control select {
+            appearance: none;
+            border: 1px solid var(--hairline);
+            background: #fff;
+            color: var(--fg);
+            padding: 10px 12px;
+            font-size: 14px;
+            border-radius: 0;
+            min-width: 240px;
+            max-width: 100%;
+        }
+
+        .jumpBtn {
+            margin-left: auto;
+            border: 1px solid var(--hairline);
+            background: #fff;
+            color: var(--fg);
+            padding: 10px 12px;
+            font-size: 14px;
+            min-height: var(--tap);
+            min-width: 110px;
+            cursor: pointer;
+        }
+
+        .jumpBtn:focus {
+            outline: 2px solid #000;
+            outline-offset: 2px;
+        }
+
+        /* ===== Centered content frame containing nav + paper as sibling columns ===== */
+        .frame {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 16px var(--frame-pad) 60px;
+        }
+
+        .cols {
+            display: grid;
+            grid-template-columns: var(--nav-w) 1fr;
+            gap: var(--gap);
+            align-items: start;
+        }
+
+        /* ===== Navigation rail (quiet, documentation-style) ===== */
+        .nav {
+            position: sticky;
+            top: 76px;
+            /* below sticky topbar */
+            align-self: start;
+        }
+
+        .nav__title {
+            display: none;
+            /* keep chrome minimal */
+        }
+
+        .nav__list {
+            max-height: calc(100vh - 96px);
+            overflow: auto;
+            /* allowed when nav exceeds viewport height */
+            padding: 6px 0;
+        }
+
+        /* Hide scrollbar visually (cross-browser) */
+        .nav__list {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .nav__list::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav__sep {
+            color: var(--muted);
+            font-size: 12px;
+            padding: 10px 0 6px;
+            user-select: none;
+        }
+
+        .nav__item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: 0;
+            padding: 8px 0;
+            cursor: pointer;
+            color: var(--fg);
+            font-size: 14px;
+            min-height: 32px;
+        }
+
+        .nav__item:focus {
+            outline: 2px solid #000;
+            outline-offset: 2px;
+        }
+
+        .nav__item:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== Paper content ===== */
+        .paper {
+            min-width: 0;
+        }
+
+        .paper__meta {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 0 0 12px;
+        }
+
+        .sectionLabel {
+            margin: 18px 0 10px;
+            color: var(--muted);
+            font-size: 14px;
+            letter-spacing: 0.02em;
+        }
+
+        .q {
+            margin: 0 0 var(--q-gap);
+            padding: 0;
+        }
+
+        .q__head {
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            min-width: 0;
+        }
+
+        .q__num {
+            flex: 0 0 auto;
+            font-weight: 600;
+            min-width: 72px;
+        }
+
+        .q__prompt {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .q__block {
+            margin-left: 72px;
+            margin-top: var(--in-gap);
+            min-width: 0;
+        }
+
+        /* Indentation for nested sub-questions: whitespace + indentation only */
+        .q[data-depth="1"] {
+            margin-left: var(--nest-indent);
+        }
+
+        .q[data-depth="2"] {
+            margin-left: calc(var(--nest-indent) * 2);
+        }
+
+        .q[data-depth="3"] {
+            margin-left: calc(var(--nest-indent) * 3);
+        }
+
+        /* Answers visible by default; visually secondary to question, more prominent than working */
+        .answer {
+            color: var(--fg);
+            font-size: 15px;
+        }
+
+        .answer__label {
+            color: var(--muted);
+            font-size: 13px;
+            margin-right: 8px;
+        }
+
+        /* Workings collapsed by default with inline toggles */
+        .working {
+            margin-top: var(--in-gap);
+            border: 0;
+            /* no containers */
+        }
+
+        .working__toggleRow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toggle {
+            border: 1px solid var(--hairline);
+            background: #fff;
+            color: var(--fg);
+            padding: 8px 10px;
+            font-size: 14px;
+            min-height: var(--tap);
+            cursor: pointer;
+        }
+
+        .toggle:focus {
+            outline: 2px solid #000;
+            outline-offset: 2px;
+        }
+
+        .working__hint {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .working__preview {
+            margin-top: 8px;
+            color: var(--fg);
+            font-size: 14px;
+        }
+
+        .working__preview.isHidden {
+            display: none;
+        }
+
+        .working__full {
+            margin-top: 8px;
+            display: none;
+            color: var(--fg);
+            font-size: 14px;
+        }
+
+        .working.isExpanded .working__full {
+            display: block;
+        }
+
+        .working.isExpanded .working__preview {
+            display: none;
+        }
+
+        /* KaTeX overflow handling */
+        .math-block {
+            overflow-x: auto;
+            /* allowed only within block-level math container */
+            overflow-y: hidden;
+            padding: 2px 0;
+            white-space: nowrap;
+            /* KaTeX display won't wrap */
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .math-block {
+            scrollbar-width: thin;
+        }
+
+        .math-inline {
+            white-space: nowrap;
+        }
+
+        /* Inline diagrams inside the Question block */
+        .diagram {
+            margin-top: 10px;
+            max-width: 100%;
+        }
+
+        .diagram svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* ===== Mobile / small screens: nav drawer/overlay ===== */
+        .navOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.96);
+            display: none;
+            z-index: 50;
+        }
+
+        .navOverlay.isOpen {
+            display: block;
+        }
+
+        .navOverlay__panel {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 12px var(--frame-pad) 24px;
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 10px;
+        }
+
+        .navOverlay__top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 54px;
+            border-bottom: 1px solid var(--hairline);
+            padding-bottom: 10px;
+        }
+
+        .navOverlay__title {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .navOverlay__close {
+            margin-left: auto;
+            border: 1px solid var(--hairline);
+            background: #fff;
+            color: var(--fg);
+            padding: 10px 12px;
+            font-size: 14px;
+            min-height: var(--tap);
+            cursor: pointer;
+        }
+
+        .navOverlay__list {
+            overflow: auto;
+            /* allowed: navigation list can scroll if long */
+            padding: 6px 0;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .navOverlay__list::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Responsive layout */
+        @media (max-width: 900px) {
+            :root {
+                --nav-w: 120px;
+            }
+
+            .control select {
+                min-width: 200px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .cols {
+                grid-template-columns: 1fr;
+            }
+
+            .nav {
+                display: none;
+            }
+
+            /* use overlay/drawer on mobile */
+            .jumpBtn {
+                display: inline-flex;
+            }
+
+            .q__num {
+                min-width: 56px;
+            }
+
+            .q__block {
+                margin-left: 56px;
+            }
+
+            .q[data-depth="1"] {
+                margin-left: 12px;
+            }
+
+            .q[data-depth="2"] {
+                margin-left: 24px;
+            }
+
+            .q[data-depth="3"] {
+                margin-left: 36px;
+            }
+        }
+
+        @media (min-width: 761px) {
+            .jumpBtn {
+                display: none;
+            }
+
+            /* desktop uses persistent rail */
+        }
+
+        /* Reduce accidental horizontal overflow from long words */
+        .q__prompt,
+        .working__full,
+        .working__preview,
+        .answer {
+            overflow-wrap: anywhere;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Top control area (fixed location & aligned to centered frame) -->
+    <header class="topbar" aria-label="Top controls">
+        <div class="topbar__inner">
+            <div class="control">
+                <label for="paperSelect">Paper Selector</label>
+                <select id="paperSelect" aria-label="Paper Selector"></select>
+            </div>
+            <button class="jumpBtn" id="jumpBtn" type="button" aria-haspopup="dialog" aria-controls="navOverlay">
+                Jump to
+            </button>
+        </div>
+    </header>
+
+    <!-- Centered content frame containing nav rail + paper -->
+    <main class="frame">
+        <div class="cols">
+            <aside class="nav" aria-label="Document navigation">
+                <div class="nav__list" id="navList" tabindex="0" aria-label="Question navigation list"></div>
+            </aside>
+
+            <section class="paper" aria-label="Paper content">
+                <p class="paper__meta" id="paperMeta"></p>
+                <div id="paperRoot"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Mobile navigation overlay -->
+    <div class="navOverlay" id="navOverlay" role="dialog" aria-modal="true" aria-label="Jump to question">
+        <div class="navOverlay__panel">
+            <div class="navOverlay__top">
+                <div class="navOverlay__title">Jump to</div>
+                <button class="navOverlay__close" id="navClose" type="button">Close</button>
+            </div>
+            <div class="navOverlay__list" id="navListMobile" tabindex="0"
+                aria-label="Question navigation list (mobile)"></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================
+           Data model (stress datasets)
+           ========================= */
+
+        const DIAGRAMS = {
+            geometry: () => `
+    <div class="diagram" aria-label="Diagram: geometry">
+      <svg viewBox="0 0 520 220" role="img" aria-label="Triangle and circle with labels">
+        <rect x="1" y="1" width="518" height="218" fill="none" stroke="#000" stroke-width="2"/>
+        <circle cx="390" cy="110" r="60" fill="none" stroke="#000" stroke-width="2"/>
+        <path d="M90 170 L190 40 L290 170 Z" fill="none" stroke="#000" stroke-width="2"/>
+        <text x="185" y="30" font-size="16" fill="#000">A</text>
+        <text x="78" y="190" font-size="16" fill="#000">B</text>
+        <text x="295" y="190" font-size="16" fill="#000">C</text>
+        <text x="360" y="50" font-size="16" fill="#000">r</text>
+        <text x="385" y="115" font-size="16" fill="#000">O</text>
+        <text x="120" y="120" font-size="14" fill="#000">[angle]</text>
+      </svg>
+    </div>`,
+            bars: () => `
+    <div class="diagram" aria-label="Diagram: ratio bars">
+      <svg viewBox="0 0 520 220" role="img" aria-label="Ratio bars">
+        <rect x="1" y="1" width="518" height="218" fill="none" stroke="#000" stroke-width="2"/>
+        <text x="20" y="40" font-size="16" fill="#000">A</text>
+        <rect x="60" y="22" width="420" height="26" fill="none" stroke="#000" stroke-width="2"/>
+        <line x1="200" y1="22" x2="200" y2="48" stroke="#000" stroke-width="2"/>
+        <line x1="340" y1="22" x2="340" y2="48" stroke="#000" stroke-width="2"/>
+        <text x="20" y="100" font-size="16" fill="#000">B</text>
+        <rect x="60" y="82" width="420" height="26" fill="none" stroke="#000" stroke-width="2"/>
+        <line x1="270" y1="82" x2="270" y2="108" stroke="#000" stroke-width="2"/>
+        <text x="60" y="160" font-size="14" fill="#000">[equal blocks show ratio]</text>
+      </svg>
+    </div>`,
+            grid: () => `
+    <div class="diagram" aria-label="Diagram: coordinate grid">
+      <svg viewBox="0 0 520 220" role="img" aria-label="Coordinate grid with points and line">
+        <rect x="1" y="1" width="518" height="218" fill="none" stroke="#000" stroke-width="2"/>
+        <g stroke="#000" stroke-width="1" opacity="0.6">
+          ${Array.from({ length: 10 }).map((_, i) => `<line x1="${60 + i * 40}" y1="20" x2="${60 + i * 40}" y2="200"/>`).join("")}
+          ${Array.from({ length: 5 }).map((_, i) => `<line x1="60" y1="${20 + i * 40}" x2="460" y2="${20 + i * 40}"/>`).join("")}
+        </g>
+        <line x1="60" y1="200" x2="460" y2="200" stroke="#000" stroke-width="2"/>
+        <line x1="60" y1="20" x2="60" y2="200" stroke="#000" stroke-width="2"/>
+        <circle cx="140" cy="160" r="5" fill="#000"/>
+        <circle cx="340" cy="80" r="5" fill="#000"/>
+        <line x1="140" y1="160" x2="340" y2="80" stroke="#000" stroke-width="2"/>
+        <text x="120" y="155" font-size="14" fill="#000">(2,1)</text>
+        <text x="350" y="85" font-size="14" fill="#000">(7,4)</text>
+      </svg>
+    </div>`,
+            table: () => `
+    <div class="diagram" aria-label="Diagram: table grid">
+      <svg viewBox="0 0 520 220" role="img" aria-label="Table-like grid or array">
+        <rect x="1" y="1" width="518" height="218" fill="none" stroke="#000" stroke-width="2"/>
+        <rect x="60" y="40" width="400" height="140" fill="none" stroke="#000" stroke-width="2"/>
+        ${Array.from({ length: 3 }).map((_, i) => `<line x1="${60 + (i + 1) * 100}" y1="40" x2="${60 + (i + 1) * 100}" y2="180" stroke="#000" stroke-width="2"/>`).join("")}
+        ${Array.from({ length: 2 }).map((_, i) => `<line x1="60" y1="${40 + (i + 1) * 46.6667}" x2="460" y2="${40 + (i + 1) * 46.6667}" stroke="#000" stroke-width="2"/>`).join("")}
+        <text x="70" y="32" font-size="14" fill="#000">[table]</text>
+        <text x="90" y="82" font-size="14" fill="#000">1</text>
+        <text x="190" y="82" font-size="14" fill="#000">2</text>
+        <text x="290" y="82" font-size="14" fill="#000">3</text>
+        <text x="390" y="82" font-size="14" fill="#000">4</text>
+      </svg>
+    </div>`
+        };
+
+        function q(label, promptParts, answerParts, workingParts, opts = {}) {
+            return {
+                type: "question",
+                label,
+                depth: opts.depth ?? 0,
+                diagram: opts.diagram ?? null,
+                promptParts,
+                answerParts,
+                workingParts,
+            };
+        }
+
+        function section(label) {
+            return { type: "section", label };
+        }
+
+        function t(text) { return { kind: "text", text }; }
+        function mi(tex) { return { kind: "mathInline", tex }; }
+        function mb(tex) { return { kind: "mathBlock", tex }; }
+
+        function makeWorkLines(n) {
+            // Mix of short text + math blocks; stress for KaTeX + overflow.
+            const lines = [];
+            for (let i = 1; i <= n; i++) {
+                if (i % 5 === 0) {
+                    // long-ish expression to force overflow on smaller devices
+                    lines.push(mb(String.raw`\frac{(12x + ${i})^2}{3} - \frac{(8x - ${i})^2}{5} = ${i}x + 7`));
+                } else if (i % 3 === 0) {
+                    lines.push(t(`Step ${i}: simplify and keep terms together.`));
+                    lines.push(mb(String.raw`12x + ${i} = 3(x + ${Math.floor(i / 2)}) + 9`));
+                } else {
+                    lines.push(t(`Step ${i}: rearrange.`));
+                    lines.push(mi(String.raw`x`));
+                    lines.push(t(` is isolated by moving constants.`));
+                }
+            }
+            return lines;
+        }
+
+        function standardQuestions(longWorkingsExpanded = false) {
+            const out = [];
+
+            // Q1–Q17: small/medium mix
+            for (let i = 1; i <= 17; i++) {
+                out.push(q(
+                    String(i),
+                    [
+                        t("Calculate: "),
+                        mi(String.raw`${i}+${i + 3}`),
+                        t(".")
+                    ],
+                    [t("Answer: "), mi(String.raw`${2 * i + 3}`)],
+                    [
+                        t("Add the two numbers."),
+                        mb(String.raw`${i}+${i + 3}=${2 * i + 3}`)
+                    ]
+                ));
+            }
+
+            // Deep nesting: Q18(a)(i), Q18(a)(ii), Q18(b)
+            out.push(q("18", [t("A shop sells pencils and pens.")], [t("Answer: "), t("See parts")], [t("Workings are in the sub-parts.")]));
+            out.push(q("18(a)", [t("If 3 pencils cost £6, what is the cost of 1 pencil?")], [t("Answer: "), mi(String.raw`\pounds 2`)], [
+                t("Divide the total by the number of pencils."),
+                mb(String.raw`\frac{6}{3}=2`)
+            ], { depth: 1 }));
+            out.push(q("18(a)(i)", [t("Write the unit cost as a fraction of £6.")], [t("Answer: "), mb(String.raw`\frac{1}{3}\times \pounds 6`)], [
+                t("One pencil is one third of the bundle."),
+                mb(String.raw`\frac{1}{3}\times 6 = 2`)
+            ], { depth: 2 }));
+            out.push(q("18(a)(ii)", [t("Now express the cost in pence.")], [t("Answer: "), mi(String.raw`200\text{p}`)], [
+                t("Convert pounds to pence."),
+                mb(String.raw`2\times 100=200`)
+            ], { depth: 2 }));
+            out.push(q("18(b)", [t("If a pen costs "), mi(String.raw`\pounds 1.50`), t(", how much for 4 pens?")], [t("Answer: "), mi(String.raw`\pounds 6`)], [
+                t("Multiply by 4."),
+                mb(String.raw`1.5\times 4=6`)
+            ], { depth: 1 }));
+
+            // Q19–Q25: medium
+            for (let i = 19; i <= 25; i++) {
+                out.push(q(
+                    String(i),
+                    [
+                        t("Solve: "),
+                        mi(String.raw`x+${i - 10}= ${i + 2}`),
+                        t(".")
+                    ],
+                    [t("Answer: "), mi(String.raw`x=${12}`)],
+                    [
+                        t("Subtract the constant from both sides."),
+                        mb(String.raw`x = ${i + 2}-(${i - 10}) = 12`)
+                    ]
+                ));
+            }
+
+            // Q26–Q35: long algebra with multiple KaTeX blocks inside Working
+            for (let i = 26; i <= 35; i++) {
+                const label = String(i);
+                const promptParts = [
+                    t("Rearrange and solve for "),
+                    mi(String.raw`x`),
+                    t(": "),
+                    mb(String.raw`\frac{3x-${i}}{5} + \frac{2x+${i - 7}}{3} = ${i - 20}`)
+                ];
+
+                const answerParts = [t("Answer: "), mi(String.raw`x=\frac{${(i - 20) * 15 + i * 3 - (i - 7) * 5}}{(3*3 + 2*5)}`)];
+
+                const baseWorking = [
+                    t("Clear denominators by multiplying through by 15."),
+                    mb(String.raw`15\left(\frac{3x-${i}}{5}\right) + 15\left(\frac{2x+${i - 7}}{3}\right) = 15(${i - 20})`),
+                    mb(String.raw`3(3x-${i}) + 5(2x+${i - 7}) = 15(${i - 20})`),
+                    t("Expand and collect like terms."),
+                    mb(String.raw`9x-3${i} + 10x + 5(${i - 7}) = 15(${i - 20})`),
+                    mb(String.raw`19x + ( -3${i} + 5${i} - 35) = 15${i} - 300`),
+                    t("Solve for x."),
+                    mb(String.raw`19x + (2${i} - 35) = 15${i} - 300`),
+                    mb(String.raw`19x = 15${i} - 300 - 2${i} + 35`),
+                    mb(String.raw`19x = 13${i} - 265`),
+                    mb(String.raw`x = \frac{13${i} - 265}{19}`)
+                ];
+
+                // Extremely long workings: 50–60 lines for selected long-working questions
+                const extra = (i === 30 || i === 34) ? makeWorkLines(54) : [
+                    t("Optional check (substitute back)."),
+                    mb(String.raw`\text{LHS}=\text{RHS}`)
+                ];
+
+                // Deep nesting inside standard: Q30(a)(i), Q30(a)(ii), Q30(b)
+                if (i === 30) {
+                    out.push(q("30", promptParts, [t("Answer: "), t("See parts")], [t("Workings are in the sub-parts.")]));
+                    out.push(q("30(a)", [t("Solve the main equation for "), mi(String.raw`x`), t(".")], [t("Answer: "), mb(String.raw`x=\frac{13\cdot 30 - 265}{19}`)], baseWorking.concat(extra), { depth: 1 }));
+                    out.push(q("30(a)(i)", [t("Write the solution as a mixed number if needed.")], [t("Answer: "), mi(String.raw`[\text{mixed number}]`)], [
+                        t("Convert improper fraction to mixed number (if applicable)."),
+                        mb(String.raw`\frac{125}{19} = 6\frac{11}{19}`)
+                    ], { depth: 2 }));
+                    out.push(q("30(a)(ii)", [t("Round "), mi(String.raw`x`), t(" to 2 decimal places.")], [t("Answer: "), mi(String.raw`6.58`)], [
+                        t("Compute and round."),
+                        mb(String.raw`\frac{125}{19}\approx 6.5789\approx 6.58`)
+                    ], { depth: 2 }));
+                    out.push(q("30(b)", [t("Substitute your "), mi(String.raw`x`), t(" back into the original equation to check.")], [t("Answer: "), t("Both sides match.")], [
+                        t("Substitute into each fraction and compare."),
+                        mb(String.raw`\text{LHS}=\frac{3x-30}{5}+\frac{2x+23}{3}`),
+                        mb(String.raw`\text{RHS}=10`)
+                    ], { depth: 1 }));
+                    continue;
+                }
+
+                out.push(q(label, promptParts, answerParts, baseWorking.concat(extra), { workingExpanded: longWorkingsExpanded }));
+            }
+
+            return out;
+        }
+
+        function shortPaper() {
+            return [
+                q("1", [t("Calculate: "), mi(String.raw`7+5`), t(".")], [t("Answer: "), mi(String.raw`12`)], [
+                    t("Add 7 and 5."),
+                    mb(String.raw`7+5=12`)
+                ]),
+                q("2", [t("Calculate: "), mi(String.raw`36\div 6`), t(".")], [t("Answer: "), mi(String.raw`6`)], [
+                    t("Divide 36 by 6."),
+                    mb(String.raw`36\div 6=6`)
+                ]),
+                q("3", [t("Find "), mi(String.raw`\frac{3}{4}`), t(" of 20.")], [t("Answer: "), mi(String.raw`15`)], [
+                    t("Multiply 20 by 3 and divide by 4."),
+                    mb(String.raw`20\times \frac{3}{4}=15`)
+                ]),
+                q("4", [t("Solve: "), mi(String.raw`x+9=17`), t(".")], [t("Answer: "), mi(String.raw`x=8`)], [
+                    t("Subtract 9 from both sides."),
+                    mb(String.raw`x=17-9=8`)
+                ]),
+                q("5", [t("A rectangle has length 8cm and width 3cm. Find the area.")], [t("Answer: "), mi(String.raw`24\text{ cm}^2`)], [
+                    t("Area = length × width."),
+                    mb(String.raw`8\times 3=24`)
+                ]),
+                q("6", [t("Multi-part question: Work out each part.")], [t("Answer: "), t("See parts")], [t("Workings are in the sub-parts.")]),
+                q("6(a)", [t("Calculate: "), mi(String.raw`15-7`), t(".")], [t("Answer: "), mi(String.raw`8`)], [
+                    t("Subtract 7 from 15."),
+                    mb(String.raw`15-7=8`)
+                ], { depth: 1 }),
+                q("6(b)", [t("Calculate: "), mi(String.raw`4\times 9`), t(".")], [t("Answer: "), mi(String.raw`36`)], [
+                    t("Multiply 4 by 9."),
+                    mb(String.raw`4\times 9=36`)
+                ], { depth: 1 }),
+                q("6(c)", [t("Solve: "), mi(String.raw`2x=14`), t(".")], [t("Answer: "), mi(String.raw`x=7`)], [
+                    t("Divide both sides by 2."),
+                    mb(String.raw`x=\frac{14}{2}=7`)
+                ], { depth: 1 }),
+            ];
+        }
+
+        function diagramHeavyPaper() {
+            const items = [];
+            for (let i = 1; i <= 20; i++) {
+                const hasDiagram = [2, 4, 6, 9, 11, 14, 17, 20].includes(i);
+                const diagramType = hasDiagram
+                    ? (i % 4 === 0 ? "table" : i % 4 === 1 ? "geometry" : i % 4 === 2 ? "bars" : "grid")
+                    : null;
+
+                items.push(q(
+                    String(i),
+                    [
+                        t("Use the information given."),
+                        t(" "),
+                        mi(String.raw`\text{[KaTeX inline]}`),
+                        t(" ")
+                    ],
+                    [t("Answer: "), t("A short final answer.")],
+                    [
+                        t("Show the steps briefly."),
+                        mb(String.raw`\text{[KaTeX block]}`),
+                        t("Then conclude.")
+                    ],
+                    { diagram: diagramType }
+                ));
+            }
+            return items;
+        }
+
+        function sectionedPaper() {
+            const items = [];
+            items.push(section("Section A"));
+            for (let i = 1; i <= 35; i++) {
+                items.push(q(
+                    String(i),
+                    [t("Section A question "), t(String(i)), t(": "), mi(String.raw`x+${i}= ${i + 10}`)],
+                    [t("Answer: "), mi(String.raw`x=10`)],
+                    [
+                        t("Subtract "),
+                        mi(String.raw`${i}`),
+                        t(" from both sides."),
+                        mb(String.raw`x=${i + 10}-${i}=10`)
+                    ]
+                ));
+            }
+
+            items.push(section("Section B"));
+            for (let i = 36; i <= 43; i++) {
+                items.push(q(
+                    String(i),
+                    [t("Section B question "), t(String(i)), t(": Simplify "), mb(String.raw`\frac{${i}}{12}`)],
+                    [t("Answer: "), t("Simplified fraction.")],
+                    [
+                        t("Find the greatest common factor and divide numerator and denominator."),
+                        mb(String.raw`\frac{${i}}{12}=\frac{?}{?}`)
+                    ]
+                ));
+            }
+
+            items.push(section("Section C"));
+            for (let i = 44; i <= 49; i++) {
+                items.push(q(
+                    String(i),
+                    [
+                        t("Section C long working: solve "),
+                        mi(String.raw`x`),
+                        t(" in a multi-step equation."),
+                        mb(String.raw`\frac{4x-${i}}{7}+\frac{3x+${i - 40}}{5}= ${i - 35}`)
+                    ],
+                    [t("Answer: "), mi(String.raw`x=\frac{?}{?}`)],
+                    [
+                        t("This working is intentionally long for stress-testing."),
+                        ...makeWorkLines(58),
+                        t("Final simplification gives the stated answer.")
+                    ]
+                ));
+            }
+            return items;
+        }
+
+        const DATASETS = [
+            {
+                key: "short",
+                label: "Short paper",
+                meta: "6 questions total • mix of short arithmetic and one multi-part question",
+                build: () => shortPaper(),
+                workingDefaultExpanded: false
+            },
+            {
+                key: "standard",
+                label: "Standard paper",
+                meta: "35 questions total • Q26–Q35 contain long algebra questions (workings collapsed by default)",
+                build: () => standardQuestions(false),
+                workingDefaultExpanded: false
+            },
+            {
+                key: "standard_expanded",
+                label: "Standard (Workings Expanded)",
+                meta: "Dataset variant for evaluation • same as Standard paper but all workings start expanded",
+                build: () => standardQuestions(true),
+                workingDefaultExpanded: true
+            },
+            {
+                key: "diagram",
+                label: "Diagram-heavy paper",
+                meta: "20 questions total • 8 questions contain diagrams (inline SVG placeholders)",
+                build: () => diagramHeavyPaper(),
+                workingDefaultExpanded: false
+            },
+            {
+                key: "sectioned",
+                label: "Sectioned paper (original paper structure)",
+                meta: "Section A: 35 • Section B: 8 • Section C: 6 (very long workings collapsed by default)",
+                build: () => sectionedPaper(),
+                workingDefaultExpanded: false
+            }
+        ];
+
+        /* =========================
+           Rendering
+           ========================= */
+
+        const elSelect = document.getElementById("paperSelect");
+        const elMeta = document.getElementById("paperMeta");
+        const elPaper = document.getElementById("paperRoot");
+        const elNav = document.getElementById("navList");
+        const elNavMobile = document.getElementById("navListMobile");
+        const elOverlay = document.getElementById("navOverlay");
+        const elJumpBtn = document.getElementById("jumpBtn");
+        const elNavClose = document.getElementById("navClose");
+
+        function sanitizeId(label) {
+            return "q-" + String(label).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        }
+
+        function mk(tag, cls, text) {
+            const n = document.createElement(tag);
+            if (cls) n.className = cls;
+            if (text != null) n.textContent = text;
+            return n;
+        }
+
+        function renderParts(parent, parts) {
+            for (const p of parts) {
+                if (p.kind === "text") {
+                    parent.appendChild(document.createTextNode(p.text));
+                } else if (p.kind === "mathInline") {
+                    const s = document.createElement("span");
+                    s.className = "math-inline";
+                    s.setAttribute("data-tex", p.tex);
+                    s.textContent = p.tex; // fallback if KaTeX fails
+                    parent.appendChild(s);
+                } else if (p.kind === "mathBlock") {
+                    const d = document.createElement("div");
+                    d.className = "math-block";
+                    d.setAttribute("data-tex", p.tex);
+                    d.textContent = p.tex; // fallback if KaTeX fails
+                    parent.appendChild(d);
+                }
+            }
+        }
+
+        function buildQuestionNode(item, dataset) {
+            const id = sanitizeId(item.label);
+
+            const article = mk("article", "q");
+            article.id = id;
+            article.setAttribute("data-depth", String(item.depth ?? 0));
+
+            const head = mk("div", "q__head");
+            const num = mk("div", "q__num", item.label);
+            const prompt = mk("div", "q__prompt");
+            renderParts(prompt, item.promptParts);
+
+            head.appendChild(num);
+            head.appendChild(prompt);
+            article.appendChild(head);
+
+            if (item.diagram) {
+                const diagWrap = mk("div", "");
+                diagWrap.innerHTML = DIAGRAMS[item.diagram]?.() ?? "";
+                if (diagWrap.firstElementChild) {
+                    // Keep diagrams inside Question block (prompt area)
+                    prompt.appendChild(diagWrap.firstElementChild);
+                }
+            }
+
+            // Answer (visible by default)
+            const answer = mk("div", "q__block answer");
+            const aLabel = mk("span", "answer__label", "Answer");
+            answer.appendChild(aLabel);
+            const aBody = mk("span", "answer__body");
+            renderParts(aBody, item.answerParts);
+            answer.appendChild(aBody);
+            article.appendChild(answer);
+
+            // Working (collapsed by default except dataset variant)
+            const working = mk("div", "q__block working");
+            const toggleRow = mk("div", "working__toggleRow");
+            const btn = mk("button", "toggle", "Show working");
+            btn.type = "button";
+            btn.setAttribute("aria-expanded", "false");
+
+            const hint = mk("div", "working__hint", "Workings are collapsed by default.");
+
+            toggleRow.appendChild(btn);
+            toggleRow.appendChild(hint);
+            working.appendChild(toggleRow);
+
+            const preview = mk("div", "working__preview");
+            const full = mk("div", "working__full");
+
+            // Preview shows at most 1–2 lines
+            const previewLines = item.workingParts.slice(0, 2);
+            const fullLines = item.workingParts;
+
+            renderParts(preview, previewLines);
+            renderParts(full, fullLines);
+
+            working.appendChild(preview);
+            working.appendChild(full);
+
+            const startExpanded = dataset.workingDefaultExpanded === true;
+            if (startExpanded) {
+                working.classList.add("isExpanded");
+                btn.textContent = "Hide working";
+                btn.setAttribute("aria-expanded", "true");
+            }
+
+            btn.addEventListener("click", () => {
+                const expanded = working.classList.toggle("isExpanded");
+                btn.textContent = expanded ? "Hide working" : "Show working";
+                btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+            });
+
+            article.appendChild(working);
+
+            return article;
+        }
+
+        function buildSectionNode(label) {
+            const h = mk("div", "sectionLabel", label);
+            h.setAttribute("role", "heading");
+            h.setAttribute("aria-level", "2");
+            return h;
+        }
+
+        function buildNav(items, targetEl, closeOnClick) {
+            targetEl.innerHTML = "";
+            for (const item of items) {
+                if (item.type === "section") {
+                    const sep = mk("div", "nav__sep", item.label);
+                    targetEl.appendChild(sep);
+                    continue;
+                }
+                if (item.type !== "question") continue;
+
+                const b = mk("button", "nav__item", item.label);
+                b.type = "button";
+                b.addEventListener("click", () => {
+                    const id = sanitizeId(item.label);
+                    const target = document.getElementById(id);
+                    if (target) {
+                        // Navigation is non-destructive; do not change expanded/collapsed states.
+                        target.scrollIntoView({ behavior: "auto", block: "start" });
+                    }
+                    if (closeOnClick) closeOverlay();
+                });
+                targetEl.appendChild(b);
+            }
+        }
+
+        function renderKaTeX() {
+            // Programmatic rendering; graceful fallback is already plain text content.
+            const k = window.katex;
+            if (!k) return;
+
+            const inlineNodes = document.querySelectorAll(".math-inline[data-tex]");
+            inlineNodes.forEach(n => {
+                const tex = n.getAttribute("data-tex") || "";
+                try {
+                    k.render(tex, n, { throwOnError: false, displayMode: false });
+                } catch (e) {
+                    // fallback: keep textContent
+                }
+            });
+
+            const blockNodes = document.querySelectorAll(".math-block[data-tex]");
+            blockNodes.forEach(n => {
+                const tex = n.getAttribute("data-tex") || "";
+                try {
+                    // For block, render into a child span to preserve overflow container
+                    n.innerHTML = "";
+                    const inner = document.createElement("div");
+                    n.appendChild(inner);
+                    k.render(tex, inner, { throwOnError: false, displayMode: true });
+                } catch (e) {
+                    // fallback: keep textContent (already set), but we cleared HTML; restore.
+                    n.textContent = tex;
+                }
+            });
+        }
+
+        function renderPaper(datasetKey) {
+            const dataset = DATASETS.find(d => d.key === datasetKey) || DATASETS[0];
+            const items = dataset.build();
+
+            // Meta
+            elMeta.textContent = dataset.meta;
+
+            // Paper content
+            elPaper.innerHTML = "";
+            for (const item of items) {
+                if (item.type === "section") {
+                    elPaper.appendChild(buildSectionNode(item.label));
+                } else if (item.type === "question") {
+                    elPaper.appendChild(buildQuestionNode(item, dataset));
+                }
+            }
+
+            // Nav (desktop + mobile)
+            buildNav(items, elNav, false);
+            buildNav(items, elNavMobile, true);
+
+            // Render KaTeX after DOM exists (and after KaTeX script loads)
+            // If KaTeX isn't ready yet, try once after load.
+            if (window.katex) renderKaTeX();
+            else window.addEventListener("load", renderKaTeX, { once: true });
+        }
+
+        /* =========================
+           Overlay behaviour (mobile)
+           ========================= */
+
+        function openOverlay() {
+            elOverlay.classList.add("isOpen");
+            // Focus first nav item if possible
+            const firstBtn = elNavMobile.querySelector("button.nav__item");
+            (firstBtn || elNavClose).focus();
+        }
+        function closeOverlay() {
+            elOverlay.classList.remove("isOpen");
+            elJumpBtn.focus();
+        }
+
+        elJumpBtn?.addEventListener("click", openOverlay);
+        elNavClose?.addEventListener("click", closeOverlay);
+
+        // Click outside panel closes (still inline, no replacement views)
+        elOverlay.addEventListener("click", (e) => {
+            if (e.target === elOverlay) closeOverlay();
+        });
+
+        // Escape closes
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && elOverlay.classList.contains("isOpen")) closeOverlay();
+        });
+
+        /* =========================
+           Init
+           ========================= */
+
+        (function init() {
+            // Populate selector
+            for (const d of DATASETS) {
+                const opt = document.createElement("option");
+                opt.value = d.key;
+                opt.textContent = d.label;
+                elSelect.appendChild(opt);
+            }
+
+            // Default dataset
+            elSelect.value = DATASETS[0].key;
+            renderPaper(elSelect.value);
+
+            // Switching papers: hide/show content and rebuild navigation accordingly.
+            // Switching papers must NOT auto-expand/collapse beyond defaults (per dataset).
+            elSelect.addEventListener("change", () => {
+                renderPaper(elSelect.value);
+            });
+        })();
+    </script>
+</body>
+
+</html>
