@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ - Maths Paper Solution Viewer (Stress Test)</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+    <style>
+        /* * GLOBAL RESET & TYPOGRAPHY 
+         * Grayscale, Modern Sans-Serif, Calm Tone
+         */
+        :root {
+            --c-bg: #ffffff;
+            --c-text-primary: #111111;
+            --c-text-secondary: #555555;
+            --c-text-tertiary: #777777;
+            --c-border: #e0e0e0;
+            --c-surface-hover: #f4f4f4;
+
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+            --s-gutter: 2rem;
+            --s-max-width: 1024px;
+            /* Centered content frame width */
+            --s-nav-width: 140px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--c-bg);
+            color: var(--c-text-primary);
+            font-family: var(--font-family);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* * LAYOUT ARCHITECTURE 
+         * Single centered frame, sibling columns
+         */
+        .app-shell {
+            max-width: var(--s-max-width);
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* TOP CONTROLS (Paper Selector) */
+        .top-controls {
+            padding: 1.5rem 2rem;
+            background: var(--c-bg);
+            border-bottom: 1px solid var(--c-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .paper-selector {
+            font-family: inherit;
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--c-text-tertiary);
+            border-radius: 4px;
+            background: white;
+            color: var(--c-text-primary);
+            cursor: pointer;
+        }
+
+        /* MAIN CONTENT GRID */
+        .content-frame {
+            display: grid;
+            grid-template-columns: var(--s-nav-width) 1fr;
+            /* Sibling columns */
+            gap: var(--s-gutter);
+            flex: 1;
+            padding-top: 2rem;
+            align-items: start;
+        }
+
+        /* NAVIGATION RAIL */
+        .doc-nav {
+            position: sticky;
+            top: 80px;
+            /* Offset for top controls */
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+            padding-right: 10px;
+            /* Hide Scrollbar */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* IE 10+ */
+        }
+
+        .doc-nav::-webkit-scrollbar {
+            display: none;
+            /* Chrome/Safari */
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .nav-section-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--c-text-tertiary);
+            text-transform: uppercase;
+            margin-top: 1rem;
+            margin-bottom: 0.25rem;
+            padding-left: 0.5rem;
+            pointer-events: none;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 4px 8px;
+            font-size: 0.9rem;
+            color: var(--c-text-secondary);
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background 0.1s ease, color 0.1s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background-color: var(--c-surface-hover);
+            color: var(--c-text-primary);
+        }
+
+        .nav-item.is-active {
+            font-weight: 700;
+            color: var(--c-text-primary);
+            background-color: var(--c-surface-hover);
+        }
+
+        /* PAPER CONTENT COLUMN */
+        .paper-content {
+            padding-bottom: 5rem;
+            padding-right: 2rem;
+            /* Balance visual weight */
+            min-width: 0;
+            /* Prevent grid blowout */
+        }
+
+        /* * COMPONENT: QUESTION UNIT 
+         */
+        .question-block {
+            margin-bottom: 4rem;
+            /* Large rhythm spacing */
+            scroll-margin-top: 100px;
+            /* Scroll anchor offset */
+        }
+
+        /* HEADER: Identifier + Prompt */
+        .q-header {
+            display: flex;
+            gap: 1.5rem;
+            align-items: baseline;
+            margin-bottom: 1.5rem;
+        }
+
+        .q-id {
+            font-weight: 600;
+            color: var(--c-text-secondary);
+            min-width: 2.5rem;
+            /* Alignment anchor */
+            font-size: 1.1rem;
+        }
+
+        .q-prompt {
+            font-size: 1.1rem;
+            color: var(--c-text-primary);
+            font-weight: 400;
+            flex: 1;
+        }
+
+        /* INDENTATION FOR SUB-QUESTIONS */
+        .question-block[data-indent="1"] {
+            margin-left: 2rem;
+        }
+
+        .question-block[data-indent="2"] {
+            margin-left: 4rem;
+        }
+
+        /* DIAGRAMS (Inline SVG) */
+        .q-diagram {
+            margin: 1.5rem 0;
+            display: block;
+            max-width: 100%;
+        }
+
+        .q-diagram svg {
+            display: block;
+            height: auto;
+            max-width: 100%;
+            border: 1px solid transparent;
+            /* Layout debugging */
+        }
+
+        /* ANSWER SECTION */
+        .q-answer-row {
+            margin-left: 4rem;
+            /* Visual indentation relative to prompt */
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+        }
+
+        .lbl-answer {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .val-answer {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--c-text-primary);
+        }
+
+        /* SOLUTION DETAILS (Accordion) */
+        .solution-details-wrapper {
+            margin-left: 4rem;
+        }
+
+        .btn-toggle-working {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 0.95rem;
+            color: var(--c-text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            text-decoration-color: #ccc;
+        }
+
+        .btn-toggle-working:hover {
+            color: var(--c-text-primary);
+            text-decoration-color: #999;
+        }
+
+        /* Working Content Region */
+        .working-content {
+            display: none;
+            /* Default collapsed */
+            margin-top: 1.5rem;
+            padding-left: 1rem;
+            border-left: 2px solid var(--c-border);
+        }
+
+        .working-content.is-open {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* SEMANTIC BLOCKS inside Solution Details */
+        .sd-block {
+            margin-bottom: 1.5rem;
+        }
+
+        .sd-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .sd-body {
+            font-size: 1rem;
+            color: var(--c-text-secondary);
+        }
+
+        .sd-body.math-dense {
+            line-height: 1.8;
+        }
+
+        /* MATH OVERFLOW HANDLING (Safe Zones) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0.5rem 0;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Stop horizontal scroll interference */
+        .katex-display::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .katex-display::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 2px;
+        }
+
+        /* MOBILE ERGONOMICS */
+        @media (max-width: 768px) {
+            :root {
+                --s-gutter: 1rem;
+            }
+
+            .content-frame {
+                grid-template-columns: 1fr;
+                /* Stacked layout */
+                display: block;
+            }
+
+            .doc-nav {
+                display: none;
+                /* Use overlay trigger for mobile */
+            }
+
+            /* Mobile Overlay Nav Trigger (Add-on) */
+            .mobile-nav-trigger {
+                display: block;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: var(--c-text-primary);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 30px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                z-index: 200;
+                font-weight: 600;
+                cursor: pointer;
+            }
+
+            .q-header {
+                gap: 0.75rem;
+            }
+
+            .q-answer-row,
+            .solution-details-wrapper {
+                margin-left: 0;
+                /* Flatten hierarchy on narrow screens */
+                padding-left: 2.5rem;
+                /* Align with text start */
+            }
+
+            .paper-selector {
+                width: 100%;
+            }
+        }
+
+        /* Utility for desktop-only nav */
+        .mobile-nav-trigger {
+            display: none;
+        }
+
+        /* Mobile Nav Drawer */
+        .mobile-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 250px;
+            background: white;
+            z-index: 300;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            border-left: 1px solid var(--c-border);
+            padding: 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mobile-drawer.is-open {
+            transform: translateX(0);
+        }
+
+        .mobile-drawer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 250;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .mobile-drawer-overlay.is-open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="top-controls">
+        <div style="font-weight:700; color:#333;">RTQ Prototype</div>
+        <select id="paperSelector" class="paper-selector" aria-label="Select Paper">
+            <option value="standard">Standard Paper (35 Qs)</option>
+            <option value="short">Short Paper (6 Qs)</option>
+            <option value="diagrams">Diagram Heavy (20 Qs)</option>
+            <option value="sectioned">Sectioned Paper (A/B/C)</option>
+            <option value="expanded">Standard (Workings Expanded)</option>
+        </select>
+    </header>
+
+    <main class="app-shell">
+        <div class="content-frame">
+
+            <nav class="doc-nav" aria-label="Paper Navigation">
+                <ul class="nav-list" id="navList">
+                </ul>
+            </nav>
+
+            <article class="paper-content" id="paperContent">
+            </article>
+        </div>
+    </main>
+
+    <div class="mobile-nav-trigger" id="mobileNavTrigger">Jump to...</div>
+    <div class="mobile-drawer-overlay" id="drawerOverlay"></div>
+    <aside class="mobile-drawer" id="mobileDrawer">
+        <h3 style="margin-top:0">Navigate</h3>
+        <ul class="nav-list" id="mobileNavList"></ul>
+    </aside>
+
+
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        /**
+         * DATA GENERATION & CONTENT LOGIC
+         * Stress-test harness to simulate variable datasets without external files.
+         */
+
+        // --- SVG HELPERS ---
+        const SVG_TYPES = {
+            geometry: `<svg viewBox="0 0 200 150" width="300"><path d="M20,130 L100,20 L180,130 Z" fill="none" stroke="#333" stroke-width="2"/><circle cx="100" cy="85" r="30" fill="none" stroke="#777" stroke-dasharray="4 2"/><text x="100" y="145" text-anchor="middle" fill="#333" font-size="12">12cm</text></svg>`,
+            bar: `<svg viewBox="0 0 300 100" width="300"><rect x="0" y="20" width="120" height="40" fill="#ddd"/><rect x="125" y="20" width="80" height="40" fill="#999"/><text x="0" y="80" fill="#333" font-size="12">Part A</text><text x="125" y="80" fill="#333" font-size="12">Part B</text></svg>`,
+            grid: `<svg viewBox="0 0 200 200" width="200"><defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#eee" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /><path d="M20,180 L180,20" stroke="#333" stroke-width="2"/></svg>`,
+            table: `<svg viewBox="0 0 300 100" width="300"><rect x="0" y="0" width="300" height="100" fill="none" stroke="#ccc"/><line x1="0" y1="30" x2="300" y2="30" stroke="#ccc"/><line x1="150" y1="0" x2="150" y2="100" stroke="#ccc"/><text x="10" y="20" fill="#333" font-weight="bold">Item</text><text x="160" y="20" fill="#333" font-weight="bold">Cost</text></svg>`
+        };
+
+        // --- DATASET GENERATORS ---
+
+        function generatePaperData(type) {
+            let questions = [];
+
+            // Helper to create a single question object
+            const createQ = (id, prompt, answer, workingLines, opts = {}) => ({
+                id: id,
+                prompt: prompt,
+                answer: answer,
+                workingLines: workingLines, // Number of lines of dummy math
+                hasDiagram: opts.hasDiagram || false,
+                diagramType: opts.diagramType || 'geometry',
+                indent: opts.indent || 0,
+                sectionHeader: opts.sectionHeader || null,
+                extras: opts.extras || false, // Keep in mind, formulas, alternatives
+                forceExpand: type === 'expanded'
+            });
+
+            if (type === 'short') {
+                questions.push(createQ('1', 'Calculate the sum of 456 and 789.', '1245', 3));
+                questions.push(createQ('2', 'Solve for x: $$ 3x + 4 = 19 $$', 'x = 5', 5));
+                questions.push(createQ('3', 'A triangle has a base of 12cm and height of 8cm.', '48 cm²', 4, { hasDiagram: true }));
+                questions.push(createQ('4a', 'Find 10% of 50.', '5', 2, { indent: 1 }));
+                questions.push(createQ('4b', 'Hence, find 15% of 50.', '7.5', 3, { indent: 1 }));
+                questions.push(createQ('5', 'Long division: $$ 4560 \\div 12 $$', '380', 8));
+            }
+
+            else if (type === 'standard' || type === 'expanded') {
+                for (let i = 1; i <= 35; i++) {
+                    let workingLen = i > 25 ? 20 : 5; // Long questions at end
+                    let prompt = `Question text for number ${i}. Simplify the expression given below.`;
+                    if (i > 30) workingLen = 50; // Add-on: Extremely long workings
+
+                    // Add-on: Deep Nesting at Q18 and Q30
+                    if (i === 18) {
+                        questions.push(createQ('18(a)(i)', 'Sub-sub-question nested.', '42', 4, { indent: 2 }));
+                        questions.push(createQ('18(a)(ii)', 'Another nested part.', '12', 4, { indent: 2 }));
+                        questions.push(createQ('18(b)', 'Sub-question level.', 'y = 2', 4, { indent: 1 }));
+                    } else if (i === 30) {
+                        questions.push(createQ('30(a)', 'Find the derivative.', '2x', 15, { indent: 1, extras: true }));
+                        questions.push(createQ('30(b)', 'Evaluate at x=4.', '8', 5, { indent: 1 }));
+                    } else {
+                        questions.push(createQ(`${i}`, prompt, `x = ${i * 2}`, workingLen, {
+                            hasDiagram: (i % 7 === 0), // Occasional diagrams
+                            diagramType: Object.keys(SVG_TYPES)[i % 4],
+                            extras: (i > 32) // Add-on: Solution Details Coverage
+                        }));
+                    }
+                }
+            }
+
+            else if (type === 'diagrams') {
+                for (let i = 1; i <= 20; i++) {
+                    questions.push(createQ(`${i}`, 'Calculate the area based on the diagram.', `${i * 10} units`, 6, {
+                        hasDiagram: (i % 2 !== 0), // Every other question
+                        diagramType: Object.keys(SVG_TYPES)[i % 4]
+                    }));
+                }
+            }
+
+            else if (type === 'sectioned') {
+                // Section A
+                questions.push(createQ('1', 'Arithmetic start.', '10', 3, { sectionHeader: 'Section A' }));
+                for (let i = 2; i <= 10; i++) questions.push(createQ(`${i}`, 'Standard question.', 'Answer', 4));
+
+                // Section B
+                questions.push(createQ('11', 'Algebra introduction.', 'x=2', 8, { sectionHeader: 'Section B' }));
+                for (let i = 12; i <= 18; i++) questions.push(createQ(`${i}`, 'Intermediate steps.', 'Answer', 8));
+
+                // Section C (Long details)
+                questions.push(createQ('19', 'Complex derivation.', 'Proof', 40, { sectionHeader: 'Section C', extras: true }));
+                for (let i = 20; i <= 24; i++) questions.push(createQ(`${i}`, 'Extended analysis.', 'QED', 55, { extras: true }));
+            }
+
+            return questions;
+        }
+
+        // --- RENDER FUNCTIONS ---
+
+        function renderPaper(paperType) {
+            const container = document.getElementById('paperContent');
+            const navList = document.getElementById('navList');
+            const mobileNavList = document.getElementById('mobileNavList');
+
+            // Clear existing
+            container.innerHTML = '';
+            navList.innerHTML = '';
+            mobileNavList.innerHTML = '';
+
+            const data = generatePaperData(paperType);
+
+            data.forEach((q, index) => {
+                // 1. Build Nav Item
+                if (q.sectionHeader) {
+                    const headerHtml = `<li class="nav-section-label">${q.sectionHeader}</li>`;
+                    navList.insertAdjacentHTML('beforeend', headerHtml);
+                    mobileNavList.insertAdjacentHTML('beforeend', headerHtml);
+                }
+
+                const navItemHtml = `<li class="nav-item" onclick="scrollToQuestion('${q.id}')" data-target="${q.id}">${q.id}</li>`;
+                navList.insertAdjacentHTML('beforeend', navItemHtml);
+                mobileNavList.insertAdjacentHTML('beforeend', navItemHtml);
+
+                // 2. Build Question HTML
+                const qBlock = document.createElement('section');
+                qBlock.className = 'question-block';
+                qBlock.id = `q-${q.id}`;
+                qBlock.dataset.indent = q.indent;
+
+                // Diagram Logic
+                const diagramHtml = q.hasDiagram ?
+                    `<div class="q-diagram">${SVG_TYPES[q.diagramType]}</div>` : '';
+
+                // Solution Details Content Construction
+                let solutionContent = '';
+
+                // Add-on: Keep in Mind / Formulas (Coverage Stress Test)
+                if (q.extras) {
+                    solutionContent += `
+                <div class="sd-block">
+                    <span class="sd-label">Keep in mind</span>
+                    <div class="sd-body">Remember to convert units before calculating the final area.</div>
+                </div>
+                <div class="sd-block">
+                    <span class="sd-label">Formulas used</span>
+                    <div class="sd-body">$$ A = \\pi r^2 $$</div>
+                </div>
+            `;
+                }
+
+                // Primary Working (Generates KaTeX lines)
+                let mathLines = '';
+                for (let k = 0; k < q.workingLines; k++) {
+                    mathLines += `$$ \\text{Step ${k + 1}}: \\quad ${k * 2}x + ${k}y = \\frac{${k + 10}}{2} $$ \n`;
+                }
+
+                solutionContent += `
+            <div class="sd-block">
+                <span class="sd-label">Working</span>
+                <div class="sd-body math-dense">${mathLines}</div>
+            </div>
+        `;
+
+                // Add-on: Alternative Working
+                if (q.extras) {
+                    solutionContent += `
+                <div class="sd-block">
+                    <span class="sd-label">Alternative working</span>
+                    <div class="sd-body math-dense">$$ \\text{Using method 2: } y = mx + c $$</div>
+                </div>
+            `;
+                }
+
+                const isExpanded = q.forceExpand ? 'is-open' : '';
+                const toggleText = q.forceExpand ? 'Hide working' : 'Show working';
+
+                qBlock.innerHTML = `
+            <div class="q-header">
+                <span class="q-id">${q.id}</span>
+                <div class="q-prompt">
+                    ${q.prompt}
+                    ${q.hasDiagram ? ' (See diagram below)' : ''}
+                    <div style="margin-top:0.5rem">$$ \\text{Given: } f(x) = x^2 + ${index} $$</div>
+                    ${diagramHtml}
+                </div>
+            </div>
+
+            <div class="q-answer-row">
+                <span class="lbl-answer">Answer</span>
+                <span class="val-answer">${q.answer}</span>
+            </div>
+
+            <div class="solution-details-wrapper">
+                <button class="btn-toggle-working" aria-expanded="${q.forceExpand}" onclick="toggleWorking(this)">
+                    <span>${toggleText}</span>
+                </button>
+                <div class="working-content ${isExpanded}">
+                    ${solutionContent}
+                </div>
+            </div>
+        `;
+
+                container.appendChild(qBlock);
+            });
+
+            // 3. Trigger KaTeX Rendering
+            renderMathInElement(container, {
+                delimiters: [
+                    { left: '$$', right: '$$', display: true },
+                    { left: '$', right: '$', display: false }
+                ],
+                throwOnError: false
+            });
+        }
+
+        // --- INTERACTION HANDLERS ---
+
+        function toggleWorking(btn) {
+            const content = btn.nextElementSibling;
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+
+            if (isExpanded) {
+                content.classList.remove('is-open');
+                btn.setAttribute('aria-expanded', 'false');
+                btn.querySelector('span').textContent = 'Show working';
+            } else {
+                content.classList.add('is-open');
+                btn.setAttribute('aria-expanded', 'true');
+                btn.querySelector('span').textContent = 'Hide working';
+            }
+        }
+
+        function scrollToQuestion(id) {
+            const el = document.getElementById(`q-${id}`);
+            if (el) {
+                const topOffset = 100; // Account for sticky header
+                const elementPosition = el.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - topOffset;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: "smooth"
+                });
+
+                // Mobile drawer close logic
+                closeMobileDrawer();
+            }
+        }
+
+        // --- MOBILE DRAWER LOGIC ---
+        const drawer = document.getElementById('mobileDrawer');
+        const overlay = document.getElementById('drawerOverlay');
+
+        document.getElementById('mobileNavTrigger').addEventListener('click', () => {
+            drawer.classList.add('is-open');
+            overlay.classList.add('is-open');
+        });
+
+        overlay.addEventListener('click', closeMobileDrawer);
+
+        function closeMobileDrawer() {
+            drawer.classList.remove('is-open');
+            overlay.classList.remove('is-open');
+        }
+
+
+        // --- INITIALIZATION ---
+
+        const selector = document.getElementById('paperSelector');
+        selector.addEventListener('change', (e) => {
+            renderPaper(e.target.value);
+            window.scrollTo(0, 0); // Reset scroll on paper switch
+        });
+
+        // Load default
+        window.addEventListener('DOMContentLoaded', () => {
+            renderPaper('standard');
+        });
+
+        // Optional: Highlight active nav item on scroll (Intersection Observer)
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id.replace('q-', '');
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('is-active'));
+                    document.querySelector(`.nav-item[data-target="${id}"]`)?.classList.add('is-active');
+                }
+            });
+        }, { threshold: 0.1, rootMargin: "-10% 0px -80% 0px" });
+
+        // Re-observe after render
+        const originalRender = renderPaper;
+        renderPaper = function (type) {
+            originalRender(type);
+            document.querySelectorAll('.question-block').forEach(el => observer.observe(el));
+        }
+
+    </script>
+</body>
+
+</html>
