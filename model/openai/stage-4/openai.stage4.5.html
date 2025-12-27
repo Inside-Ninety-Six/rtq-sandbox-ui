@@ -1,0 +1,1610 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RTQ — Maths Paper Solution Viewer (Stress Test Harness)</title>
+
+    <!-- KaTeX (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5bSNyx0Y9Qv3pGkGk5Qxv8lGx0qRrQm6YH3fZf2t7dYJp8J2bJqQ" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-1lSseHn9G8E9t+oXyXK8mP4yZ9x7u2D9Q3m1qYc0pRrF8Y9uQx8q2w6H6EwQm7n8"
+        crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            /* Grayscale-first surface system (subtle value shifts) */
+            --page-bg: #f2f3f5;
+            --content-surface: #ffffff;
+            --nav-surface: #f7f7f8;
+            --details-surface: #f4f5f6;
+
+            /* Text */
+            --text: #111213;
+            --muted: #4b4f55;
+            --quiet: #6a7078;
+
+            /* Lines (minimal) */
+            --hairline: rgba(17, 18, 19, 0.10);
+
+            /* Focus */
+            --focus: rgba(17, 18, 19, 0.55);
+
+            /* Radii & shadows (very soft; avoid card-like) */
+            --radius: 14px;
+            --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+
+            /* Layout */
+            --frame-max: 1120px;
+            --gutter: 18px;
+            --nav-w: 170px;
+
+            /* Type */
+            --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--font);
+            color: var(--text);
+            background: var(--page-bg);
+            line-height: 1.45;
+        }
+
+        /* Accessible focus baseline */
+        :focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+            border-radius: 8px;
+        }
+
+        /* Top controls aligned to centered frame */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--page-bg);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .frame {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 12px var(--gutter);
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 6px 0;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .label {
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        select {
+            font: inherit;
+            font-size: 14px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--hairline);
+            background: var(--content-surface);
+            color: var(--text);
+            box-shadow: none;
+        }
+
+        .jump-btn {
+            font: inherit;
+            font-size: 14px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--hairline);
+            background: var(--content-surface);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .jump-btn:hover {
+            background: #fbfbfc;
+        }
+
+        /* Desktop two-column within centered frame */
+        .layout {
+            display: grid;
+            grid-template-columns: var(--nav-w) 1fr;
+            gap: 18px;
+            align-items: start;
+            padding-top: 16px;
+            padding-bottom: 26px;
+        }
+
+        nav {
+            background: var(--nav-surface);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 12px 10px;
+            position: sticky;
+            top: 64px;
+            /* below header */
+            border: 1px solid var(--hairline);
+        }
+
+        .nav-title {
+            font-size: 12px;
+            letter-spacing: 0.02em;
+            color: var(--quiet);
+            margin: 0 0 8px 6px;
+            text-transform: uppercase;
+        }
+
+        .nav-list {
+            margin: 0;
+            padding: 0 6px 6px 6px;
+            list-style: none;
+
+            /* Only becomes an independent scroll region if it exceeds viewport height */
+            max-height: calc(100vh - 120px);
+            overflow: auto;
+
+            /* Hide scrollbar visually, keep functional */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* legacy */
+        }
+
+        .nav-list::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* WebKit/Blink */
+
+        .nav-sep {
+            margin: 10px 0 6px 0;
+            padding: 4px 6px;
+            font-size: 12px;
+            color: var(--muted);
+            border-top: 1px solid var(--hairline);
+        }
+
+        .nav-item a {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 6px;
+            border-radius: 10px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 13px;
+            line-height: 1.2;
+            width: 100%;
+        }
+
+        .nav-item a:hover {
+            background: rgba(17, 18, 19, 0.04);
+        }
+
+        .nav-item a[aria-current="true"] {
+            color: var(--text);
+            font-weight: 700;
+            /* allowed for current nav item */
+            background: rgba(17, 18, 19, 0.06);
+        }
+
+        main {
+            background: var(--content-surface);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--hairline);
+            padding: 18px 18px 10px 18px;
+            min-width: 0;
+            /* allow content wrap */
+        }
+
+        /* Paper header inside content surface */
+        .paper-meta {
+            margin: 0 0 14px 0;
+            padding: 0 0 10px 0;
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .paper-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 650;
+            letter-spacing: -0.01em;
+        }
+
+        .paper-sub {
+            margin: 4px 0 0 0;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        /* Question rhythm and hierarchy */
+        .q {
+            padding: 14px 0;
+        }
+
+        .q+.q {
+            margin-top: 18px;
+            /* largest spacing unit between top-level questions */
+            border-top: 0;
+        }
+
+        /* Separation decreases with nesting depth (spacing + indentation only) */
+        .q.depth-0 {
+            margin-left: 0;
+        }
+
+        .q.depth-1 {
+            margin-left: 22px;
+        }
+
+        .q.depth-2 {
+            margin-left: 42px;
+        }
+
+        .q.depth-3 {
+            margin-left: 58px;
+        }
+
+        /* On very small screens, reduce indentation to preserve reading width */
+        @media (max-width: 520px) {
+            .q.depth-1 {
+                margin-left: 14px;
+            }
+
+            .q.depth-2 {
+                margin-left: 26px;
+            }
+
+            .q.depth-3 {
+                margin-left: 36px;
+            }
+        }
+
+        .q-head {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .qid {
+            flex: 0 0 auto;
+            font-size: 14px;
+            color: var(--muted);
+            margin-top: 2px;
+            min-width: 52px;
+            /* orientation marker */
+            text-align: right;
+        }
+
+        .qtext {
+            flex: 1 1 auto;
+            min-width: 0;
+            font-size: 16px;
+            /* primary anchor */
+            line-height: 1.6;
+            /* generous line height */
+            letter-spacing: -0.01em;
+        }
+
+        .answer {
+            margin-left: 62px;
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        .answer .alabel {
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 650;
+            /* label allowed */
+        }
+
+        .answer .avalue {
+            font-size: 14px;
+            /* tertiary */
+            color: var(--text);
+        }
+
+        /* Solution details: subordinate surface */
+        .details-wrap {
+            margin-left: 62px;
+            margin-top: 10px;
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toggle {
+            font: inherit;
+            font-size: 14px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--hairline);
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+        }
+
+        .toggle:hover {
+            background: rgba(17, 18, 19, 0.04);
+        }
+
+        .toggle .chev {
+            display: inline-block;
+            margin-left: 6px;
+            transform: translateY(1px);
+            color: var(--quiet);
+        }
+
+        .details-preview {
+            font-size: 13px;
+            color: var(--quiet);
+            max-width: 72ch;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+        }
+
+        .details {
+            margin-top: 10px;
+            padding: 12px 12px;
+            background: var(--details-surface);
+            border-radius: 12px;
+            border: 1px solid var(--hairline);
+        }
+
+        .dblock+.dblock {
+            margin-top: 10px;
+        }
+
+        .dlabel {
+            font-size: 13px;
+            font-weight: 650;
+            /* labels allowed */
+            color: var(--muted);
+            margin: 0 0 6px 0;
+        }
+
+        .dtext {
+            font-size: 13px;
+            /* denser than question */
+            line-height: 1.45;
+            /* slightly tighter */
+            color: var(--text);
+            margin: 0;
+        }
+
+        /* Math: no page-level horizontal scroll; allow only in block math containers */
+        .math-inline {
+            white-space: nowrap;
+            display: inline-block;
+            max-width: 100%;
+            vertical-align: baseline;
+        }
+
+        .math-block {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding: 8px 10px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.65);
+            border-radius: 10px;
+            border: 1px solid var(--hairline);
+
+            /* keep scrollbar visible only when needed; ok if it appears */
+        }
+
+        /* Diagrams in question block */
+        .diagram {
+            margin: 10px 0 0 0;
+            max-width: 520px;
+        }
+
+        .diagram svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Mobile: drawer/overlay navigation */
+        .mobile-only {
+            display: none;
+        }
+
+        .desktop-only {
+            display: inline-flex;
+        }
+
+        @media (max-width: 900px) {
+            :root {
+                --nav-w: 160px;
+            }
+
+            .layout {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            nav {
+                display: none;
+            }
+
+            .mobile-only {
+                display: inline-flex;
+            }
+
+            .desktop-only {
+                display: none;
+            }
+
+            main {
+                padding: 16px 14px 10px 14px;
+            }
+
+            .answer,
+            .details-wrap {
+                margin-left: 0;
+            }
+
+            .qid {
+                min-width: 44px;
+            }
+        }
+
+        /* Overlay */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 18, 19, 0.40);
+            display: none;
+            z-index: 30;
+            padding: 12px;
+        }
+
+        .overlay[data-open="true"] {
+            display: block;
+        }
+
+        .drawer {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            background: var(--nav-surface);
+            border-radius: var(--radius);
+            border: 1px solid var(--hairline);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+            overflow: hidden;
+        }
+
+        .drawer-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 12px;
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .drawer-title {
+            margin: 0;
+            font-size: 14px;
+            color: var(--muted);
+            font-weight: 650;
+        }
+
+        .close-btn {
+            font: inherit;
+            font-size: 14px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--hairline);
+            background: var(--content-surface);
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .close-btn:hover {
+            background: #fbfbfc;
+        }
+
+        .drawer-body {
+            padding: 10px 12px 12px 12px;
+        }
+
+        .drawer .nav-list {
+            max-height: min(60vh, 520px);
+            padding: 2px 6px 6px 6px;
+        }
+
+        /* Utility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="frame">
+            <div class="topbar" aria-label="Paper controls">
+                <div class="controls">
+                    <span class="label">Paper</span>
+                    <select id="paperSelect" aria-label="Paper selector">
+                        <option value="short">Short paper</option>
+                        <option value="standard">Standard paper</option>
+                        <option value="diagram">Diagram-heavy paper</option>
+                        <option value="sectioned">Sectioned paper</option>
+                        <option value="standardExpanded">Standard (Workings Expanded)</option>
+                    </select>
+
+                    <button id="jumpBtn" class="jump-btn mobile-only" type="button" aria-haspopup="dialog"
+                        aria-controls="navOverlay">
+                        Jump to
+                    </button>
+                </div>
+
+                <!-- Keep a stable location for top controls; optional right-side area reserved -->
+                <div class="desktop-only" aria-hidden="true" style="opacity:0; user-select:none;">
+                    <span class="label"> </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="frame">
+        <div class="layout">
+            <nav aria-label="Document navigation (question identifiers only)">
+                <p class="nav-title">Questions</p>
+                <ul id="navListDesktop" class="nav-list"></ul>
+            </nav>
+
+            <main id="mainContent" tabindex="-1">
+                <div class="paper-meta">
+                    <h1 id="paperTitle" class="paper-title">Paper</h1>
+                    <p id="paperSub" class="paper-sub">Single continuous document. Answers visible by default. Workings
+                        collapsed by default.</p>
+                </div>
+
+                <section id="paperContent" aria-label="Paper content"></section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Mobile overlay navigation -->
+    <div id="navOverlay" class="overlay" role="dialog" aria-modal="true" aria-label="Jump to question"
+        data-open="false">
+        <div class="drawer">
+            <div class="drawer-head">
+                <p class="drawer-title">Questions</p>
+                <button id="closeOverlayBtn" class="close-btn" type="button">Close</button>
+            </div>
+            <div class="drawer-body">
+                <ul id="navListMobile" class="nav-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ---------- Utilities ----------
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, (m) => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[m]));
+        }
+
+        function normalizeAnchorId(qid) {
+            // Create stable IDs for anchors; preserve uniqueness.
+            return "q-" + String(qid).trim()
+                .replace(/\s+/g, "")
+                .replace(/[()]/g, "")
+                .replace(/[^a-zA-Z0-9]+/g, "-")
+                .replace(/-+/g, "-")
+                .replace(/^-|-$/g, "")
+                .toLowerCase();
+        }
+
+        function countNesting(qid) {
+            // Heuristic: count occurrences of '(' in identifier to infer depth.
+            const s = String(qid);
+            const depth = (s.match(/\(/g) || []).length;
+            return Math.min(depth, 3);
+        }
+
+        function el(tag, attrs = {}, children = []) {
+            const node = document.createElement(tag);
+            for (const [k, v] of Object.entries(attrs)) {
+                if (k === "class") node.className = v;
+                else if (k === "html") node.innerHTML = v;
+                else if (k.startsWith("aria-")) node.setAttribute(k, v);
+                else if (k === "dataset") { for (const [dk, dv] of Object.entries(v)) node.dataset[dk] = dv; }
+                else if (k === "text") node.textContent = v;
+                else node.setAttribute(k, v);
+            }
+            for (const c of children) node.appendChild(c);
+            return node;
+        }
+
+        // ---------- Diagram SVGs (reused types) ----------
+        function svgGeometry() {
+            return `
+        <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Geometry diagram">
+          <rect x="0" y="0" width="320" height="180" fill="none" stroke="rgba(17,18,19,0.18)"/>
+          <circle cx="240" cy="90" r="46" fill="none" stroke="rgba(17,18,19,0.35)" stroke-width="2"/>
+          <path d="M60 140 L140 40 L220 140 Z" fill="none" stroke="rgba(17,18,19,0.35)" stroke-width="2"/>
+          <text x="138" y="34" font-size="12" fill="rgba(17,18,19,0.75)">A</text>
+          <text x="52" y="154" font-size="12" fill="rgba(17,18,19,0.75)">B</text>
+          <text x="222" y="154" font-size="12" fill="rgba(17,18,19,0.75)">C</text>
+          <text x="240" y="92" font-size="12" text-anchor="middle" fill="rgba(17,18,19,0.75)">O</text>
+          <line x1="240" y1="90" x2="282" y2="90" stroke="rgba(17,18,19,0.35)" stroke-width="2"/>
+          <text x="262" y="84" font-size="12" fill="rgba(17,18,19,0.75)">r</text>
+        </svg>
+      `;
+        }
+
+        function svgRatioBars() {
+            return `
+        <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ratio bars diagram">
+          <rect x="0" y="0" width="320" height="180" fill="none" stroke="rgba(17,18,19,0.18)"/>
+          <text x="16" y="38" font-size="12" fill="rgba(17,18,19,0.75)">A</text>
+          <rect x="40" y="24" width="240" height="18" fill="rgba(17,18,19,0.10)" stroke="rgba(17,18,19,0.25)"/>
+          <line x1="120" y1="24" x2="120" y2="42" stroke="rgba(17,18,19,0.25)"/>
+          <line x1="200" y1="24" x2="200" y2="42" stroke="rgba(17,18,19,0.25)"/>
+
+          <text x="16" y="96" font-size="12" fill="rgba(17,18,19,0.75)">B</text>
+          <rect x="40" y="82" width="200" height="18" fill="rgba(17,18,19,0.10)" stroke="rgba(17,18,19,0.25)"/>
+          <line x1="106" y1="82" x2="106" y2="100" stroke="rgba(17,18,19,0.25)"/>
+          <line x1="172" y1="82" x2="172" y2="100" stroke="rgba(17,18,19,0.25)"/>
+
+          <text x="16" y="154" font-size="12" fill="rgba(17,18,19,0.75)">C</text>
+          <rect x="40" y="140" width="260" height="18" fill="rgba(17,18,19,0.10)" stroke="rgba(17,18,19,0.25)"/>
+          <line x1="105" y1="140" x2="105" y2="158" stroke="rgba(17,18,19,0.25)"/>
+          <line x1="170" y1="140" x2="170" y2="158" stroke="rgba(17,18,19,0.25)"/>
+          <line x1="235" y1="140" x2="235" y2="158" stroke="rgba(17,18,19,0.25)"/>
+        </svg>
+      `;
+        }
+
+        function svgCoordinateGrid() {
+            return `
+        <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Coordinate grid diagram">
+          <rect x="0" y="0" width="320" height="180" fill="none" stroke="rgba(17,18,19,0.18)"/>
+          <g stroke="rgba(17,18,19,0.12)" stroke-width="1">
+            ${Array.from({ length: 12 }).map((_, i) => `<line x1="${20 + i * 24}" y1="20" x2="${20 + i * 24}" y2="160"/>`).join("")}
+            ${Array.from({ length: 7 }).map((_, i) => `<line x1="20" y1="${20 + i * 20}" x2="300" y2="${20 + i * 20}"/>`).join("")}
+          </g>
+          <g stroke="rgba(17,18,19,0.35)" stroke-width="2">
+            <line x1="160" y1="20" x2="160" y2="160"/>
+            <line x1="20" y1="100" x2="300" y2="100"/>
+          </g>
+          <circle cx="88" cy="124" r="4" fill="rgba(17,18,19,0.55)"/>
+          <circle cx="232" cy="76" r="4" fill="rgba(17,18,19,0.55)"/>
+          <path d="M88 124 L232 76" fill="none" stroke="rgba(17,18,19,0.45)" stroke-width="2"/>
+          <text x="86" y="140" font-size="12" fill="rgba(17,18,19,0.75)">(−3, −1)</text>
+          <text x="210" y="66" font-size="12" fill="rgba(17,18,19,0.75)">(3, 2)</text>
+        </svg>
+      `;
+        }
+
+        function svgTableGrid() {
+            return `
+        <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Table-like grid diagram">
+          <rect x="0" y="0" width="320" height="180" fill="none" stroke="rgba(17,18,19,0.18)"/>
+          <rect x="40" y="30" width="240" height="120" fill="rgba(17,18,19,0.05)" stroke="rgba(17,18,19,0.30)"/>
+          ${[1, 2, 3].map(i => `<line x1="${40 + i * 60}" y1="30" x2="${40 + i * 60}" y2="150" stroke="rgba(17,18,19,0.25)"/>`).join("")}
+          ${[1, 2].map(i => `<line x1="40" y1="${30 + i * 40}" x2="280" y2="${30 + i * 40}" stroke="rgba(17,18,19,0.25)"/>`).join("")}
+          <text x="70" y="55" font-size="12" fill="rgba(17,18,19,0.75)">x</text>
+          <text x="130" y="55" font-size="12" fill="rgba(17,18,19,0.75)">1</text>
+          <text x="190" y="55" font-size="12" fill="rgba(17,18,19,0.75)">2</text>
+          <text x="250" y="55" font-size="12" fill="rgba(17,18,19,0.75)">3</text>
+          <text x="70" y="95" font-size="12" fill="rgba(17,18,19,0.75)">y</text>
+          <text x="130" y="95" font-size="12" fill="rgba(17,18,19,0.75)">2</text>
+          <text x="190" y="95" font-size="12" fill="rgba(17,18,19,0.75)">4</text>
+          <text x="250" y="95" font-size="12" fill="rgba(17,18,19,0.75)">6</text>
+        </svg>
+      `;
+        }
+
+        const DIAGRAMS = {
+            geometry: svgGeometry,
+            ratio: svgRatioBars,
+            grid: svgCoordinateGrid,
+            table: svgTableGrid
+        };
+
+        // ---------- Math rendering ----------
+        function safeRenderMath(elm, tex, displayMode) {
+            // If KaTeX fails to load, fall back to plain text (do not hide content).
+            try {
+                if (!window.katex || !window.katex.render) {
+                    elm.textContent = tex;
+                    return;
+                }
+                window.katex.render(tex, elm, {
+                    throwOnError: false,
+                    displayMode: !!displayMode
+                });
+            } catch (e) {
+                elm.textContent = tex;
+            }
+        }
+
+        function renderAllMath(container) {
+            const nodes = container.querySelectorAll("[data-math]");
+            nodes.forEach((n) => {
+                const tex = n.getAttribute("data-math") || "";
+                const mode = n.getAttribute("data-mode") || "inline";
+                safeRenderMath(n, tex, mode === "display");
+            });
+        }
+
+        // ---------- Dataset building ----------
+        function mkMathInline(tex) {
+            const span = el("span", { class: "math-inline", dataset: { math: tex, mode: "inline" } });
+            span.setAttribute("data-math", tex);
+            span.setAttribute("data-mode", "inline");
+            return span;
+        }
+
+        function mkMathBlock(tex) {
+            const div = el("div", { class: "math-block" });
+            const inner = el("div", { dataset: { math: tex, mode: "display" } });
+            inner.setAttribute("data-math", tex);
+            inner.setAttribute("data-mode", "display");
+            div.appendChild(inner);
+            return div;
+        }
+
+        function mkPara(parts) {
+            const p = el("p", { class: "dtext" });
+            parts.forEach(part => {
+                if (typeof part === "string") p.appendChild(document.createTextNode(part));
+                else p.appendChild(part);
+            });
+            return p;
+        }
+
+        function mkQuestionPrompt(promptParts, diagramType) {
+            const wrap = el("div", { class: "qtext" });
+            const p = document.createElement("p");
+            p.style.margin = "0";
+            promptParts.forEach(part => {
+                if (typeof part === "string") p.appendChild(document.createTextNode(part));
+                else p.appendChild(part);
+            });
+            wrap.appendChild(p);
+
+            if (diagramType && DIAGRAMS[diagramType]) {
+                const d = el("div", { class: "diagram", html: DIAGRAMS[diagramType]() });
+                wrap.appendChild(d);
+            }
+            return wrap;
+        }
+
+        function mkDetailsSection(label, bodyNodes) {
+            const block = el("div", { class: "dblock" });
+            block.appendChild(el("p", { class: "dlabel", text: label }));
+            bodyNodes.forEach(n => block.appendChild(n));
+            return block;
+        }
+
+        function mkWorkingLines(count, seed) {
+            // Generate a mix of short and overflow-prone expressions (50–60 lines when requested)
+            const lines = [];
+            for (let i = 1; i <= count; i++) {
+                const k = i + seed;
+                if (i % 10 === 0) {
+                    // intentionally wide expression to stress overflow
+                    lines.push(String.raw`\frac{(x+${k})(x+${k + 1})(x+${k + 2})(x+${k + 3})(x+${k + 4})}{(x+1)(x+2)}=\frac{x^5+ \cdots }{x^2+3x+2}`);
+                } else if (i % 4 === 0) {
+                    lines.push(String.raw`x_{${i}} = \frac{${k}}{${k + 2}} \cdot \frac{${k + 3}}{${k + 5}}`);
+                } else if (i % 3 === 0) {
+                    lines.push(String.raw`${k}x + ${k + 1} = ${k + 7}\;\Rightarrow\; x = \frac{${k + 6}}{${k}}`);
+                } else {
+                    lines.push(String.raw`\frac{${k}}{${k + 1}} + \frac{1}{${k + 2}} = \frac{${k}(${k + 2}) + (${k + 1})}{(${k + 1})(${k + 2})}`);
+                }
+            }
+            return lines;
+        }
+
+        function mkQuestionObj({
+            qid,
+            promptParts,
+            answerText,
+            diagramType = null,
+            details = null,
+            expandedByDefault = false,
+            depthOverride = null
+        }) {
+            return {
+                qid,
+                promptParts,
+                diagramType,
+                answerText,
+                details,
+                expandedByDefault,
+                depthOverride
+            };
+        }
+
+        function mkDetails({
+            keepInMind = null,
+            formulasUsed = null,
+            working = null,              // array of nodes
+            alternativeWorking = null,   // array of nodes
+            previewText = ""
+        }) {
+            return { keepInMind, formulasUsed, working, alternativeWorking, previewText };
+        }
+
+        // ---------- Build datasets ----------
+        function buildShortPaper() {
+            const questions = [];
+
+            questions.push(mkQuestionObj({
+                qid: "1",
+                promptParts: ["Calculate ", mkMathInline(String.raw`48 \div 6`), "."],
+                answerText: "8",
+                details: mkDetails({
+                    previewText: "Use division facts to find how many 6s make 48.",
+                    working: [
+                        mkPara(["Think: ", mkMathInline(String.raw`6 \times 8 = 48`), "."]),
+                        mkMathBlock(String.raw`48 \div 6 = 8`)
+                    ]
+                })
+            }));
+
+            questions.push(mkQuestionObj({
+                qid: "2",
+                promptParts: ["Write ", mkMathInline(String.raw`\frac{3}{5}`), " as a decimal."],
+                answerText: "0.6",
+                details: mkDetails({
+                    formulasUsed: [mkPara(["Fraction to decimal by division: ", mkMathInline(String.raw`3 \div 5`), "."])],
+                    previewText: "Divide numerator by denominator.",
+                    working: [
+                        mkMathBlock(String.raw`3 \div 5 = 0.6`)
+                    ]
+                })
+            }));
+
+            questions.push(mkQuestionObj({
+                qid: "3",
+                promptParts: ["A box has 12 pencils. How many pencils in 4 boxes?"],
+                answerText: "48",
+                details: mkDetails({
+                    keepInMind: [mkPara(["Equal groups means multiplication."])],
+                    previewText: "Multiply pencils per box by number of boxes.",
+                    working: [
+                        mkMathBlock(String.raw`12 \times 4 = 48`)
+                    ]
+                })
+            }));
+
+            // Multi-part with sub-questions and sub-sub-questions
+            questions.push(mkQuestionObj({
+                qid: "4",
+                promptParts: ["A recipe uses 2 cups of flour for 8 biscuits."],
+                answerText: "See parts",
+                details: mkDetails({
+                    previewText: "Find cups per biscuit, then scale up.",
+                    working: [mkPara(["Work through parts (a) and (b)."])]
+                })
+            }));
+
+            questions.push(mkQuestionObj({
+                qid: "4(a)",
+                promptParts: ["How many cups of flour per biscuit?"],
+                answerText: String.raw`\(\frac{1}{4}\) cup`,
+                depthOverride: 1,
+                details: mkDetails({
+                    previewText: "Divide total cups by number of biscuits.",
+                    working: [
+                        mkMathBlock(String.raw`\frac{2}{8}=\frac{1}{4}`)
+                    ]
+                })
+            }));
+
+            questions.push(mkQuestionObj({
+                qid: "4(a)(i)",
+                promptParts: ["Write the answer as a decimal."],
+                answerText: "0.25",
+                depthOverride: 2,
+                details: mkDetails({
+                    previewText: "Convert the fraction to a decimal.",
+                    working: [
+                        mkMathBlock(String.raw`\frac{1}{4}=0.25`)
+                    ]
+                })
+            }));
+
+            questions.push(mkQuestionObj({
+                qid: "4(b)",
+                promptParts: ["How many cups of flour for 20 biscuits?"],
+                answerText: "5 cups",
+                depthOverride: 1,
+                details: mkDetails({
+                    previewText: "Multiply cups per biscuit by 20.",
+                    formulasUsed: [mkPara(["Scale by multiplication."])],
+                    working: [
+                        mkMathBlock(String.raw`20 \times \frac{1}{4} = 5`)
+                    ],
+                    alternativeWorking: [
+                        mkPara(["Or scale from 8 biscuits:"]),
+                        mkMathBlock(String.raw`8 \to 20 \text{ is } \times 2.5,\;\; 2 \times 2.5 = 5`)
+                    ]
+                })
+            }));
+
+            return {
+                id: "short",
+                title: "Short paper",
+                subtitle: "6 questions total (includes a multi-part question).",
+                questions
+            };
+        }
+
+        function buildStandardPaper(expandedVariant = false) {
+            const questions = [];
+
+            // Q1–Q25 smaller/medium
+            for (let i = 1; i <= 25; i++) {
+                const useVariant = (i % 7 === 0);
+                const withDiagram = (i === 8 || i === 15);
+                const diagramType = withDiagram ? (i === 8 ? "table" : "grid") : null;
+
+                const promptParts = (i % 5 === 0)
+                    ? ["Simplify ", mkMathInline(String.raw`\frac{` + (i + 2) + `}{` + (i + 4) + `}`), "."]
+                    : ["Calculate ", mkMathInline(String.raw`${10 + i} + ${i}`), "."];
+
+                const answerText = (i % 5 === 0)
+                    ? `${(i + 2)}/${(i + 4)} (in simplest form if possible)`
+                    : String(10 + i + i);
+
+                const details = mkDetails({
+                    previewText: useVariant
+                        ? "Use a quick reminder, a formula, or an alternative method."
+                        : "Show the working steps briefly.",
+                    keepInMind: (i === 7 || i === 14 || i === 21) ? [mkPara(["Keep numbers aligned and check units."])] : null,
+                    formulasUsed: (i === 10 || i === 20 || i === 25) ? [mkPara(["Useful identity: ", mkMathInline(String.raw`a+b=b+a`), " (commutative)."])] : null,
+                    working: [
+                        mkPara(["Step 1: write it clearly."]),
+                        mkMathBlock(i % 5 === 0
+                            ? String.raw`\frac{` + (i + 2) + `}{` + (i + 4) + `} = \frac{` + (i + 2) + `\div 1}{` + (i + 4) + `\div 1}`
+                            : String.raw`${10 + i} + ${i} = ${10 + i + i}`
+                        )
+                    ],
+                    alternativeWorking: (i === 12 || i === 18 || i === 24) ? [
+                        mkPara(["Alternative: estimate and then confirm exactly."]),
+                        mkMathBlock(String.raw`(\text{estimate})\;\; ${10 + i} + ${i} \approx ${10 + i + i}`)
+                    ] : null
+                });
+
+                questions.push(mkQuestionObj({
+                    qid: String(i),
+                    promptParts,
+                    diagramType,
+                    answerText,
+                    details,
+                    expandedByDefault: !!expandedVariant
+                }));
+            }
+
+            // Deep nesting examples in Standard paper
+            questions.push(mkQuestionObj({
+                qid: "18(a)",
+                promptParts: ["A pattern increases by 3 each time. Start at 5."],
+                answerText: "See parts",
+                details: mkDetails({
+                    previewText: "Write terms and describe the rule.",
+                    working: [
+                        mkPara(["Work through sub-parts."])
+                    ]
+                }),
+                expandedByDefault: !!expandedVariant
+            }));
+            questions.push(mkQuestionObj({
+                qid: "18(a)(i)",
+                promptParts: ["Write the first four terms."],
+                answerText: "5, 8, 11, 14",
+                depthOverride: 2,
+                details: mkDetails({
+                    previewText: "Add 3 each time.",
+                    working: [
+                        mkMathBlock(String.raw`5,\; 5+3=8,\; 8+3=11,\; 11+3=14`)
+                    ]
+                }),
+                expandedByDefault: !!expandedVariant
+            }));
+            questions.push(mkQuestionObj({
+                qid: "18(a)(ii)",
+                promptParts: ["Write the nth term."],
+                answerText: String.raw`\(3n+2\)`,
+                depthOverride: 2,
+                details: mkDetails({
+                    previewText: "Start at 5 when n=1, so shift by 2.",
+                    formulasUsed: [mkPara(["Arithmetic sequence form: ", mkMathInline(String.raw`a_n = a_1 + (n-1)d`), "."])],
+                    working: [
+                        mkMathBlock(String.raw`a_n = 5 + (n-1)\cdot 3 = 3n+2`)
+                    ]
+                }),
+                expandedByDefault: !!expandedVariant
+            }));
+
+            // Q26–Q35 long algebra with multiple block maths and very long workings on selected ones
+            for (let i = 26; i <= 35; i++) {
+                const long = true;
+                const includeLongWorkings = (i === 30 || i === 33);
+                const manyLines = includeLongWorkings ? mkWorkingLines(56, i) : mkWorkingLines(12, i);
+
+                const workingNodes = [
+                    mkPara(["Rearrange and simplify carefully."]),
+                    mkMathBlock(String.raw`\text{Solve:}\;\; 2(3x-` + (i - 20) + `) = ` + (i + 10) + ` - x`),
+                    mkMathBlock(String.raw`6x - ` + (2 * (i - 20)) + ` = ` + (i + 10) + ` - x`),
+                    mkMathBlock(String.raw`7x = ` + ((i + 10) + (2 * (i - 20)))),
+                    mkMathBlock(String.raw`x = \frac{` + ((i + 10) + (2 * (i - 20))) + `}{7}`)
+                ];
+
+                // Add many additional lines (stress test)
+                manyLines.forEach(tex => workingNodes.push(mkMathBlock(tex)));
+
+                const details = mkDetails({
+                    previewText: "Long algebra working (collapsed by default in Standard).",
+                    keepInMind: (i === 26 || i === 31 || i === 35) ? [mkPara(["Move one type of term at a time to keep it tidy."])] : null,
+                    formulasUsed: (i === 28 || i === 32 || i === 34) ? [mkPara(["Distributive law: ", mkMathInline(String.raw`a(b+c)=ab+ac`), "."])] : null,
+                    working: workingNodes,
+                    alternativeWorking: (i === 29 || i === 33) ? [
+                        mkPara(["Alternative method: collect terms first, then divide."]),
+                        mkMathBlock(String.raw`2(3x-` + (i - 20) + `)=` + (i + 10) + `-x \Rightarrow 7x = ` + ((i + 10) + (2 * (i - 20))))
+                    ] : null
+                });
+
+                questions.push(mkQuestionObj({
+                    qid: String(i),
+                    promptParts: [
+                        "Solve for ", mkMathInline(String.raw`x`), ": ",
+                        mkMathInline(String.raw`2(3x-` + (i - 20) + `)=` + (i + 10) + `-x`)
+                    ],
+                    answerText: `x = ${((i + 10) + (2 * (i - 20)))}/7`,
+                    details,
+                    expandedByDefault: !!expandedVariant
+                }));
+
+                // Add nested sub-questions around Q30 as required
+                if (i === 30) {
+                    questions.push(mkQuestionObj({
+                        qid: "30(a)(i)",
+                        promptParts: ["Check your solution by substitution."],
+                        answerText: "Substitution shown",
+                        depthOverride: 2,
+                        details: mkDetails({
+                            previewText: "Replace x and verify both sides match.",
+                            working: [
+                                mkPara(["Substitute the value of ", mkMathInline(String.raw`x`), " back into the equation."]),
+                                mkMathBlock(String.raw`\text{LHS} = 2(3x-10),\;\; \text{RHS} = 40-x`)
+                            ]
+                        }),
+                        expandedByDefault: !!expandedVariant
+                    }));
+                    questions.push(mkQuestionObj({
+                        qid: "30(a)(ii)",
+                        promptParts: ["Explain why dividing by 7 is valid here."],
+                        answerText: "Because 7 ≠ 0",
+                        depthOverride: 2,
+                        details: mkDetails({
+                            previewText: "Division is valid when the divisor is not zero.",
+                            keepInMind: [mkPara(["You can divide both sides by the same non-zero number."])],
+                            working: [
+                                mkMathBlock(String.raw`7x = k \Rightarrow x = \frac{k}{7}\;\;(\text{since }7\neq 0)`)
+                            ]
+                        }),
+                        expandedByDefault: !!expandedVariant
+                    }));
+                    questions.push(mkQuestionObj({
+                        qid: "30(b)",
+                        promptParts: ["If the equation was ", mkMathInline(String.raw`7x=0`), ", what is ", mkMathInline(String.raw`x`), "?"],
+                        answerText: "0",
+                        depthOverride: 1,
+                        details: mkDetails({
+                            previewText: "If 7x equals zero, x must be zero.",
+                            working: [
+                                mkMathBlock(String.raw`7x=0 \Rightarrow x=0`)
+                            ]
+                        }),
+                        expandedByDefault: !!expandedVariant
+                    }));
+                }
+            }
+
+            return {
+                id: expandedVariant ? "standardExpanded" : "standard",
+                title: expandedVariant ? "Standard (Workings Expanded)" : "Standard paper",
+                subtitle: expandedVariant
+                    ? "35 questions total. Same as Standard, but all workings start expanded (dataset variant only)."
+                    : "35 questions total. Q26–Q35 contain long algebra questions (workings collapsed by default).",
+                questions
+            };
+        }
+
+        function buildDiagramPaper() {
+            const questions = [];
+            const diagramOrder = ["geometry", "ratio", "grid", "table", "geometry", "ratio", "grid", "table"];
+            let dIdx = 0;
+
+            for (let i = 1; i <= 20; i++) {
+                const hasDiagram = (i <= 8); // at least 8 questions contain diagrams
+                const diagramType = hasDiagram ? diagramOrder[dIdx++ % diagramOrder.length] : null;
+
+                const promptParts = hasDiagram
+                    ? ["Use the diagram to answer. Find the value of ", mkMathInline(String.raw`x`), "."]
+                    : ["Calculate ", mkMathInline(String.raw`${i}\times ${i + 2}`), "."];
+
+                const details = mkDetails({
+                    previewText: hasDiagram
+                        ? "Refer to the labels and write a short working line."
+                        : "Multiply and check.",
+                    keepInMind: (i === 3 || i === 6 || i === 9) ? [mkPara(["Label what you know before you calculate."])] : null,
+                    formulasUsed: (i === 4 || i === 7 || i === 12) ? [mkPara(["If needed: ", mkMathInline(String.raw`\text{Area}=\text{length}\times\text{width}`), "."])] : null,
+                    working: hasDiagram
+                        ? [
+                            mkPara(["Use the values shown in the diagram."]),
+                            mkMathBlock(String.raw`x = 12 - 5 = 7`)
+                        ]
+                        : [
+                            mkMathBlock(String.raw`${i}\times ${i + 2} = ${i * (i + 2)}`)
+                        ],
+                    alternativeWorking: (i === 5 || i === 8 || i === 16) ? [
+                        mkPara(["Alternative: break it apart."]),
+                        mkMathBlock(String.raw`${i}\times (${i}+2)= ${i}\times ${i} + ${i}\times 2`)
+                    ] : null
+                });
+
+                questions.push(mkQuestionObj({
+                    qid: String(i),
+                    promptParts,
+                    diagramType,
+                    answerText: hasDiagram ? "7" : String(i * (i + 2)),
+                    details
+                }));
+            }
+
+            return {
+                id: "diagram",
+                title: "Diagram-heavy paper",
+                subtitle: "20 questions total. 8 questions contain diagrams (inline SVG placeholders).",
+                questions
+            };
+        }
+
+        function buildSectionedPaper() {
+            const sections = [
+                { label: "A", count: 35, kind: "small" },
+                { label: "B", count: 8, kind: "medium" },
+                { label: "C", count: 6, kind: "veryLong" }
+            ];
+
+            const questions = [];
+            let qNum = 1;
+
+            sections.forEach(sec => {
+                for (let i = 0; i < sec.count; i++) {
+                    const qid = String(qNum);
+                    const isVeryLong = (sec.label === "C");
+                    const includeLongWorkings = isVeryLong && (i === 1 || i === 4);
+                    const manyLines = includeLongWorkings ? mkWorkingLines(60, qNum) : mkWorkingLines(18, qNum);
+
+                    const promptParts = isVeryLong
+                        ? ["Solve and show working for ", mkMathInline(String.raw`x`), ": ", mkMathInline(String.raw`(x-` + (i + 2) + `)^2 = ` + (i + 12))]
+                        : (sec.kind === "medium"
+                            ? ["Find ", mkMathInline(String.raw`\frac{` + (qNum + 3) + `}{` + (qNum + 9) + `}`), " in simplest form."]
+                            : ["Calculate ", mkMathInline(String.raw`${qNum + 7} - ${i + 1}`), "."]);
+
+                    const answerText = isVeryLong
+                        ? "x = (two possible answers)"
+                        : (sec.kind === "medium"
+                            ? `${qNum + 3}/${qNum + 9}`
+                            : String((qNum + 7) - (i + 1)));
+
+                    // Stress-test Solution Details coverage variants
+                    const includeKeep = (qNum % 9 === 0) || (sec.label === "C" && i % 2 === 0);
+                    const includeFormulas = (qNum % 11 === 0) || (sec.label === "B" && i % 2 === 1);
+                    const includeAlt = (qNum % 8 === 0) || (sec.label === "C" && i === 2);
+
+                    const workingNodes = [];
+                    if (isVeryLong) {
+                        workingNodes.push(mkPara(["Expand carefully or use square roots."]));
+                        workingNodes.push(mkMathBlock(String.raw`(x-` + (i + 2) + `)^2 = ` + (i + 12)));
+                        workingNodes.push(mkMathBlock(String.raw`x-` + (i + 2) + ` = \pm\sqrt{` + (i + 12) + `}`));
+                        workingNodes.push(mkMathBlock(String.raw`x = ` + (i + 2) + ` \pm \sqrt{` + (i + 12) + `}`));
+                        // Add multiple KaTeX blocks for long section C
+                        manyLines.forEach(tex => workingNodes.push(mkMathBlock(tex)));
+                    } else {
+                        workingNodes.push(mkMathBlock(sec.kind === "medium"
+                            ? String.raw`\frac{` + (qNum + 3) + `}{` + (qNum + 9) + `} = \frac{` + (qNum + 3) + `\div 1}{` + (qNum + 9) + `\div 1}`
+                            : String.raw`${qNum + 7} - ${i + 1} = ${(qNum + 7) - (i + 1)}`
+                        ));
+                    }
+
+                    const details = mkDetails({
+                        previewText: isVeryLong
+                            ? "Very long Solution Details (collapsed by default in Section C)."
+                            : "Short working line (collapsed by default).",
+                        keepInMind: includeKeep ? [mkPara(["Keep track of signs and write each step on a new line."])] : null,
+                        formulasUsed: includeFormulas ? [mkPara(["Reminder: ", mkMathInline(String.raw`(a-b)^2=a^2-2ab+b^2`), "."])] : null,
+                        working: workingNodes,
+                        alternativeWorking: includeAlt ? [
+                            mkPara(["Alternative working: use estimation or a different rearrangement."]),
+                            mkMathBlock(String.raw`\text{Check: substitute your answer(s) back into the original expression.}`)
+                        ] : null
+                    });
+
+                    questions.push(mkQuestionObj({
+                        qid,
+                        promptParts,
+                        answerText,
+                        details,
+                        expandedByDefault: false,
+                        sectionLabel: sec.label
+                    }));
+
+                    qNum++;
+                }
+            });
+
+            return {
+                id: "sectioned",
+                title: "Sectioned paper",
+                subtitle: "Section A: 35 questions. Section B: 8 questions. Section C: 6 questions (very long Solution Details, collapsed by default).",
+                questions,
+                sections: sections.map(s => s.label)
+            };
+        }
+
+        // ---------- Render ----------
+        const DATASETS = {
+            short: buildShortPaper(),
+            standard: buildStandardPaper(false),
+            diagram: buildDiagramPaper(),
+            sectioned: buildSectionedPaper(),
+            standardExpanded: buildStandardPaper(true)
+        };
+
+        function clearNode(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+
+        function setPaperMeta(ds) {
+            document.getElementById("paperTitle").textContent = ds.title;
+            document.getElementById("paperSub").textContent = ds.subtitle + " Answers visible by default. Solution Details revealed with “Show working”.";
+        }
+
+        function renderNav(ds) {
+            const desktop = document.getElementById("navListDesktop");
+            const mobile = document.getElementById("navListMobile");
+            clearNode(desktop);
+            clearNode(mobile);
+
+            // For sectioned paper: A/B/C labels as non-clickable separators
+            if (ds.id === "sectioned") {
+                // Determine split points based on counts: A=35, B=8, C=6 (from dataset build)
+                const counts = { A: 35, B: 8, C: 6 };
+                const all = ds.questions;
+
+                let idx = 0;
+                ["A", "B", "C"].forEach(sec => {
+                    const sep = el("li", { class: "nav-sep", text: "Section " + sec });
+                    const sep2 = el("li", { class: "nav-sep", text: "Section " + sec });
+                    desktop.appendChild(sep);
+                    mobile.appendChild(sep2);
+
+                    for (let i = 0; i < counts[sec]; i++) {
+                        const q = all[idx++];
+                        const anchor = "#" + normalizeAnchorId(q.qid);
+                        const liD = el("li", { class: "nav-item" });
+                        const liM = el("li", { class: "nav-item" });
+
+                        const aD = el("a", { href: anchor, "data-qid": q.qid, text: q.qid });
+                        const aM = el("a", { href: anchor, "data-qid": q.qid, text: q.qid });
+
+                        liD.appendChild(aD);
+                        liM.appendChild(aM);
+                        desktop.appendChild(liD);
+                        mobile.appendChild(liM);
+                    }
+                });
+                return;
+            }
+
+            // Non-sectioned: list question identifiers only
+            ds.questions.forEach(q => {
+                const anchor = "#" + normalizeAnchorId(q.qid);
+
+                const liD = el("li", { class: "nav-item" });
+                const liM = el("li", { class: "nav-item" });
+
+                const aD = el("a", { href: anchor, "data-qid": q.qid, text: q.qid });
+                const aM = el("a", { href: anchor, "data-qid": q.qid, text: q.qid });
+
+                liD.appendChild(aD);
+                liM.appendChild(aM);
+                desktop.appendChild(liD);
+                mobile.appendChild(liM);
+            });
+        }
+
+        function renderQuestion(q) {
+            const anchorId = normalizeAnchorId(q.qid);
+            const depth = (q.depthOverride != null) ? q.depthOverride : countNesting(q.qid);
+
+            const qWrap = el("article", { class: `q depth-${depth}`, id: anchorId });
+            qWrap.setAttribute("aria-label", "Question " + q.qid);
+
+            const head = el("div", { class: "q-head" });
+            head.appendChild(el("div", { class: "qid", text: q.qid }));
+            head.appendChild(mkQuestionPrompt(q.promptParts, q.diagramType));
+            qWrap.appendChild(head);
+
+            // Answer (always visible)
+            const ans = el("div", { class: "answer" });
+            ans.appendChild(el("span", { class: "alabel", text: "Answer" }));
+            // Keep answer value readable; allow KaTeX inline when present in text via fallback parentheses style if user typed it
+            const av = el("span", { class: "avalue", text: q.answerText });
+            ans.appendChild(av);
+            qWrap.appendChild(ans);
+
+            // Solution Details toggle + region
+            if (q.details) {
+                const detailsWrap = el("div", { class: "details-wrap" });
+
+                const toggleRow = el("div", { class: "toggle-row" });
+                const btnId = `${anchorId}-toggle`;
+                const regionId = `${anchorId}-details`;
+
+                const btn = el("button", {
+                    class: "toggle",
+                    type: "button",
+                    id: btnId,
+                    "aria-controls": regionId,
+                    "aria-expanded": q.expandedByDefault ? "true" : "false"
+                });
+                btn.appendChild(document.createTextNode(q.expandedByDefault ? "Hide working" : "Show working"));
+                btn.appendChild(el("span", { class: "chev", "aria-hidden": "true", text: q.expandedByDefault ? "▾" : "▸" }));
+                toggleRow.appendChild(btn);
+
+                // Minimal preview (1–2 lines)
+                const preview = el("div", { class: "details-preview", text: q.details.previewText || "" });
+                toggleRow.appendChild(preview);
+
+                detailsWrap.appendChild(toggleRow);
+
+                const region = el("div", { class: "details", id: regionId, "aria-label": "Solution Details" });
+                if (!q.expandedByDefault) region.hidden = true;
+
+                // Ordered subsections: Keep in mind, Formulas used, Working, Alternative working
+                if (q.details.keepInMind) {
+                    region.appendChild(mkDetailsSection("Keep in mind", q.details.keepInMind));
+                }
+                if (q.details.formulasUsed) {
+                    region.appendChild(mkDetailsSection("Formulas used", q.details.formulasUsed));
+                }
+                if (q.details.working) {
+                    region.appendChild(mkDetailsSection("Working", q.details.working));
+                }
+                if (q.details.alternativeWorking) {
+                    region.appendChild(mkDetailsSection("Alternative working", q.details.alternativeWorking));
+                }
+
+                detailsWrap.appendChild(region);
+                qWrap.appendChild(detailsWrap);
+
+                // Toggle behavior: inline only; no cross-question effects; no focus movement; no forced scrolling
+                btn.addEventListener("click", () => {
+                    const isOpen = btn.getAttribute("aria-expanded") === "true";
+                    const next = !isOpen;
+                    btn.setAttribute("aria-expanded", next ? "true" : "false");
+                    // Update text-first label
+                    btn.childNodes[0].nodeValue = next ? "Hide working" : "Show working";
+                    btn.querySelector(".chev").textContent = next ? "▾" : "▸";
+                    region.hidden = !next;
+                    // Keep focus on button; do not auto scroll.
+                });
+            }
+
+            return qWrap;
+        }
+
+        function renderPaper(dsId) {
+            const ds = DATASETS[dsId] || DATASETS.short;
+            setPaperMeta(ds);
+            renderNav(ds);
+
+            const container = document.getElementById("paperContent");
+            clearNode(container);
+
+            ds.questions.forEach(q => container.appendChild(renderQuestion(q)));
+
+            // KaTeX rendering (programmatic)
+            renderAllMath(container);
+
+            // Update active nav (on load)
+            updateActiveNav();
+        }
+
+        // ---------- Navigation overlay (mobile) ----------
+        const overlay = document.getElementById("navOverlay");
+        const jumpBtn = document.getElementById("jumpBtn");
+        const closeBtn = document.getElementById("closeOverlayBtn");
+        const mainContent = document.getElementById("mainContent");
+
+        let lastFocused = null;
+
+        function getFocusableInOverlay() {
+            return overlay.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])');
+        }
+
+        function openOverlay() {
+            lastFocused = document.activeElement;
+            overlay.dataset.open = "true";
+
+            // Prevent background interaction while open
+            mainContent.setAttribute("aria-hidden", "true");
+            if ("inert" in mainContent) mainContent.inert = true;
+
+            // Focus first element inside overlay
+            const focusables = getFocusableInOverlay();
+            if (focusables.length) focusables[0].focus();
+        }
+
+        function closeOverlay() {
+            overlay.dataset.open = "false";
+
+            mainContent.removeAttribute("aria-hidden");
+            if ("inert" in mainContent) mainContent.inert = false;
+
+            if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();
+        }
+
+        jumpBtn.addEventListener("click", openOverlay);
+        closeBtn.addEventListener("click", closeOverlay);
+
+        // Close overlay if clicking backdrop (but not when clicking inside drawer)
+        overlay.addEventListener("mousedown", (e) => {
+            if (e.target === overlay) closeOverlay();
+        });
+
+        // Trap focus within overlay; allow Escape to close
+        overlay.addEventListener("keydown", (e) => {
+            if (overlay.dataset.open !== "true") return;
+            if (e.key === "Escape") {
+                e.preventDefault();
+                closeOverlay();
+                return;
+            }
+            if (e.key !== "Tab") return;
+
+            const focusables = Array.from(getFocusableInOverlay());
+            if (!focusables.length) return;
+
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            const active = document.activeElement;
+
+            if (e.shiftKey && active === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && active === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+
+        // Close overlay after navigation click (mobile)
+        function wireNavClickToClose() {
+            const mobileNav = document.getElementById("navListMobile");
+            mobileNav.addEventListener("click", (e) => {
+                const a = e.target.closest("a[href^='#']");
+                if (!a) return;
+                closeOverlay();
+                // do not modify expanded/collapsed states; anchor jump only
+            });
+        }
+
+        // ---------- Active nav item (quiet indicator) ----------
+        function updateActiveNav() {
+            // Determine current question by closest top of viewport among question anchors.
+            const qs = Array.from(document.querySelectorAll("#paperContent .q"));
+            if (!qs.length) return;
+
+            let best = null;
+            let bestDist = Infinity;
+
+            const viewportTop = 80; // below header
+            qs.forEach(q => {
+                const r = q.getBoundingClientRect();
+                const dist = Math.abs(r.top - viewportTop);
+                // Prefer elements at/above viewportTop slightly
+                const penalty = (r.top > viewportTop) ? dist + 50 : dist;
+                if (penalty < bestDist) {
+                    bestDist = penalty;
+                    best = q;
+                }
+            });
+
+            const currentId = best ? best.id : null;
+            const currentQid = currentId ? (best.querySelector(".qid")?.textContent || "") : "";
+
+            const allLinks = document.querySelectorAll("#navListDesktop a, #navListMobile a");
+            allLinks.forEach(a => {
+                const isCurrent = normalizeAnchorId(a.dataset.qid || "") === currentId;
+                if (isCurrent) {
+                    a.setAttribute("aria-current", "true");
+                } else {
+                    a.removeAttribute("aria-current");
+                }
+            });
+        }
+
+        let ticking = false;
+        window.addEventListener("scroll", () => {
+            if (ticking) return;
+            ticking = true;
+            window.requestAnimationFrame(() => {
+                updateActiveNav();
+                ticking = false;
+            });
+        }, { passive: true });
+
+        // ---------- Paper switching ----------
+        const select = document.getElementById("paperSelect");
+        select.addEventListener("change", () => {
+            renderPaper(select.value);
+            // Do not auto expand/collapse beyond defaults (handled by dataset)
+            // Do not force focus movement
+        });
+
+        // ---------- Init ----------
+        wireNavClickToClose();
+        renderPaper(select.value);
+    </script>
+</body>
+
+</html>
