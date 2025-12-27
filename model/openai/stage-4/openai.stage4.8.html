@@ -1,0 +1,1905 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RTQ – Maths Paper Solution Viewer (Stress Test Harness)</title>
+
+    <!-- KaTeX (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5YcytMQAqF+VZ9VXl2Ff8VfS6tH2R2g9Q7m2uVxYJQ8LZC7G4JwD" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-3eR+fQq8tA1wz3Yx1YB+u1H8t5lq0l0Q8r2E0mJwZfO0kq4vZf1lqf0sF9Z8YpQW"
+        crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --bg: #f3f3f3;
+            --surface: #ffffff;
+            --surface-2: #f7f7f7;
+            --surface-3: #eeeeee;
+
+            --text: #1a1a1a;
+            --muted: #4a4a4a;
+            --quiet: #6a6a6a;
+
+            --line: #d8d8d8;
+            --focus: #1a1a1a;
+
+            --frame-max: 1080px;
+            --nav-w: 140px;
+
+            --gap-xxl: 36px;
+            /* between top-level questions */
+            --gap-xl: 22px;
+            /* within question: prompt -> answer -> toggle */
+            --gap-lg: 14px;
+            /* within solution details blocks */
+            --gap-md: 10px;
+            --gap-sm: 6px;
+
+            --radius: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            line-height: 1.45;
+            overflow-x: hidden;
+            /* never allow page-level horizontal scroll */
+        }
+
+        a {
+            color: inherit;
+        }
+
+        button,
+        select {
+            font: inherit;
+            color: inherit;
+        }
+
+        /* Top controls aligned to centered frame */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: linear-gradient(to bottom, var(--bg), rgba(243, 243, 243, 0.92));
+            backdrop-filter: blur(2px);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .topbar-inner {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            min-width: 0;
+        }
+
+        .label {
+            font-size: 14px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        select {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 8px 10px;
+            min-width: 260px;
+            max-width: 100%;
+        }
+
+        .topbar-right {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .jump-btn {
+            display: none;
+            /* shown on smaller screens */
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 8px 10px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .jump-btn:focus-visible,
+        .drawer-close:focus-visible,
+        .toggle:focus-visible,
+        .nav a:focus-visible,
+        select:focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+            border-radius: 8px;
+        }
+
+        /* Centered content frame with nav + paper as sibling columns */
+        .frame {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 16px 16px 44px;
+            display: grid;
+            grid-template-columns: var(--nav-w) minmax(0, 1fr);
+            gap: 22px;
+            align-items: start;
+        }
+
+        /* Navigation rail (quiet, documentation-style) */
+        .nav {
+            position: sticky;
+            top: 62px;
+            /* below topbar */
+            align-self: start;
+            background: transparent;
+            border: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .nav-surface {
+            background: transparent;
+            padding: 4px 0;
+        }
+
+        .nav-title {
+            font-size: 12px;
+            color: var(--quiet);
+            letter-spacing: 0.02em;
+            margin: 0 0 8px;
+            padding: 0 6px;
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: calc(100vh - 92px);
+            /* allow independent scroll if needed */
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding-right: 6px;
+
+            /* hide scrollbars but keep scrolling */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* legacy */
+        }
+
+        .nav-list::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-list li {
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav a {
+            display: block;
+            text-decoration: none;
+            padding: 6px 6px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--quiet);
+        }
+
+        .nav a:hover {
+            text-decoration: underline;
+        }
+
+        .nav a[aria-current="true"] {
+            font-weight: 700;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .nav .sep {
+            font-size: 12px;
+            color: var(--muted);
+            padding: 10px 6px 6px;
+            margin-top: 6px;
+            letter-spacing: 0.06em;
+            text-transform: none;
+        }
+
+        /* Paper surface */
+        main.paper {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 20px 20px 28px;
+        }
+
+        /* Question rhythm */
+        .paper-head {
+            margin: 0 0 16px;
+            padding: 0 0 10px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .paper-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .paper-sub {
+            margin: 6px 0 0;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .section-label {
+            margin: 22px 0 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--line);
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .q {
+            margin: 0;
+            padding: 0;
+        }
+
+        .q+.q {
+            margin-top: var(--gap-xxl);
+        }
+
+        .q[data-depth="1"] {
+            margin-left: 18px;
+        }
+
+        .q[data-depth="2"] {
+            margin-left: 34px;
+        }
+
+        /* separation strength decreases with depth */
+        .q[data-depth="1"]+.q[data-depth="1"] {
+            margin-top: 24px;
+        }
+
+        .q[data-depth="2"]+.q[data-depth="2"] {
+            margin-top: 18px;
+        }
+
+        .q-header {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .qid {
+            flex: 0 0 auto;
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.6;
+            min-width: 44px;
+            text-align: right;
+            padding-top: 1px;
+        }
+
+        .qprompt {
+            flex: 1 1 auto;
+            min-width: 0;
+            font-size: 16px;
+            /* primary anchor */
+            color: var(--text);
+            line-height: 1.55;
+        }
+
+        .qprompt p {
+            margin: 0 0 10px;
+        }
+
+        .qprompt p:last-child {
+            margin-bottom: 0;
+        }
+
+        .diagram {
+            margin: 12px 0 0;
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .diagram svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .answer {
+            margin-left: 54px;
+            margin-top: var(--gap-xl);
+            display: grid;
+            grid-template-columns: 64px minmax(0, 1fr);
+            gap: 10px;
+            align-items: baseline;
+        }
+
+        .answer .alabel {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--muted);
+        }
+
+        .answer .avalue {
+            font-size: 15px;
+            color: var(--text);
+        }
+
+        .disclosure {
+            margin-left: 54px;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .toggle {
+            align-self: flex-start;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 6px 8px;
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 13px;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .toggle:hover {
+            color: var(--text);
+        }
+
+        .toggle .chev {
+            display: inline-block;
+            width: 0.9em;
+            text-align: center;
+            margin-right: 6px;
+            color: var(--quiet);
+        }
+
+        .details-preview {
+            max-width: 100%;
+            color: var(--quiet);
+            font-size: 13px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .details {
+            margin-left: 54px;
+            margin-top: 12px;
+            background: var(--surface-3);
+            border-radius: 10px;
+            padding: 14px 14px;
+        }
+
+        .details .block+.block {
+            margin-top: var(--gap-lg);
+        }
+
+        .block-title {
+            margin: 0 0 8px;
+            font-size: 13px;
+            font-weight: 700;
+            /* labels only */
+            color: var(--muted);
+        }
+
+        .block-body {
+            font-size: 14px;
+            color: var(--text);
+            line-height: 1.45;
+        }
+
+        .block-body p {
+            margin: 0 0 8px;
+        }
+
+        .block-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* KaTeX integration & overflow safety */
+        .math-inline {
+            display: inline-block;
+            vertical-align: baseline;
+            max-width: 100%;
+        }
+
+        .math-block {
+            background: transparent;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin: 8px 0;
+            overflow-x: auto;
+            /* only math can scroll horizontally */
+            overflow-y: hidden;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .math-block::-webkit-scrollbar {
+            display: none;
+        }
+
+        .math-block .katex-display {
+            margin: 0;
+        }
+
+        /* avoid extra vertical slack */
+
+        .line {
+            margin: 6px 0;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        /* Drawer (mobile/tablet) */
+        .backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        .drawer {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            grid-template-columns: 1fr;
+            z-index: 50;
+        }
+
+        .drawer-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: min(320px, 88vw);
+            background: var(--surface);
+            border-right: 1px solid var(--line);
+            padding: 12px 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .drawer-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 10px;
+        }
+
+        .drawer-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--muted);
+        }
+
+        .drawer-close {
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 8px 10px;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 13px;
+        }
+
+        .drawer .nav-list {
+            max-height: none;
+            height: 100%;
+        }
+
+        /* Background lock while drawer open */
+        body[data-drawer-open="true"] {
+            overflow: hidden;
+        }
+
+        body[data-drawer-open="true"] .frame,
+        body[data-drawer-open="true"] .topbar {
+            pointer-events: none;
+            user-select: none;
+        }
+
+        body[data-drawer-open="true"] #drawerRoot {
+            pointer-events: auto;
+            user-select: auto;
+        }
+
+        /* Responsive */
+        @media (max-width: 920px) {
+            :root {
+                --nav-w: 120px;
+            }
+
+            .qid {
+                min-width: 40px;
+            }
+
+            .answer,
+            .disclosure,
+            .details {
+                margin-left: 48px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .frame {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+
+            .nav {
+                display: none;
+            }
+
+            .jump-btn {
+                display: inline-flex;
+            }
+
+            main.paper {
+                padding: 16px 14px 24px;
+            }
+
+            .qid {
+                min-width: 34px;
+                text-align: left;
+            }
+
+            .q-header {
+                gap: 8px;
+            }
+
+            .answer,
+            .disclosure,
+            .details {
+                margin-left: 0;
+            }
+
+            .answer {
+                grid-template-columns: 64px minmax(0, 1fr);
+            }
+
+            .q[data-depth="1"] {
+                margin-left: 12px;
+            }
+
+            .q[data-depth="2"] {
+                margin-left: 22px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar" id="topbar">
+        <div class="topbar-inner">
+            <div class="topbar-left">
+                <span class="label">Paper</span>
+                <select id="paperSelect" aria-label="Paper selector">
+                    <option value="short">Short paper</option>
+                    <option value="standard">Standard paper</option>
+                    <option value="standardExpanded">Standard (Workings Expanded)</option>
+                    <option value="diagram">Diagram-heavy paper</option>
+                    <option value="sectioned">Sectioned paper</option>
+                </select>
+            </div>
+            <div class="topbar-right">
+                <button class="jump-btn" id="openDrawerBtn" type="button" aria-haspopup="dialog"
+                    aria-controls="drawerRoot">
+                    Jump to
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="frame" id="appFrame">
+        <nav class="nav" aria-label="Question navigation">
+            <div class="nav-surface">
+                <p class="nav-title">Questions</p>
+                <ul class="nav-list" id="navList"></ul>
+            </div>
+        </nav>
+
+        <main class="paper" id="paperMain">
+            <!-- Rendered content -->
+        </main>
+    </div>
+
+    <!-- Mobile drawer (nav) -->
+    <div id="drawerRoot" hidden>
+        <div class="drawer" role="dialog" aria-modal="true" aria-label="Jump to question">
+            <div class="backdrop" id="drawerBackdrop"></div>
+            <div class="drawer-panel" role="document">
+                <div class="drawer-head">
+                    <p class="drawer-title">Jump to</p>
+                    <button class="drawer-close" id="closeDrawerBtn" type="button">Close</button>
+                </div>
+                <ul class="nav-list" id="drawerNavList"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const elPaper = document.getElementById('paperMain');
+            const elNav = document.getElementById('navList');
+            const elDrawerNav = document.getElementById('drawerNavList');
+            const elSelect = document.getElementById('paperSelect');
+
+            const drawerRoot = document.getElementById('drawerRoot');
+            const openDrawerBtn = document.getElementById('openDrawerBtn');
+            const closeDrawerBtn = document.getElementById('closeDrawerBtn');
+            const drawerBackdrop = document.getElementById('drawerBackdrop');
+            const focusableDrawerSelector = 'a, button, [tabindex]:not([tabindex="-1"])';
+
+            function h(tag, attrs = {}, children = []) {
+                const n = document.createElement(tag);
+                for (const [k, v] of Object.entries(attrs)) {
+                    if (k === 'class') n.className = v;
+                    else if (k === 'text') n.textContent = v;
+                    else if (k === 'html') n.innerHTML = v;
+                    else if (k.startsWith('aria-')) n.setAttribute(k, v);
+                    else if (k === 'dataset') {
+                        for (const [dk, dv] of Object.entries(v)) n.dataset[dk] = dv;
+                    } else if (k === 'style') {
+                        for (const [sk, sv] of Object.entries(v)) n.style[sk] = sv;
+                    } else if (k === 'href') n.setAttribute('href', v);
+                    else if (k === 'id') n.id = v;
+                    else if (k === 'type') n.type = v;
+                    else if (k === 'hidden') n.hidden = !!v;
+                    else n.setAttribute(k, v);
+                }
+                for (const c of children) {
+                    if (c == null) continue;
+                    n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+                }
+                return n;
+            }
+
+            function mathInline(tex) {
+                const span = h('span', { class: 'math-inline', dataset: { tex, display: 'false' } }, [tex]);
+                return span;
+            }
+            function mathBlock(tex) {
+                const wrap = h('div', { class: 'math-block' });
+                const span = h('span', { dataset: { tex, display: 'true' } }, [tex]);
+                wrap.appendChild(span);
+                return wrap;
+            }
+
+            function renderSegments(container, segments) {
+                for (const seg of segments) {
+                    if (seg.type === 'text') {
+                        container.appendChild(document.createTextNode(seg.value));
+                    } else if (seg.type === 'math-inline') {
+                        container.appendChild(mathInline(seg.tex));
+                    } else if (seg.type === 'math-block') {
+                        container.appendChild(mathBlock(seg.tex));
+                    } else if (seg.type === 'br') {
+                        container.appendChild(document.createElement('br'));
+                    }
+                }
+            }
+
+            function diagramSVG(kind) {
+                if (kind === 'geometry') {
+                    return h('div', { class: 'diagram', 'aria-label': 'Diagram' }, [
+                        (function () {
+                            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                            svg.setAttribute('viewBox', '0 0 360 220');
+                            svg.innerHTML = `
+                <rect x="0" y="0" width="360" height="220" fill="none" stroke="#bdbdbd" stroke-width="2"/>
+                <circle cx="270" cy="110" r="56" fill="none" stroke="#7a7a7a" stroke-width="2"/>
+                <path d="M70 170 L155 55 L240 170 Z" fill="none" stroke="#7a7a7a" stroke-width="2"/>
+                <text x="146" y="44" font-size="14" fill="#5a5a5a">A</text>
+                <text x="58" y="186" font-size="14" fill="#5a5a5a">B</text>
+                <text x="246" y="186" font-size="14" fill="#5a5a5a">C</text>
+                <text x="262" y="114" font-size="14" fill="#5a5a5a">O</text>
+                <line x1="155" y1="55" x2="240" y2="170" stroke="#b0b0b0" stroke-width="2" stroke-dasharray="4 4"/>
+                <text x="176" y="120" font-size="12" fill="#6a6a6a">[labels]</text>
+              `;
+                            return svg;
+                        })()
+                    ]);
+                }
+
+                if (kind === 'bars') {
+                    return h('div', { class: 'diagram', 'aria-label': 'Diagram' }, [
+                        (function () {
+                            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                            svg.setAttribute('viewBox', '0 0 360 220');
+                            svg.innerHTML = `
+                <rect x="0" y="0" width="360" height="220" fill="none" stroke="#bdbdbd" stroke-width="2"/>
+                <text x="14" y="28" font-size="12" fill="#6a6a6a">Ratio bars</text>
+                <rect x="20" y="60" width="300" height="28" fill="#f0f0f0" stroke="#7a7a7a" stroke-width="2"/>
+                <line x1="120" y1="60" x2="120" y2="88" stroke="#7a7a7a" stroke-width="2"/>
+                <line x1="220" y1="60" x2="220" y2="88" stroke="#7a7a7a" stroke-width="2"/>
+                <text x="68" y="79" font-size="12" fill="#5a5a5a">2</text>
+                <text x="168" y="79" font-size="12" fill="#5a5a5a">2</text>
+                <text x="268" y="79" font-size="12" fill="#5a5a5a">2</text>
+
+                <rect x="20" y="120" width="260" height="28" fill="#f0f0f0" stroke="#7a7a7a" stroke-width="2"/>
+                <line x1="106.7" y1="120" x2="106.7" y2="148" stroke="#7a7a7a" stroke-width="2"/>
+                <line x1="193.4" y1="120" x2="193.4" y2="148" stroke="#7a7a7a" stroke-width="2"/>
+                <text x="64" y="139" font-size="12" fill="#5a5a5a">3</text>
+                <text x="150" y="139" font-size="12" fill="#5a5a5a">3</text>
+                <text x="236" y="139" font-size="12" fill="#5a5a5a">3</text>
+              `;
+                            return svg;
+                        })()
+                    ]);
+                }
+
+                if (kind === 'grid') {
+                    return h('div', { class: 'diagram', 'aria-label': 'Diagram' }, [
+                        (function () {
+                            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                            svg.setAttribute('viewBox', '0 0 360 220');
+                            const lines = [];
+                            for (let x = 40; x <= 320; x += 20) {
+                                lines.push(`<line x1="${x}" y1="30" x2="${x}" y2="200" stroke="#d0d0d0" stroke-width="1"/>`);
+                            }
+                            for (let y = 30; y <= 200; y += 20) {
+                                lines.push(`<line x1="40" y1="${y}" x2="320" y2="${y}" stroke="#d0d0d0" stroke-width="1"/>`);
+                            }
+                            svg.innerHTML = `
+                <rect x="0" y="0" width="360" height="220" fill="none" stroke="#bdbdbd" stroke-width="2"/>
+                <text x="14" y="28" font-size="12" fill="#6a6a6a">Coordinate grid</text>
+                ${lines.join('')}
+                <line x1="40" y1="200" x2="320" y2="200" stroke="#7a7a7a" stroke-width="2"/>
+                <line x1="40" y1="30" x2="40" y2="200" stroke="#7a7a7a" stroke-width="2"/>
+                <path d="M60 170 L140 120 L240 90 L300 60" fill="none" stroke="#7a7a7a" stroke-width="2"/>
+                <circle cx="140" cy="120" r="4" fill="#7a7a7a"/>
+                <circle cx="240" cy="90" r="4" fill="#7a7a7a"/>
+                <text x="148" y="114" font-size="12" fill="#5a5a5a">P</text>
+                <text x="248" y="84" font-size="12" fill="#5a5a5a">Q</text>
+              `;
+                            return svg;
+                        })()
+                    ]);
+                }
+
+                // table
+                return h('div', { class: 'diagram', 'aria-label': 'Diagram' }, [
+                    (function () {
+                        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                        svg.setAttribute('viewBox', '0 0 360 220');
+                        const cells = [];
+                        const x0 = 40, y0 = 50, w = 280, hgt = 140, cols = 5, rows = 4;
+                        for (let i = 0; i <= cols; i++) {
+                            const x = x0 + (w / cols) * i;
+                            cells.push(`<line x1="${x}" y1="${y0}" x2="${x}" y2="${y0 + hgt}" stroke="#7a7a7a" stroke-width="2"/>`);
+                        }
+                        for (let j = 0; j <= rows; j++) {
+                            const y = y0 + (hgt / rows) * j;
+                            cells.push(`<line x1="${x0}" y1="${y}" x2="${x0 + w}" y2="${y}" stroke="#7a7a7a" stroke-width="2"/>`);
+                        }
+                        svg.innerHTML = `
+              <rect x="0" y="0" width="360" height="220" fill="none" stroke="#bdbdbd" stroke-width="2"/>
+              <text x="14" y="28" font-size="12" fill="#6a6a6a">Table / array</text>
+              <rect x="${x0}" y="${y0}" width="${w}" height="${hgt}" fill="#f0f0f0" stroke="none"/>
+              ${cells.join('')}
+              <text x="${x0 + 10}" y="${y0 - 10}" font-size="12" fill="#6a6a6a">[values]</text>
+            `;
+                        return svg;
+                    })()
+                ]);
+            }
+
+            function slugFromQid(qid) {
+                return qid.replace(/\s+/g, '').replace(/[()]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+            }
+
+            function makeDetailsBlock(title, bodyNodes) {
+                return h('div', { class: 'block' }, [
+                    h('p', { class: 'block-title', text: title }),
+                    h('div', { class: 'block-body' }, bodyNodes)
+                ]);
+            }
+
+            function lineFromSegments(segments) {
+                const div = h('div', { class: 'line' });
+                renderSegments(div, segments);
+                return div;
+            }
+
+            function buildQuestion(q, expandedDefault) {
+                const anchorId = 'q-' + slugFromQid(q.qid);
+
+                const qEl = h('section', { class: 'q', id: anchorId, dataset: { depth: String(q.depth || 0), qid: q.qid } });
+
+                // Prompt
+                const promptWrap = h('div', { class: 'q-header' }, [
+                    h('div', { class: 'qid', text: q.qid }),
+                    (function () {
+                        const prompt = h('div', { class: 'qprompt' });
+                        for (const para of q.prompt) {
+                            const p = h('p', {});
+                            renderSegments(p, para);
+                            prompt.appendChild(p);
+                        }
+                        if (q.diagram) {
+                            prompt.appendChild(diagramSVG(q.diagram));
+                        }
+                        return prompt;
+                    })()
+                ]);
+
+                // Answer
+                const answer = h('div', { class: 'answer' }, [
+                    h('div', { class: 'alabel', text: 'Answer' }),
+                    (function () {
+                        const av = h('div', { class: 'avalue' });
+                        for (let i = 0; i < q.answer.length; i++) {
+                            const line = h('div', {});
+                            renderSegments(line, q.answer[i]);
+                            av.appendChild(line);
+                        }
+                        return av;
+                    })()
+                ]);
+
+                // Disclosure + preview
+                const disclosure = h('div', { class: 'disclosure' });
+
+                const btn = h('button', {
+                    class: 'toggle',
+                    type: 'button',
+                    'aria-expanded': expandedDefault ? 'true' : 'false'
+                }, [
+                    h('span', { class: 'chev', text: expandedDefault ? '▾' : '▸' }),
+                    expandedDefault ? 'Hide working' : 'Show working'
+                ]);
+
+                const preview = h('div', { class: 'details-preview', 'aria-hidden': 'true' });
+                if (q.preview && q.preview.length) {
+                    // show at most 1-2 lines; line-clamp handles it
+                    const pv = h('span', {});
+                    renderSegments(pv, q.preview);
+                    preview.appendChild(pv);
+                }
+
+                // Details region
+                const details = h('div', { class: 'details', hidden: !expandedDefault });
+
+                // Keep in mind
+                if (q.details && q.details.keep && q.details.keep.length) {
+                    const body = q.details.keep.map(para => {
+                        const p = h('p', {});
+                        renderSegments(p, para);
+                        return p;
+                    });
+                    details.appendChild(makeDetailsBlock('Keep in mind', body));
+                }
+
+                // Formulas used
+                if (q.details && q.details.formulas && q.details.formulas.length) {
+                    const body = q.details.formulas.map(para => {
+                        const p = h('p', {});
+                        renderSegments(p, para);
+                        return p;
+                    });
+                    details.appendChild(makeDetailsBlock('Formulas used', body));
+                }
+
+                // Working
+                if (q.details && q.details.working && q.details.working.length) {
+                    const body = q.details.working.map(line => {
+                        // line can be {type:'math-block', tex} as single block via segments
+                        // or segments array
+                        if (line.kind === 'block') {
+                            return mathBlock(line.tex);
+                        }
+                        return lineFromSegments(line.segments);
+                    });
+                    details.appendChild(makeDetailsBlock('Working', body));
+                }
+
+                // Alternative working
+                if (q.details && q.details.alternative && q.details.alternative.length) {
+                    const body = q.details.alternative.map(line => {
+                        if (line.kind === 'block') {
+                            return mathBlock(line.tex);
+                        }
+                        return lineFromSegments(line.segments);
+                    });
+                    details.appendChild(makeDetailsBlock('Alternative working', body));
+                }
+
+                btn.addEventListener('click', () => {
+                    const isOpen = btn.getAttribute('aria-expanded') === 'true';
+                    const nextOpen = !isOpen;
+                    btn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+                    btn.innerHTML = '';
+                    btn.appendChild(h('span', { class: 'chev', text: nextOpen ? '▾' : '▸' }));
+                    btn.appendChild(document.createTextNode(nextOpen ? 'Hide working' : 'Show working'));
+
+                    details.hidden = !nextOpen;
+                });
+
+                disclosure.appendChild(btn);
+                if (preview.textContent.trim().length) {
+                    disclosure.appendChild(preview);
+                }
+                disclosure.appendChild(details);
+
+                qEl.appendChild(promptWrap);
+                qEl.appendChild(answer);
+                qEl.appendChild(disclosure);
+
+                return { qEl, anchorId };
+            }
+
+            function renderKatexIn(container) {
+                // Render each math node programmatically; fallback is plain text.
+                const hasKatex = !!(window.katex && typeof window.katex.render === 'function');
+                const nodes = container.querySelectorAll('[data-tex]');
+                nodes.forEach(node => {
+                    if (!hasKatex) return; // fallback: leave text as-is
+                    const tex = node.getAttribute('data-tex') || '';
+                    const displayMode = node.getAttribute('data-display') === 'true';
+                    try {
+                        // Clear existing text for cleaner fallback if partial render fails later.
+                        node.textContent = '';
+                        window.katex.render(tex, node, {
+                            displayMode,
+                            throwOnError: false,
+                            strict: "ignore"
+                        });
+                    } catch (e) {
+                        // fallback: restore plain text
+                        node.textContent = tex;
+                    }
+                });
+            }
+
+            function buildNav(sections) {
+                elNav.innerHTML = '';
+                elDrawerNav.innerHTML = '';
+
+                const makeNavItem = (qid, anchorId) => {
+                    const a = h('a', { href: '#' + anchorId, text: qid });
+                    const li = h('li', {}, [a]);
+                    return { li, a };
+                };
+
+                const addSep = (label) => {
+                    const li = h('li', { class: 'sep', text: label, 'aria-hidden': 'true' });
+                    const li2 = h('li', { class: 'sep', text: label, 'aria-hidden': 'true' });
+                    elNav.appendChild(li);
+                    elDrawerNav.appendChild(li2);
+                };
+
+                const map = new Map(); // anchorId -> [desktopA, drawerA]
+                for (const sec of sections) {
+                    if (sec.label) {
+                        addSep(sec.label);
+                    }
+                    for (const item of sec.items) {
+                        const { li, a } = makeNavItem(item.qid, item.anchorId);
+                        const { li: liD, a: aD } = makeNavItem(item.qid, item.anchorId);
+                        elNav.appendChild(li);
+                        elDrawerNav.appendChild(liD);
+
+                        // Close drawer after jump (mobile)
+                        aD.addEventListener('click', () => closeDrawer());
+
+                        map.set(item.anchorId, [a, aD]);
+                    }
+                }
+                return map;
+            }
+
+            function observeCurrentQuestion(navMap) {
+                // Clear any existing current marker
+                navMap.forEach(([a1, a2]) => {
+                    a1.setAttribute('aria-current', 'false');
+                    a2.setAttribute('aria-current', 'false');
+                });
+
+                const qs = Array.from(elPaper.querySelectorAll('.q[id]'));
+                if (!('IntersectionObserver' in window) || qs.length === 0) return;
+
+                const obs = new IntersectionObserver((entries) => {
+                    // pick the entry closest to top that is intersecting
+                    const visible = entries
+                        .filter(e => e.isIntersecting)
+                        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+                    if (!visible.length) return;
+                    const id = visible[0].target.id;
+                    navMap.forEach(([a1, a2]) => {
+                        a1.removeAttribute('aria-current');
+                        a2.removeAttribute('aria-current');
+                    });
+                    const pair = navMap.get(id);
+                    if (pair) {
+                        pair[0].setAttribute('aria-current', 'true');
+                        pair[1].setAttribute('aria-current', 'true');
+                    }
+                }, { root: null, threshold: [0.02], rootMargin: "-10% 0px -82% 0px" });
+
+                qs.forEach(q => obs.observe(q));
+            }
+
+            function longWorkingLines(count) {
+                const lines = [];
+                // alternate between text+inline and block lines
+                for (let i = 1; i <= count; i++) {
+                    if (i % 6 === 0) {
+                        lines.push({ kind: 'block', tex: String.raw`\displaystyle \frac{(x+${i})^2 - (x-${i})^2}{2${i}} = 2x` });
+                    } else {
+                        lines.push({
+                            segments: [
+                                { type: 'text', value: `${i}. ` },
+                                { type: 'math-inline', tex: String.raw`x_{${i + 1}} = x_${i} + 1` },
+                                { type: 'text', value: `  and so ` },
+                                { type: 'math-inline', tex: String.raw`x_${i} = x_1 + (${i}-1)` }
+                            ]
+                        });
+                    }
+                }
+                return lines;
+            }
+
+            function mkText(value) { return { type: 'text', value }; }
+            function mkMI(tex) { return { type: 'math-inline', tex }; }
+            function mkMB(tex) { return { type: 'math-block', tex }; }
+
+            function baseShortPaper() {
+                return {
+                    title: 'Short paper',
+                    subtitle: '6 questions • mix of short arithmetic and one multi-part question',
+                    defaultExpandedAll: false,
+                    sections: [
+                        {
+                            label: null, questions: [
+                                {
+                                    qid: '1',
+                                    depth: 0,
+                                    prompt: [
+                                        [mkText('Work out '), mkMI(String.raw`7\times 8`), mkText('.')]
+                                    ],
+                                    answer: [
+                                        [mkMI(String.raw`56`)]
+                                    ],
+                                    preview: [mkMI(String.raw`7\times 8 = 56`)],
+                                    details: {
+                                        keep: [],
+                                        formulas: [],
+                                        working: [
+                                            { segments: [mkText('Multiply: '), mkMI(String.raw`7\times 8 = 56`)] }
+                                        ],
+                                        alternative: []
+                                    }
+                                },
+                                {
+                                    qid: '2',
+                                    depth: 0,
+                                    prompt: [
+                                        [mkText('Calculate '), mkMI(String.raw`\frac{3}{4}+\frac{1}{8}`), mkText('.')]
+                                    ],
+                                    answer: [
+                                        [mkMI(String.raw`\frac{7}{8}`)]
+                                    ],
+                                    preview: [mkMI(String.raw`\frac{3}{4}=\frac{6}{8}`), mkText(', so total is '), mkMI(String.raw`\frac{7}{8}`)],
+                                    details: {
+                                        keep: [
+                                            [mkText('Use a common denominator before adding fractions.')]
+                                        ],
+                                        formulas: [],
+                                        working: [
+                                            { segments: [mkMI(String.raw`\frac{3}{4}=\frac{6}{8}`), mkText(' so '), mkMI(String.raw`\frac{6}{8}+\frac{1}{8}=\frac{7}{8}`)] }
+                                        ],
+                                        alternative: [
+                                            { segments: [mkText('Convert to decimals: '), mkMI(String.raw`0.75+0.125=0.875`), mkText(', which is '), mkMI(String.raw`\frac{7}{8}`)] }
+                                        ]
+                                    }
+                                },
+                                {
+                                    qid: '3',
+                                    depth: 0,
+                                    prompt: [
+                                        [mkText('A book costs £'), mkMI(String.raw`9.60`), mkText('. There is a discount of £'), mkMI(String.raw`1.75`), mkText('. What is the new price?')]
+                                    ],
+                                    answer: [
+                                        [mkText('£'), mkMI(String.raw`7.85`)]
+                                    ],
+                                    preview: [mkMI(String.raw`9.60-1.75=7.85`)],
+                                    details: {
+                                        keep: [],
+                                        formulas: [],
+                                        working: [
+                                            { segments: [mkMI(String.raw`9.60-1.75=7.85`)] }
+                                        ],
+                                        alternative: []
+                                    }
+                                },
+                                // Multi-part with nesting
+                                {
+                                    qid: '4',
+                                    depth: 0,
+                                    prompt: [
+                                        [mkText('Solve these:')]
+                                    ],
+                                    answer: [
+                                        [mkText('See parts below.')]
+                                    ],
+                                    preview: [mkText('Parts 4a and 4b each have an Answer and Working.')],
+                                    details: {
+                                        keep: [],
+                                        formulas: [],
+                                        working: [
+                                            { segments: [mkText('This question has sub-parts (a) and (b).')] }
+                                        ],
+                                        alternative: []
+                                    }
+                                },
+                                {
+                                    qid: '4a',
+                                    depth: 1,
+                                    prompt: [
+                                        [mkText('Work out '), mkMI(String.raw`120 \div 6`), mkText('.')]
+                                    ],
+                                    answer: [
+                                        [mkMI(String.raw`20`)]
+                                    ],
+                                    preview: [mkMI(String.raw`120\div 6 = 20`)],
+                                    details: {
+                                        keep: [],
+                                        formulas: [],
+                                        working: [
+                                            { segments: [mkMI(String.raw`120\div 6 = 20`)] }
+                                        ],
+                                        alternative: []
+                                    }
+                                },
+                                {
+                                    qid: '4b',
+                                    depth: 1,
+                                    prompt: [
+                                        [mkText('A rectangle has perimeter '), mkMI(String.raw`30`), mkText(' cm. One side is '), mkMI(String.raw`9`), mkText(' cm. Find the other side.')]
+                                    ],
+                                    answer: [
+                                        [mkMI(String.raw`6`), mkText(' cm')]
+                                    ],
+                                    preview: [mkMI(String.raw`2(9+w)=30 \Rightarrow w=6`)],
+                                    details: {
+                                        keep: [
+                                            [mkText('Perimeter of a rectangle is twice the sum of adjacent sides.')]
+                                        ],
+                                        formulas: [
+                                            [mkMI(String.raw`P=2(l+w)`)]
+                                        ],
+                                        working: [
+                                            { segments: [mkMI(String.raw`30=2(9+w)`)] },
+                                            { segments: [mkMI(String.raw`15=9+w`)] },
+                                            { segments: [mkMI(String.raw`w=6`)] }
+                                        ],
+                                        alternative: []
+                                    }
+                                },
+                                {
+                                    qid: '5',
+                                    depth: 0,
+                                    prompt: [
+                                        [mkText('Write '), mkMI(String.raw`0.36`), mkText(' as a fraction in its simplest form.')]
+                                    ],
+                                    answer: [
+                                        [mkMI(String.raw`\frac{9}{25}`)]
+                                    ],
+                                    preview: [mkMI(String.raw`0.36=\frac{36}{100}=\frac{9}{25}`)],
+                                    details: {
+                                        keep: [
+                                            [mkText('Simplify by dividing top and bottom by the same number.')]
+                                        ],
+                                        formulas: [],
+                                        working: [
+                                            { segments: [mkMI(String.raw`0.36=\frac{36}{100}`)] },
+                                            { segments: [mkMI(String.raw`\frac{36}{100}=\frac{9}{25}`)] }
+                                        ],
+                                        alternative: []
+                                    }
+                                },
+                                {
+                                    qid: '6',
+                                    depth: 0,
+                                    prompt: [
+                                        [mkText('Work out '), mkMI(String.raw`3^4`), mkText('.')]
+                                    ],
+                                    answer: [
+                                        [mkMI(String.raw`81`)]
+                                    ],
+                                    preview: [mkMI(String.raw`3^4=3\cdot 3\cdot 3\cdot 3=81`)],
+                                    details: {
+                                        keep: [],
+                                        formulas: [],
+                                        working: [
+                                            { segments: [mkMI(String.raw`3^4=3\cdot 3\cdot 3\cdot 3=81`)] }
+                                        ],
+                                        alternative: []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                };
+            }
+
+            function standardPaper(expandAll) {
+                const qs = [];
+                // Q1–Q25 shorter mix
+                for (let i = 1; i <= 25; i++) {
+                    const hasKeep = (i === 5 || i === 12 || i === 19);
+                    const hasForm = (i === 7 || i === 14 || i === 21);
+                    const hasAlt = (i === 9 || i === 16 || i === 23);
+                    const hasAll = (i === 10);
+
+                    const prompt = [
+                        [
+                            mkText('Question '), mkMI(String.raw`${i}`), mkText(': ')
+                        ]
+                    ];
+                    // Provide varied prompt text
+                    if (i % 5 === 1) {
+                        prompt.push([mkText('Work out '), mkMI(String.raw`${i * 3}+${i}`), mkText('.')]);
+                    } else if (i % 5 === 2) {
+                        prompt.push([mkText('Simplify '), mkMI(String.raw`\frac{${i}}{${i + 4}}`), mkText(' where possible.')]);
+                    } else if (i % 5 === 3) {
+                        prompt.push([mkText('Find '), mkMI(String.raw`x`), mkText(' if '), mkMI(String.raw`x+${i}= ${i + 11}`), mkText('.')]);
+                    } else if (i % 5 === 4) {
+                        prompt.push([mkText('A number is increased by '), mkMI(String.raw`${i}`), mkText('%. Write the multiplier.')]);
+                    } else {
+                        prompt.push([mkText('Convert '), mkMI(String.raw`0.${(i % 10)}${(i * 3) % 10}`), mkText(' to a fraction in simplest form.')]);
+                    }
+
+                    const answer = [];
+                    if (i % 5 === 1) {
+                        answer.push([mkMI(String.raw`${i * 3 + i}`)]);
+                    } else if (i % 5 === 2) {
+                        answer.push([mkMI(String.raw`\frac{${i}}{${i + 4}}`)]);
+                    } else if (i % 5 === 3) {
+                        answer.push([mkMI(String.raw`${11}`)]);
+                    } else if (i % 5 === 4) {
+                        answer.push([mkMI(String.raw`1.${i}`)]);
+                    } else {
+                        answer.push([mkMI(String.raw`\frac{${(i % 9) + 1}}{${(i % 7) + 11}}`)]);
+                    }
+
+                    const details = {
+                        keep: [],
+                        formulas: [],
+                        working: [],
+                        alternative: []
+                    };
+
+                    if (hasKeep || hasAll) {
+                        details.keep.push([mkText('Check units and keep your layout tidy so you can spot mistakes easily.')]);
+                    }
+                    if (hasForm || hasAll) {
+                        details.formulas.push([mkText('Percent multiplier: '), mkMI(String.raw`\text{new}=\text{original}\times(1+\frac{p}{100})`)]);
+                    }
+
+                    // Basic working
+                    if (i % 5 === 1) {
+                        details.working.push({ segments: [mkMI(String.raw`${i * 3}+${i}=${i * 4}`)] });
+                    } else if (i % 5 === 2) {
+                        details.working.push({ segments: [mkText('No common factor to cancel, so it stays as '), mkMI(String.raw`\frac{${i}}{${i + 4}}`)] });
+                    } else if (i % 5 === 3) {
+                        details.working.push({ segments: [mkMI(String.raw`x=${i + 11}-${i} = 11`)] });
+                    } else if (i % 5 === 4) {
+                        details.working.push({ segments: [mkMI(String.raw`1+\frac{${i}}{100}`), mkText(' is the multiplier.')] });
+                    } else {
+                        details.working.push({ segments: [mkMI(String.raw`0.${(i % 10)}${(i * 3) % 10}=\frac{${(i % 10) * 10 + ((i * 3) % 10)}}{100}`)] });
+                        details.working.push({ segments: [mkText('Simplify if possible.')] });
+                    }
+
+                    if (hasAlt || hasAll) {
+                        details.alternative.push({ segments: [mkText('A different method leads to the same answer (check by substituting back).')] });
+                    }
+
+                    const preview = (details.working[0] && details.working[0].segments) ? details.working[0].segments : [mkText('Working is available.')];
+
+                    qs.push({
+                        qid: String(i),
+                        depth: 0,
+                        prompt,
+                        answer,
+                        preview,
+                        details
+                    });
+
+                    // Deep nesting stress test: Q18(a)(i)/(ii)/(b)
+                    if (i === 18) {
+                        qs.push({
+                            qid: '18(a)(i)',
+                            depth: 2,
+                            prompt: [
+                                [mkText('Solve '), mkMI(String.raw`2x+3=17`), mkText('.')]
+                            ],
+                            answer: [
+                                [mkMI(String.raw`x=7`)]
+                            ],
+                            preview: [mkMI(String.raw`2x=14 \Rightarrow x=7`)],
+                            details: {
+                                keep: [],
+                                formulas: [],
+                                working: [
+                                    { segments: [mkMI(String.raw`2x+3=17`)] },
+                                    { segments: [mkMI(String.raw`2x=14`)] },
+                                    { segments: [mkMI(String.raw`x=7`)] }
+                                ],
+                                alternative: []
+                            }
+                        });
+                        qs.push({
+                            qid: '18(a)(ii)',
+                            depth: 2,
+                            prompt: [
+                                [mkText('Now solve '), mkMI(String.raw`3x-5=22`), mkText('.')]
+                            ],
+                            answer: [
+                                [mkMI(String.raw`x=9`)]
+                            ],
+                            preview: [mkMI(String.raw`3x=27 \Rightarrow x=9`)],
+                            details: {
+                                keep: [],
+                                formulas: [],
+                                working: [
+                                    { segments: [mkMI(String.raw`3x-5=22`)] },
+                                    { segments: [mkMI(String.raw`3x=27`)] },
+                                    { segments: [mkMI(String.raw`x=9`)] }
+                                ],
+                                alternative: []
+                            }
+                        });
+                        qs.push({
+                            qid: '18(b)',
+                            depth: 1,
+                            prompt: [
+                                [mkText('Use your answers to find '), mkMI(String.raw`x+y`), mkText(' where '), mkMI(String.raw`y=2x-5`), mkText(' and '), mkMI(String.raw`x=7`), mkText('.')]
+                            ],
+                            answer: [
+                                [mkMI(String.raw`16`)]
+                            ],
+                            preview: [mkMI(String.raw`y=9,\ x+y=16`)],
+                            details: {
+                                keep: [],
+                                formulas: [],
+                                working: [
+                                    { segments: [mkMI(String.raw`y=2(7)-5=9`)] },
+                                    { segments: [mkMI(String.raw`x+y=7+9=16`)] }
+                                ],
+                                alternative: []
+                            }
+                        });
+                    }
+                }
+
+                // Q26–Q35 long algebra; include multiple KaTeX block placeholders and very long workings
+                for (let i = 26; i <= 35; i++) {
+                    const isExtremelyLong = (i === 33 || i === 30);
+                    const hasAll = (i === 30); // include keep + formulas + alternative here
+                    const prompt = [
+                        [mkText('A long algebra question. Read the prompt carefully before checking the answer.')],
+                        [mkText('Simplify and solve: '), mkMI(String.raw`\frac{2x+${i}}{3} - \frac{x-${i - 20}}{2} = ${i - 10}`)]
+                    ];
+
+                    const details = {
+                        keep: [],
+                        formulas: [],
+                        working: [],
+                        alternative: []
+                    };
+
+                    if (hasAll) {
+                        details.keep.push([mkText('Keep track of signs when expanding brackets and combining like terms.')]);
+                        details.formulas.push([mkText('To clear denominators, multiply both sides by the LCM of denominators.')]);
+                        details.formulas.push([mkMI(String.raw`\text{LCM}(2,3)=6`)]);
+                    } else if (i % 2 === 0) {
+                        details.keep.push([mkText('Multiply carefully to avoid losing terms.')]);
+                    } else {
+                        details.formulas.push([mkText('Clear fractions by multiplying by the common denominator.')]);
+                    }
+
+                    // Working includes multiple block equations
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle \frac{2x+${i}}{3} - \frac{x-${i - 20}}{2} = ${i - 10}` });
+                    details.working.push({ segments: [mkText('Multiply by 6 to clear denominators.')] });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle 2(2x+${i}) - 3(x-${i - 20}) = 6(${i - 10})` });
+                    details.working.push({ segments: [mkText('Expand and collect like terms.')] });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle 4x+2${i} -3x +3(${i - 20}) = 6${i}-60` });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle x +5${i} -60 = 6${i}-60` });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle x = ${i}` });
+
+                    if (isExtremelyLong) {
+                        // 50–60 lines stress test (Working only)
+                        details.working.push({ segments: [mkText('Extra working lines (stress test):')] });
+                        longWorkingLines(56).forEach(x => details.working.push(x));
+                    }
+
+                    if (hasAll || i === 29 || i === 32) {
+                        details.alternative.push({ segments: [mkText('Alternative: rearrange first, then clear denominators (same result).')] });
+                        details.alternative.push({ kind: 'block', tex: String.raw`\displaystyle \frac{4x+2${i}-3x+3(${i - 20})}{6} = ${i - 10}` });
+                    }
+
+                    const answer = [
+                        [mkMI(String.raw`x=${i}`)]
+                    ];
+
+                    const preview = [mkMI(String.raw`x=${i}`), mkText(' (after clearing denominators)')];
+
+                    qs.push({
+                        qid: String(i),
+                        depth: 0,
+                        prompt,
+                        answer,
+                        preview,
+                        details
+                    });
+
+                    // Deep nesting add-on: Q30(a)(i)/(ii)/(b)
+                    if (i === 30) {
+                        qs.push({
+                            qid: '30(a)(i)',
+                            depth: 2,
+                            prompt: [
+                                [mkText('Factorise '), mkMI(String.raw`x^2-9`), mkText('.')]
+                            ],
+                            answer: [
+                                [mkMI(String.raw`(x-3)(x+3)`)]
+                            ],
+                            preview: [mkMI(String.raw`x^2-9=(x-3)(x+3)`)],
+                            details: {
+                                keep: [],
+                                formulas: [
+                                    [mkText('Difference of two squares: '), mkMI(String.raw`a^2-b^2=(a-b)(a+b)`)]
+                                ],
+                                working: [
+                                    { segments: [mkMI(String.raw`x^2-9=x^2-3^2`)] },
+                                    { segments: [mkMI(String.raw`(x-3)(x+3)`)] }
+                                ],
+                                alternative: []
+                            }
+                        });
+                        qs.push({
+                            qid: '30(a)(ii)',
+                            depth: 2,
+                            prompt: [
+                                [mkText('Solve '), mkMI(String.raw`(x-3)(x+3)=0`), mkText('.')]
+                            ],
+                            answer: [
+                                [mkMI(String.raw`x=3 \text{ or } x=-3`)]
+                            ],
+                            preview: [mkMI(String.raw`x=3,-3`)],
+                            details: {
+                                keep: [],
+                                formulas: [],
+                                working: [
+                                    { segments: [mkMI(String.raw`x-3=0 \Rightarrow x=3`)] },
+                                    { segments: [mkMI(String.raw`x+3=0 \Rightarrow x=-3`)] }
+                                ],
+                                alternative: []
+                            }
+                        });
+                        qs.push({
+                            qid: '30(b)',
+                            depth: 1,
+                            prompt: [
+                                [mkText('Check your solutions in the original expression.')]
+                            ],
+                            answer: [
+                                [mkText('Both values make the expression equal to 0.')]
+                            ],
+                            preview: [mkText('Substitute back to verify.')],
+                            details: {
+                                keep: [],
+                                formulas: [],
+                                working: [
+                                    { segments: [mkText('Substitute each value to confirm the product is zero.')] }
+                                ],
+                                alternative: []
+                            }
+                        });
+                    }
+                }
+
+                return {
+                    title: expandAll ? 'Standard paper (Workings Expanded)' : 'Standard paper',
+                    subtitle: '35 questions • Q26–Q35 contain long algebra questions',
+                    defaultExpandedAll: !!expandAll,
+                    sections: [{ label: null, questions: qs }]
+                };
+            }
+
+            function diagramPaper() {
+                const qs = [];
+                const diagramSlots = new Set([2, 4, 6, 9, 11, 14, 17, 20]); // 8 diagram questions
+                const types = ['geometry', 'bars', 'grid', 'table'];
+                for (let i = 1; i <= 20; i++) {
+                    const d = diagramSlots.has(i) ? types[(i - 1) % types.length] : null;
+                    const prompt = [
+                        [mkText('Answer the question below.')],
+                    ];
+                    if (d === 'geometry') {
+                        prompt.push([mkText('In the diagram, find the missing angle. Use '), mkMI(String.raw`180^\circ`), mkText(' for a straight line.')]);
+                    } else if (d === 'bars') {
+                        prompt.push([mkText('Use the ratio bars to find the total when one part is '), mkMI(String.raw`6`), mkText('.')]);
+                    } else if (d === 'grid') {
+                        prompt.push([mkText('Read the coordinates of point '), mkMI(String.raw`P`), mkText(' and point '), mkMI(String.raw`Q`), mkText('.')]);
+                    } else if (d === 'table') {
+                        prompt.push([mkText('Complete the table using the pattern shown.')]);
+                    } else {
+                        prompt.push([mkText('Work out '), mkMI(String.raw`${i + 12}\times 3`), mkText('.')]);
+                    }
+
+                    const answer = [];
+                    if (d === 'geometry') {
+                        answer.push([mkMI(String.raw`60^\circ`)]);
+                    } else if (d === 'bars') {
+                        answer.push([mkMI(String.raw`18`)]);
+                    } else if (d === 'grid') {
+                        answer.push([mkMI(String.raw`P(5,4),\ Q(10,5)`)]);
+                    } else if (d === 'table') {
+                        answer.push([mkText('A completed table.')]);
+                    } else {
+                        answer.push([mkMI(String.raw`${(i + 12) * 3}`)]);
+                    }
+
+                    const details = {
+                        keep: [],
+                        formulas: [],
+                        working: [],
+                        alternative: []
+                    };
+
+                    if (i === 3 || i === 8 || i === 15) {
+                        details.keep.push([mkText('Use the diagram as given; don’t assume lengths or angles unless they are labelled.')]);
+                    }
+                    if (i === 5 || i === 12 || i === 18) {
+                        details.formulas.push([mkText('Angles in a triangle add to '), mkMI(String.raw`180^\circ`), mkText('.')]);
+                    }
+                    if (i === 7 || i === 14 || i === 19) {
+                        details.alternative.push({ segments: [mkText('Alternative working: solve using a different arrangement of the same information.')] });
+                    }
+
+                    if (d === 'geometry') {
+                        details.working.push({ segments: [mkText('Use triangle angle sum: '), mkMI(String.raw`a+b+c=180^\circ`)] });
+                        details.working.push({ kind: 'block', tex: String.raw`\displaystyle 180^\circ - (50^\circ+70^\circ)=60^\circ` });
+                    } else if (d === 'bars') {
+                        details.working.push({ segments: [mkText('Count equal parts in the bar model.')] });
+                        details.working.push({ kind: 'block', tex: String.raw`\displaystyle 3\text{ parts} \times 6 = 18` });
+                    } else if (d === 'grid') {
+                        details.working.push({ segments: [mkText('Read x then y from the grid lines.')] });
+                        details.working.push({ kind: 'block', tex: String.raw`\displaystyle P(5,4),\quad Q(10,5)` });
+                    } else if (d === 'table') {
+                        details.working.push({ segments: [mkText('Follow the pattern across rows and columns.')] });
+                        details.working.push({ kind: 'block', tex: String.raw`\displaystyle a_{n}=a_{n-1}+2` });
+                    } else {
+                        details.working.push({ segments: [mkMI(String.raw`${i + 12}\times 3=${(i + 12) * 3}`)] });
+                    }
+
+                    const preview = (details.working[0] && details.working[0].segments) ? details.working[0].segments : [mkText('Working is available.')];
+
+                    qs.push({
+                        qid: String(i),
+                        depth: 0,
+                        diagram: d,
+                        prompt,
+                        answer,
+                        preview,
+                        details
+                    });
+                }
+
+                return {
+                    title: 'Diagram-heavy paper',
+                    subtitle: '20 questions • 8 questions include diagrams',
+                    defaultExpandedAll: false,
+                    sections: [{ label: null, questions: qs }]
+                };
+            }
+
+            function sectionedPaper() {
+                const sectionA = [];
+                const sectionB = [];
+                const sectionC = [];
+
+                // Section A: 35 small/medium
+                for (let i = 1; i <= 35; i++) {
+                    sectionA.push({
+                        qid: String(i),
+                        depth: 0,
+                        prompt: [
+                            [mkText('Section A question. Work it out carefully.')],
+                            [mkText('Find '), mkMI(String.raw`x`), mkText(' if '), mkMI(String.raw`x+${(i % 9) + 2}=${(i % 9) + 14}`), mkText('.')]
+                        ],
+                        answer: [
+                            [mkMI(String.raw`${12}`)]
+                        ],
+                        preview: [mkMI(String.raw`x=12`)],
+                        details: {
+                            keep: (i === 4 || i === 17 || i === 28) ? [[mkText('Write each step on a new line to keep it clear.')]] : [],
+                            formulas: (i === 6 || i === 18 || i === 29) ? [[mkText('Rearrange by doing the same operation to both sides.')]] : [],
+                            working: [
+                                { segments: [mkMI(String.raw`x=${(i % 9) + 14}-${(i % 9) + 2}=12`)] }
+                            ],
+                            alternative: (i === 9 || i === 21 || i === 33) ? [
+                                { segments: [mkText('Alternative: check by substituting '), mkMI(String.raw`x=12`), mkText(' back into the equation.')] }
+                            ] : []
+                        }
+                    });
+                }
+
+                // Section B: 8 medium
+                for (let i = 1; i <= 8; i++) {
+                    const qid = String(i);
+                    sectionB.push({
+                        qid,
+                        depth: 0,
+                        prompt: [
+                            [mkText('Section B question. Ratio and fractions mix.')],
+                            [mkText('Simplify '), mkMI(String.raw`\frac{${i + 8}}{${(i + 8) * 2}}`), mkText(' and explain.')]
+                        ],
+                        answer: [
+                            [mkMI(String.raw`\frac{1}{2}`)]
+                        ],
+                        preview: [mkMI(String.raw`\frac{${i + 8}}{${(i + 8) * 2}}=\frac{1}{2}`)],
+                        details: {
+                            keep: (i === 2) ? [[mkText('Divide numerator and denominator by the same non-zero number.')]] : [],
+                            formulas: (i === 5) ? [[mkText('Equivalent fractions keep the same value when scaled by the same factor.')]] : [],
+                            working: [
+                                { segments: [mkText('Divide top and bottom by '), mkMI(String.raw`${i + 8}`), mkText(': ')] },
+                                { segments: [mkMI(String.raw`\frac{${i + 8}}{${(i + 8) * 2}}=\frac{1}{2}`)] }
+                            ],
+                            alternative: (i === 6) ? [
+                                { segments: [mkText('Alternative: convert to decimal to verify: '), mkMI(String.raw`0.5`)] }
+                            ] : []
+                        }
+                    });
+                }
+
+                // Section C: 6 very long workings (collapsed by default)
+                for (let i = 1; i <= 6; i++) {
+                    const qnum = i;
+                    const qid = String(qnum);
+                    const details = {
+                        keep: [],
+                        formulas: [],
+                        working: [],
+                        alternative: []
+                    };
+
+                    if (i === 1) {
+                        details.keep.push([mkText('Start by rewriting the expression in a cleaner form before expanding.')]);
+                        details.formulas.push([mkText('Use '), mkMI(String.raw`(a+b)^2=a^2+2ab+b^2`), mkText(' when expanding.')]);
+                        details.alternative.push({ segments: [mkText('Alternative working is shown after the main derivation.')] });
+                    }
+                    if (i === 2 || i === 5) {
+                        details.keep.push([mkText('If a line gets too long, keep it readable by using one equation per line.')]);
+                    }
+                    if (i === 3 || i === 6) {
+                        details.formulas.push([mkText('Common denominator: '), mkMI(String.raw`\text{LCM}`), mkText(' helps combine fractions.')]);
+                    }
+
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle \text{Solve } \frac{3x+${10 + i}}{4} + \frac{x-${6 + i}}{5} = ${12 + i}` });
+                    details.working.push({ segments: [mkText('Clear denominators using the LCM '), mkMI(String.raw`20`), mkText('.')] });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle 5(3x+${10 + i}) + 4(x-${6 + i}) = 20(${12 + i})` });
+                    details.working.push({ segments: [mkText('Expand and collect like terms.')] });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle 15x+5(${10 + i}) + 4x - 4(${6 + i}) = ${240 + 20 * i}` });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle 19x + ${50 + 5 * i - 24 - 4 * i} = ${240 + 20 * i}` });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle 19x + ${26 + i} = ${240 + 20 * i}` });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle 19x = ${214 + 19 * i}` });
+                    details.working.push({ kind: 'block', tex: String.raw`\displaystyle x = ${11 + i}` });
+
+                    // Extremely long workings: 50–60 lines in Working
+                    details.working.push({ segments: [mkText('Extra working lines (stress test):')] });
+                    longWorkingLines(52 + (i % 3)).forEach(x => details.working.push(x));
+
+                    if (i === 1) {
+                        details.alternative.push({ segments: [mkText('Alternative: rearrange to isolate fractions first, then clear denominators.')] });
+                        details.alternative.push({ kind: 'block', tex: String.raw`\displaystyle \frac{3x+${11}}{4} = ${13} - \frac{x-${7}}{5}` });
+                    }
+
+                    sectionC.push({
+                        qid,
+                        depth: 0,
+                        prompt: [
+                            [mkText('Section C question (very long).')],
+                            [mkText('Work through the algebra carefully. The answer is short even when the working is long.')]
+                        ],
+                        answer: [
+                            [mkMI(String.raw`x=${11 + i}`)]
+                        ],
+                        preview: [mkMI(String.raw`x=${11 + i}`), mkText(' (after clearing denominators)')],
+                        details
+                    });
+                }
+
+                return {
+                    title: 'Sectioned paper',
+                    subtitle: 'Section A: 35 • Section B: 8 • Section C: 6 (very long workings)',
+                    defaultExpandedAll: false,
+                    sections: [
+                        { label: 'A', questions: sectionA },
+                        { label: 'B', questions: sectionB },
+                        { label: 'C', questions: sectionC }
+                    ]
+                };
+            }
+
+            const DATASETS = {
+                short: baseShortPaper(),
+                standard: standardPaper(false),
+                standardExpanded: standardPaper(true),
+                diagram: diagramPaper(),
+                sectioned: sectionedPaper()
+            };
+
+            function renderPaper(key) {
+                const ds = DATASETS[key] || DATASETS.short;
+
+                // Clear
+                elPaper.innerHTML = '';
+
+                // Header
+                elPaper.appendChild(
+                    h('div', { class: 'paper-head' }, [
+                        h('h1', { class: 'paper-title', text: ds.title }),
+                        h('p', { class: 'paper-sub', text: ds.subtitle })
+                    ])
+                );
+
+                const navSections = [];
+                const questionEls = [];
+
+                for (const sec of ds.sections) {
+                    if (sec.label) {
+                        elPaper.appendChild(h('div', { class: 'section-label', text: 'Section ' + sec.label }));
+                    }
+
+                    const navItems = [];
+                    for (const q of sec.questions) {
+                        const built = buildQuestion(q, ds.defaultExpandedAll === true);
+                        elPaper.appendChild(built.qEl);
+                        navItems.push({ qid: q.qid, anchorId: built.anchorId });
+                        questionEls.push(built.qEl);
+                    }
+                    navSections.push({ label: sec.label, items: navItems });
+                }
+
+                // Build navigation (desktop + drawer)
+                const navMap = buildNav(navSections);
+
+                // Render KaTeX in paper content
+                renderKatexIn(elPaper);
+
+                // Render KaTeX in both nav lists? (none needed)
+                // Observe current position
+                observeCurrentQuestion(navMap);
+
+                // If drawer open, ensure it reflects current paper and is usable immediately
+                renderKatexIn(drawerRoot);
+
+                // Ensure the first nav item is marked current on load (without scrolling)
+                const firstQ = elPaper.querySelector('.q[id]');
+                if (firstQ) {
+                    const pair = navMap.get(firstQ.id);
+                    if (pair) {
+                        pair[0].setAttribute('aria-current', 'true');
+                        pair[1].setAttribute('aria-current', 'true');
+                    }
+                }
+            }
+
+            // Drawer interactions
+            function openDrawer() {
+                document.body.dataset.drawerOpen = 'true';
+                drawerRoot.hidden = false;
+
+                // Focus management: keep focus inside drawer while open
+                const focusables = drawerRoot.querySelectorAll(focusableDrawerSelector);
+                if (focusables.length) focusables[0].focus();
+            }
+
+            function closeDrawer() {
+                document.body.dataset.drawerOpen = 'false';
+                drawerRoot.hidden = true;
+                // Return focus to opener (reasonable for accessibility)
+                if (openDrawerBtn) openDrawerBtn.focus();
+            }
+
+            function onKeyDownDrawer(e) {
+                if (drawerRoot.hidden) return;
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeDrawer();
+                    return;
+                }
+                if (e.key !== 'Tab') return;
+
+                const focusables = Array.from(drawerRoot.querySelectorAll(focusableDrawerSelector))
+                    .filter(n => !n.disabled && n.offsetParent !== null);
+                if (!focusables.length) return;
+
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+
+            openDrawerBtn.addEventListener('click', openDrawer);
+            closeDrawerBtn.addEventListener('click', closeDrawer);
+            drawerBackdrop.addEventListener('click', closeDrawer);
+            document.addEventListener('keydown', onKeyDownDrawer);
+
+            // Paper selector
+            elSelect.addEventListener('change', () => {
+                renderPaper(elSelect.value);
+            });
+
+            // Initial render
+            renderPaper(elSelect.value);
+
+        })();
+    </script>
+</body>
+
+</html>
