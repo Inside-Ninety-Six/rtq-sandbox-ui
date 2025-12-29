@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Prototype)</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+
+    <style>
+        /* =========================================
+           RESET & VARIABLES
+           ========================================= */
+        :root {
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            
+            /* Semantic Colors (Grayscale per Stage 4) */
+            --color-bg: #F9F9F9;           /* App background */
+            --color-surface: #FFFFFF;      /* Content surface */
+            --color-text-primary: #111111; /* Question text */
+            --color-text-secondary: #444444; /* Answers, Labels */
+            --color-text-tertiary: #666666; /* Workings, Nav default */
+            --color-text-quiet: #888888;    /* Meta, placeholders */
+            --color-border: #E0E0E0;
+            --color-focus: #000000;
+            
+            /* Spacing Rhythm */
+            --space-xs: 4px;
+            --space-s: 8px;
+            --space-m: 16px;
+            --space-l: 24px;
+            --space-xl: 48px;
+            --space-xxl: 64px;
+
+            /* Layout */
+            --nav-width: 180px;
+            --frame-max-width: 1024px;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-sans);
+            background-color: var(--color-bg);
+            color: var(--color-text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* =========================================
+           LAYOUT SHELL (CANONICAL)
+           ========================================= */
+        
+        .app-frame {
+            max-width: var(--frame-max-width);
+            margin: 0 auto;
+            min-height: 100vh;
+            background-color: var(--color-surface); /* Unified surface */
+            display: grid;
+            grid-template-rows: auto 1fr;
+            box-shadow: 0 0 20px rgba(0,0,0,0.02);
+        }
+
+        /* Top Controls Area */
+        .controls-area {
+            padding: var(--space-m) var(--space-l);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-m);
+            align-items: center;
+            background-color: var(--color-surface);
+            z-index: 100;
+        }
+
+        .controls-group {
+            display: flex;
+            align-items: center;
+            gap: var(--space-s);
+        }
+
+        select, button, label {
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        select {
+            padding: var(--space-s);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            background-color: white;
+        }
+
+        /* Main Grid: Nav + Content */
+        .main-layout {
+            display: grid;
+            grid-template-columns: var(--nav-width) 1fr;
+            position: relative;
+        }
+
+        /* =========================================
+           NAVIGATION (LEFT COL)
+           ========================================= */
+        
+        .doc-nav {
+            padding: var(--space-l) var(--space-m);
+            /* Sticky logic */
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            border-right: 1px solid transparent; /* Visual separation if needed, currently clean */
+            
+            /* Hide scrollbars (Add-on) */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+        .doc-nav::-webkit-scrollbar { 
+            display: none; 
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+
+        .nav-section-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--color-text-quiet);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: var(--space-m);
+            margin-bottom: var(--space-xs);
+            padding-left: var(--space-s);
+        }
+        .nav-section-label:first-child {
+            margin-top: 0;
+        }
+
+        .nav-item {
+            display: block;
+            text-decoration: none;
+            color: var(--color-text-tertiary);
+            padding: var(--space-xs) var(--space-s);
+            border-radius: 4px;
+            font-size: 14px;
+            transition: color 0.1s, background-color 0.1s;
+        }
+
+        .nav-item:hover {
+            color: var(--color-text-primary);
+            background-color: #f0f0f0;
+        }
+
+        .nav-item.is-active {
+            font-weight: 700;
+            color: var(--color-text-primary);
+            background-color: #eeeeee;
+        }
+
+        /* =========================================
+           PAPER CONTENT (RIGHT COL)
+           ========================================= */
+        
+        .paper-content {
+            padding: var(--space-xl) var(--space-xl) var(--space-xxl) var(--space-xl);
+            /* Single continuous scroll provided by body/html, 
+               but main-layout ensures it fits the frame. */
+        }
+
+        /* Question Unit */
+        .question-block {
+            margin-bottom: var(--space-xxl); /* Large spacing between top-level questions */
+            scroll-margin-top: var(--space-m);
+        }
+
+        /* Sub-question indentations (Add-on: Deep Nesting) */
+        .sub-question-block {
+            margin-top: var(--space-l);
+            margin-bottom: var(--space-l);
+            padding-left: var(--space-l); /* Indent */
+            border-left: 2px solid transparent; /* Placeholder for alignment */
+        }
+        
+        .sub-sub-question-block {
+            margin-top: var(--space-m);
+            margin-bottom: var(--space-m);
+            padding-left: var(--space-l);
+        }
+
+        /* Typography Hierarchy */
+        .q-header {
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-s);
+            margin-bottom: var(--space-s);
+        }
+
+        .q-id {
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--color-text-secondary);
+            flex-shrink: 0;
+            width: 3ch; /* alignment aid */
+        }
+
+        .q-prompt {
+            font-size: 18px;
+            color: var(--color-text-primary);
+            line-height: 1.6;
+            flex-grow: 1;
+        }
+        
+        .sub-question-block .q-prompt { font-size: 16px; }
+        .sub-sub-question-block .q-prompt { font-size: 16px; }
+
+        /* Diagrams */
+        .q-diagram {
+            margin: var(--space-m) 0;
+            max-width: 100%;
+            display: block;
+        }
+        
+        .svg-placeholder {
+            display: block;
+            background-color: #f4f4f4;
+            border: 1px solid var(--color-border);
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Answer Section */
+        .answer-block {
+            margin-top: var(--space-m);
+            margin-bottom: var(--space-m);
+            padding-left: calc(3ch + var(--space-s)); /* Align with prompt text */
+            font-size: 16px;
+        }
+
+        .answer-label {
+            font-weight: 700;
+            color: var(--color-text-secondary);
+            margin-right: var(--space-s);
+        }
+
+        .answer-value {
+            font-family: inherit;
+            color: var(--color-text-primary);
+        }
+
+        /* Solution Details Section */
+        .solution-details {
+            margin-top: var(--space-s);
+            padding-left: calc(3ch + var(--space-s)); /* Align with prompt text */
+        }
+
+        .toggle-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-text-tertiary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            text-decoration: underline;
+            text-decoration-color: var(--color-border);
+            text-underline-offset: 4px;
+        }
+
+        .toggle-btn:hover {
+            color: var(--color-text-primary);
+            text-decoration-color: var(--color-text-tertiary);
+        }
+
+        .details-content {
+            display: none; /* Hidden by default */
+            margin-top: var(--space-m);
+            padding-top: var(--space-s);
+            border-top: 1px dotted var(--color-border);
+            color: var(--color-text-secondary);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .details-content.is-expanded {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Solution Sections (Guidance, Formulas, etc) */
+        .sol-section {
+            margin-bottom: var(--space-m);
+        }
+
+        .sol-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-quiet);
+            margin-bottom: var(--space-xs);
+        }
+
+        /* Math Containers & Overflow Safety */
+        .math-block {
+            font-family: 'Times New Roman', serif;
+            background-color: #FDFDFD; /* Very subtle shift */
+            padding: var(--space-xs) 0;
+            /* Overflow constraint */
+            overflow-x: auto;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            margin: 0.5em 0;
+        }
+
+        /* Placeholder styling */
+        .math-placeholder-block {
+            font-family: monospace;
+            color: #555;
+            background: #eee;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: block;
+            margin: 8px 0;
+            white-space: pre-wrap;
+        }
+        
+        .math-placeholder-inline {
+            font-family: monospace;
+            color: #555;
+            background: #eee;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-size: 0.9em;
+        }
+
+        /* =========================================
+           MOBILE / RESPONSIVE
+           ========================================= */
+        
+        .mobile-nav-toggle {
+            display: none; /* Desktop default */
+        }
+
+        @media (max-width: 768px) {
+            .app-frame {
+                display: block; /* Stack controls and main */
+            }
+
+            .main-layout {
+                grid-template-columns: 1fr; /* Single column */
+            }
+
+            .doc-nav {
+                /* Drawer logic */
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 260px;
+                height: 100vh;
+                background: white;
+                z-index: 1000;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+                border-right: none;
+            }
+
+            .doc-nav.is-open {
+                transform: translateX(0);
+            }
+
+            /* Overlay backdrop */
+            .nav-overlay {
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+                display: none;
+            }
+            .nav-overlay.is-open { display: block; }
+
+            .mobile-nav-toggle {
+                display: inline-block;
+                background: transparent;
+                border: 1px solid var(--color-border);
+                padding: 6px 12px;
+                border-radius: 4px;
+                margin-right: var(--space-s);
+            }
+
+            .paper-content {
+                padding: var(--space-m);
+            }
+            
+            .q-id { width: auto; margin-right: var(--space-s); }
+            
+            .answer-block, .solution-details {
+                padding-left: 0; /* Align left on mobile to save space */
+                margin-left: var(--space-s);
+                border-left: 2px solid var(--color-border);
+                padding-left: var(--space-s);
+            }
+        }
+
+        /* Accessibility Focus */
+        *:focus-visible {
+            outline: 2px solid var(--color-focus);
+            outline-offset: 2px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="app-frame">
+    
+    <header class="controls-area">
+        <button class="mobile-nav-toggle" id="navToggle" aria-label="Toggle Navigation">☰ Questions</button>
+        
+        <div class="controls-group">
+            <label for="paperSelect">Paper:</label>
+            <select id="paperSelect">
+                <option value="short">Short Paper</option>
+                <option value="standard">Standard Paper</option>
+                <option value="standard_expanded">Standard (Expanded)</option>
+                <option value="diagram">Diagram Heavy</option>
+                <option value="sectioned">Sectioned Paper</option>
+            </select>
+        </div>
+
+        <div class="controls-group">
+            <input type="checkbox" id="katexToggle">
+            <label for="katexToggle">Real KaTeX Rendering (Add-on)</label>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <div class="nav-overlay" id="navOverlay"></div>
+
+        <nav class="doc-nav" id="docNav" aria-label="Question Navigation">
+            <ul class="nav-list" id="navList">
+                </ul>
+        </nav>
+
+        <main class="paper-content" id="paperContent">
+            </main>
+    </div>
+
+</div>
+
+<script>
+    /* =========================================
+       DATA GENERATION & MOCK CONTENT
+       ========================================= */
+
+    // Helper: SVG Generators
+    const SVGS = {
+        geometry: (w=200, h=150) => `
+            <svg class="svg-placeholder" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Geometry diagram">
+                <rect width="100%" height="100%" fill="#f9f9f9"/>
+                <path d="M50,120 L150,120 L100,30 Z" stroke="#333" stroke-width="2" fill="none"/>
+                <circle cx="100" cy="80" r="15" stroke="#333" stroke-width="1" fill="none" stroke-dasharray="4 2"/>
+                <text x="100" y="140" text-anchor="middle" fill="#555" font-family="sans-serif" font-size="12">10 cm</text>
+            </svg>`,
+        bar: (w=200, h=100) => `
+            <svg class="svg-placeholder" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Bar chart">
+                <rect width="100%" height="100%" fill="#f9f9f9"/>
+                <rect x="20" y="20" width="100" height="20" fill="#bbb"/>
+                <rect x="20" y="50" width="140" height="20" fill="#888"/>
+                <line x1="20" y1="10" x2="20" y2="90" stroke="#333" stroke-width="1"/>
+            </svg>`,
+        grid: (w=150, h=150) => `
+            <svg class="svg-placeholder" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Coordinate grid">
+                <defs><pattern id="g" width="15" height="15" patternUnits="userSpaceOnUse"><path d="M15 0L0 0 0 15" fill="none" stroke="#ddd" stroke-width="1"/></pattern></defs>
+                <rect width="100%" height="100%" fill="url(#g)"/>
+                <line x1="10" y1="140" x2="140" y2="140" stroke="#333" stroke-width="2"/>
+                <line x1="10" y1="140" x2="10" y2="10" stroke="#333" stroke-width="2"/>
+                <path d="M10,140 L140,10" stroke="#666" stroke-width="2"/>
+            </svg>`,
+        table: (w=300, h=100) => `
+            <svg class="svg-placeholder" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Data table">
+                <rect width="100%" height="100%" fill="#fff" stroke="#ccc"/>
+                <line x1="0" y1="30" x2="300" y2="30" stroke="#333" stroke-width="1"/>
+                <line x1="100" y1="0" x2="100" y2="100" stroke="#333" stroke-width="1"/>
+                <line x1="200" y1="0" x2="200" y2="100" stroke="#333" stroke-width="1"/>
+                <text x="50" y="20" text-anchor="middle" fill="#333" font-family="sans-serif" font-size="12">Item</text>
+                <text x="150" y="20" text-anchor="middle" fill="#333" font-family="sans-serif" font-size="12">Cost</text>
+            </svg>`
+    };
+
+    // Question Factory
+    function createQuestion(id, prompt, answer, type = 'std', details = {}) {
+        return {
+            id,
+            prompt,
+            answer,
+            type, // std, diagram, sub
+            diagram: details.diagram || null,
+            guidance: details.guidance || null,
+            formulas: details.formulas || null,
+            working: details.working || ['...'],
+            altWorking: details.altWorking || null,
+            subQuestions: details.subQuestions || []
+        };
+    }
+
+    /* DATASETS */
+    
+    // 1. Short Paper
+    const paperShort = [
+        createQuestion('1', 'Fill in the missing number: $$55 + \\boxed{a} = 82$$', '27', 'std', {
+            working: ['Let the missing number = $a$', '$55 + a = 82$', '$a = 82 - 55$', '$a = 27$']
+        }),
+        createQuestion('2', 'Calculate: $$32 \\times 20$$', '640', 'std', {
+            working: ['$32 \\times 2 = 64$', '$64 \\times 10 = 640$']
+        }),
+        createQuestion('3', 'Subtract three hundred and three from six thousand.', '5697', 'std', {
+            working: ['$6000 - 303$', 'Align columns:', '  6000', '-  303', '______', '  5697']
+        }),
+        createQuestion('4', 'A film starts at 14:30 and lasts 105 minutes. When does it finish?', '16:15', 'std', {
+            guidance: 'Convert minutes to hours and minutes.',
+            working: ['$105 \\text{ mins} = 1 \\text{ hour } 45 \\text{ mins}$', '$14:30 + 1:00 = 15:30$', '$15:30 + 0:45 = 16:15$']
+        }),
+        createQuestion('5', 'Look at the shape.', 'Tile E', 'diagram', {
+            diagram: SVGS.geometry(),
+            working: ['Perimeter analysis shows Tile E can be removed without changing the total length.']
+        }),
+        createQuestion('6', 'Solve this problem.', 'See below', 'sub', {
+            subQuestions: [
+                createQuestion('6a', 'How many 20p coins make £2?', '10', 'std', { working: ['$200 \\div 20 = 10$'] }),
+                createQuestion('6b', 'What is 10% of that number?', '1', 'std', { working: ['$10 \\times 0.1 = 1$'] })
+            ]
+        })
+    ];
+
+    // 2. Standard Paper (35 Questions, Long Algebra at end)
+    const paperStandard = [];
+    for (let i = 1; i <= 25; i++) {
+        paperStandard.push(createQuestion(i.toString(), `Standard arithmetic question number ${i}. Calculate $$${i} \\times 12$$.`, `${i*12}`, 'std', {
+            working: [`$${i} \\times 10 = ${i*10}$`, `$${i} \\times 2 = ${i*2}$`, `Total = ${i*12}`]
+        }));
+    }
+    // Add long algebra questions 26-35
+    for (let i = 26; i <= 35; i++) {
+        const longWorking = [];
+        // Add 10 lines of mock algebra
+        for(let j=0; j<10; j++) longWorking.push(`Step ${j+1}: $${i}x^2 + ${j}y = ${(i+j)*10}$`);
+        
+        paperStandard.push(createQuestion(i.toString(), `Deep algebra problem ${i}. Solve for $x$.`, `$x = ${i/2}$`, 'std', {
+            guidance: 'Use quadratic formula.',
+            formulas: '$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$',
+            working: longWorking,
+            altWorking: ['Alternative method using factorization...', '...yields same result.']
+        }));
+    }
+    // Add nested add-on to Q30 if needed (done dynamically below)
+
+    // 3. Diagram Heavy
+    const paperDiagram = [];
+    for (let i = 1; i <= 20; i++) {
+        const hasDiag = i % 2 === 0; // Every even question
+        const type = hasDiag ? 'diagram' : 'std';
+        const diagSVG = hasDiag ? (i%4===0 ? SVGS.bar() : SVGS.grid()) : null;
+        
+        paperDiagram.push(createQuestion(i.toString(), `Question ${i} involving visual data.`, '42', type, {
+            diagram: diagSVG,
+            working: ['Analyzing the diagram...', 'Step 1...', 'Answer is 42']
+        }));
+    }
+
+    // 4. Sectioned Paper
+    const paperSectioned = {
+        sections: [
+            { label: 'Section A', questions: paperShort }, // reusing short for brevity in code
+            { label: 'Section B', questions: paperDiagram.slice(0, 5) },
+            { label: 'Section C', questions: paperStandard.slice(25, 30) } // long ones
+        ]
+    };
+
+    /* =========================================
+       RENDER LOGIC
+       ========================================= */
+
+    const els = {
+        paperSelect: document.getElementById('paperSelect'),
+        katexToggle: document.getElementById('katexToggle'),
+        navToggle: document.getElementById('navToggle'),
+        navOverlay: document.getElementById('navOverlay'),
+        docNav: document.getElementById('docNav'),
+        navList: document.getElementById('navList'),
+        paperContent: document.getElementById('paperContent')
+    };
+
+    let state = {
+        paperId: 'short',
+        realKatex: false,
+        expandedMode: false // for Standard Expanded add-on
+    };
+
+    // Main Render Function
+    function render() {
+        // Clear existing
+        els.navList.innerHTML = '';
+        els.paperContent.innerHTML = '';
+
+        // Determine dataset
+        let data = [];
+        let isSectioned = false;
+        state.expandedMode = (els.paperSelect.value === 'standard_expanded');
+
+        switch (els.paperSelect.value) {
+            case 'short': data = paperShort; break;
+            case 'standard': 
+            case 'standard_expanded':
+                data = paperStandard; 
+                // Add Deep Nesting to Q18 as per Add-on
+                const q18Index = data.findIndex(q => q.id === '18');
+                if(q18Index > -1) {
+                   // Mutate for display purposes (clone to avoid permanent mutation in real app)
+                   // Simplified for prototype:
+                   data[q18Index].subQuestions = [
+                       createQuestion('18(a)(i)', 'Part a.i', '5', 'std', { working: ['$2+3=5$']}),
+                       createQuestion('18(a)(ii)', 'Part a.ii', '10', 'std', { working: ['$5 \\times 2=10$']}),
+                       createQuestion('18(b)', 'Part b', '20', 'std', { working: ['$10 \\times 2=20$']})
+                   ];
+                }
+                break;
+            case 'diagram': data = paperDiagram; break;
+            case 'sectioned': 
+                data = paperSectioned; 
+                isSectioned = true; 
+                break;
+        }
+
+        // Build HTML
+        if (isSectioned) {
+            data.sections.forEach(sec => {
+                // Nav Separator
+                const navSep = document.createElement('li');
+                navSep.className = 'nav-section-label';
+                navSep.textContent = sec.label;
+                els.navList.appendChild(navSep);
+
+                // Section Header in Content
+                const secHeader = document.createElement('h2');
+                secHeader.style.cssText = "margin-top: 64px; border-bottom: 2px solid #eee; padding-bottom: 8px;";
+                secHeader.textContent = sec.label;
+                els.paperContent.appendChild(secHeader);
+
+                sec.questions.forEach(q => renderQuestionNode(q));
+            });
+        } else {
+            data.forEach(q => renderQuestionNode(q));
+        }
+
+        // Apply KaTeX if enabled
+        if (state.realKatex && window.renderMathInElement) {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+    }
+
+    // Question Renderer
+    function renderQuestionNode(q, parentLevel = 0) {
+        // 1. Create Question Block
+        const block = document.createElement('div');
+        // Indentation logic based on nesting
+        if (parentLevel === 0) block.className = 'question-block';
+        else if (parentLevel === 1) block.className = 'sub-question-block';
+        else block.className = 'sub-sub-question-block';
+        
+        block.id = `q-${q.id}`; // Anchor
+
+        // 2. Navigation Item (Only for top level or specific sub-questions if desired, 
+        // Brief says "Navigation must present question identifiers only" e.g. 7, 7a)
+        const navItem = document.createElement('li');
+        const navLink = document.createElement('a');
+        navLink.className = 'nav-item';
+        navLink.href = `#q-${q.id}`;
+        navLink.textContent = q.id;
+        navLink.onclick = (e) => {
+            e.preventDefault();
+            block.scrollIntoView({behavior: 'smooth'});
+            // Update active state manually or let observer handle it
+            if(window.innerWidth <= 768) closeNav();
+        };
+        navItem.appendChild(navLink);
+        els.navList.appendChild(navItem);
+
+
+        // 3. Question Prompt
+        const header = document.createElement('div');
+        header.className = 'q-header';
+        
+        const idSpan = document.createElement('span');
+        idSpan.className = 'q-id';
+        idSpan.textContent = q.id;
+        
+        const promptSpan = document.createElement('div');
+        promptSpan.className = 'q-prompt';
+        promptSpan.innerHTML = processMath(q.prompt); // Inject placeholder math
+
+        header.append(idSpan, promptSpan);
+        block.appendChild(header);
+
+        // Diagram
+        if (q.diagram) {
+            const dContainer = document.createElement('div');
+            dContainer.className = 'q-diagram';
+            dContainer.innerHTML = q.diagram;
+            block.appendChild(dContainer);
+        }
+
+        // Sub-questions?
+        if (q.subQuestions && q.subQuestions.length > 0) {
+            // If parent has subquestions, it might not have an answer itself, 
+            // but we render subquestions nested.
+            const subContainer = document.createElement('div');
+            block.appendChild(subContainer);
+            // Recursive call for sub-questions
+            // Note: sub-questions append to main content flow in this logic, 
+            // but purely nested in DOM is better for structure.
+            // However, to keep flat structure for nav generation, we need care.
+            // Simplified: Render sub-questions inside this block.
+            q.subQuestions.forEach(sq => {
+                const subNode = renderQuestionNode(sq, parentLevel + 1);
+                // We don't append subNode to paperContent, we return it or append to parent.
+                // Refactor: renderQuestionNode should append to DOM if top level, or return node.
+                // Let's adjust: renderQuestionNode appends to els.paperContent if level 0.
+            });
+            // Correction: The recursive call above appends to paperContent/Nav. 
+            // We need to move the appended DOM node into *this* block.
+            // This prototype logic is getting tricky with the linear requirement. 
+            // Linear doc: Q1, Q1a, Q1b. 
+            // Visual nesting: Q1a is inside Q1 visually? Or just indented below?
+            // Brief: "Sub-questions... distinguished using indentation".
+            // So they follow sequentially.
+        } else {
+            // Leaf node: Has Answer and Solution Details
+            
+            // 4. Answer
+            const ansBlock = document.createElement('div');
+            ansBlock.className = 'answer-block';
+            ansBlock.innerHTML = `<span class="answer-label">Answer</span><span class="answer-value">${processMath(q.answer)}</span>`;
+            block.appendChild(ansBlock);
+
+            // 5. Solution Details
+            const solBlock = document.createElement('div');
+            solBlock.className = 'solution-details';
+
+            // Toggle
+            const toggle = document.createElement('button');
+            toggle.className = 'toggle-btn';
+            toggle.textContent = 'Show working';
+            toggle.setAttribute('aria-expanded', 'false');
+            
+            const content = document.createElement('div');
+            content.className = 'details-content';
+            
+            // Build Content string
+            let html = '';
+            
+            // Keep in mind
+            if (q.guidance) {
+                html += `<div class="sol-section"><span class="sol-label">Guidance</span>${processMath(q.guidance)}</div>`;
+            }
+            // Formulas
+            if (q.formulas) {
+                html += `<div class="sol-section"><span class="sol-label">Formulae Used</span><div class="math-block">${processMath(q.formulas)}</div></div>`;
+            }
+            // Working
+            if (q.working) {
+                html += `<div class="sol-section"><span class="sol-label">Working</span>`;
+                q.working.forEach(line => {
+                    // Check if line is block math
+                    if(line.includes('$$')) {
+                        html += `<div class="math-block">${processMath(line)}</div>`;
+                    } else {
+                        html += `<div>${processMath(line)}</div>`;
+                    }
+                });
+                html += `</div>`;
+            }
+            // Alt Working
+            if (q.altWorking) {
+                html += `<div class="sol-section"><span class="sol-label">Alternative Working</span>`;
+                q.altWorking.forEach(line => {
+                    html += `<div>${processMath(line)}</div>`;
+                });
+                html += `</div>`;
+            }
+
+            content.innerHTML = html;
+
+            // Toggle Logic
+            let isExpanded = state.expandedMode; // Add-on default
+            
+            const updateState = () => {
+                content.classList.toggle('is-expanded', isExpanded);
+                toggle.textContent = isExpanded ? 'Hide working' : 'Show working';
+                toggle.setAttribute('aria-expanded', isExpanded);
+            };
+
+            // Set initial state
+            updateState();
+
+            toggle.onclick = () => {
+                isExpanded = !isExpanded;
+                updateState();
+            };
+
+            solBlock.append(toggle, content);
+            block.appendChild(solBlock);
+        }
+
+        // Handling the "Append" logic carefully for nesting
+        if (parentLevel === 0) {
+            els.paperContent.appendChild(block);
+        } else {
+            // If it's a sub-question, it needs to be appended to the Document stream, 
+            // but visually indented.
+            // Since we are iterating standard arrays, we just append to paperContent.
+            // The indentation class handles the visual relationship.
+            els.paperContent.appendChild(block);
+        }
+    }
+
+    // Helper: Math Placeholder Processor
+    // If Real KaTeX is off, renders text-based placeholders.
+    function processMath(text) {
+        if (!text) return '';
+        if (state.realKatex) return text; // Leave raw for KaTeX parser
+
+        // Replace $$...$$ with block placeholder
+        let out = text.replace(/\$\$(.*?)\$\$/g, (match, p1) => {
+            return `<span class="math-placeholder-block">[Math: ${p1}]</span>`;
+        });
+        // Replace $...$ with inline placeholder
+        out = out.replace(/\$(.*?)\$/g, (match, p1) => {
+            return `<span class="math-placeholder-inline">[${p1}]</span>`;
+        });
+        return out;
+    }
+
+    /* =========================================
+       INTERACTION & EVENTS
+       ========================================= */
+
+    // Select Change
+    els.paperSelect.addEventListener('change', render);
+    
+    // KaTeX Toggle
+    els.katexToggle.addEventListener('change', (e) => {
+        state.realKatex = e.target.checked;
+        render();
+    });
+
+    // Mobile Nav
+    function toggleNav() {
+        const isOpen = els.docNav.classList.toggle('is-open');
+        els.navOverlay.classList.toggle('is-open');
+    }
+    function closeNav() {
+        els.docNav.classList.remove('is-open');
+        els.navOverlay.classList.remove('is-open');
+    }
+
+    els.navToggle.addEventListener('click', toggleNav);
+    els.navOverlay.addEventListener('click', closeNav);
+
+    // Scroll Spy (Intersection Observer)
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // Find corresponding nav link
+                const id = entry.target.id;
+                document.querySelectorAll('.nav-item').forEach(link => {
+                    link.classList.toggle('is-active', link.getAttribute('href') === `#${id}`);
+                });
+            }
+        });
+    }, { rootMargin: '-20% 0px -60% 0px' }); // Active when near top
+
+    // Hook observer after render
+    const originalRender = render;
+    render = function() {
+        originalRender();
+        document.querySelectorAll('[id^="q-"]').forEach(el => observer.observe(el));
+    }
+
+    // Initial Render
+    render();
+
+</script>
+
+</body>
+</html>
