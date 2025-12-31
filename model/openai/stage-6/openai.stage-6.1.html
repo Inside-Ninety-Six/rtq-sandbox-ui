@@ -1,0 +1,1525 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RTQ – Maths Paper Solution Viewer (Prototype)</title>
+
+  <!-- Real KaTeX Rendering (Add-on) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <style>
+    :root{
+      --bg: #f6f6f4;
+      --paper: #fbfbfa;
+      --ink: #1f1f1f;
+      --muted: #5e5e5e;
+      --quiet: #7a7a7a;
+      --hairline: #e2e2de;
+      --soft: #f2f2ef; /* subtle underlay for display math only */
+      --focus: #2a2a2a; /* grayscale focus */
+      --maxw: 1120px;
+      --navw: 140px;
+
+      --sp-1: 6px;
+      --sp-2: 10px;
+      --sp-3: 14px;
+      --sp-4: 20px;
+      --sp-5: 32px; /* between top-level questions (largest) */
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin:0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      overflow-x:hidden; /* KaTeX containment invariant (page-level) */
+    }
+
+    /* Top controls (aligned to centered frame) */
+    .topbar{
+      border-bottom: 1px solid var(--hairline);
+      background: var(--bg);
+    }
+    .topbar-inner{
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 12px 16px;
+      display:flex;
+      align-items:center;
+      gap: 12px;
+    }
+    .topbar label{
+      font-size: 13px;
+      color: var(--muted);
+    }
+    select{
+      font-size: 14px;
+      padding: 6px 8px;
+      border: 1px solid var(--hairline);
+      border-radius: 0;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    .jump-btn{
+      margin-left:auto;
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 1px solid var(--hairline);
+      background: var(--paper);
+      color: var(--ink);
+      border-radius: 0;
+      display:none;
+    }
+    .jump-btn:focus{
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    /* Centered frame that contains nav + content (canonical) */
+    .frame{
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 22px 16px 40px;
+      background: var(--paper); /* surface unification: nav + content same surface */
+      display:grid;
+      grid-template-columns: var(--navw) 1fr;
+      gap: 26px;
+      align-items:start;
+    }
+
+    /* Navigation rail (quiet, documentation-style, no panel) */
+    nav{
+      position: sticky;
+      top: 16px;
+      align-self:start;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto; /* permitted only if exceeds viewport height */
+      padding: 2px 0;
+      scrollbar-width: none; /* Firefox: hide scrollbars */
+      -ms-overflow-style: none; /* legacy */
+    }
+    nav::-webkit-scrollbar{ display:none; } /* WebKit/Blink */
+    .nav-title{
+      font-size: 12px;
+      color: var(--quiet);
+      margin: 0 0 10px 0;
+      letter-spacing: .01em;
+    }
+    .nav-list{
+      list-style:none;
+      margin:0;
+      padding:0;
+    }
+    .nav-sep{
+      font-size: 12px;
+      color: var(--quiet);
+      margin: 12px 0 6px;
+    }
+    .nav-item{
+      margin: 2px 0;
+    }
+    .nav-link{
+      text-decoration:none;
+      color: var(--quiet);
+      font-size: 13px;
+      line-height: 1.7;
+      display:inline-block;
+      padding: 1px 0;
+    }
+    .nav-link:hover{ color: var(--muted); }
+    .nav-link:focus{
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .nav-link[aria-current="true"]{
+      font-weight: 600; /* current state: weight-only (primary cue) */
+      color: var(--muted);
+    }
+
+    /* Content column */
+    main{
+      min-width:0;
+      padding-right: 2px;
+    }
+
+    /* Question block: spacing-driven grouping (no cards/panels) */
+    .q{
+      margin: 0 0 var(--sp-5) 0;
+    }
+    .q-header{
+      display:flex;
+      gap: 10px;
+      align-items:baseline;
+      margin-bottom: var(--sp-2);
+    }
+    .qid{
+      font-weight: 600;
+      color: var(--muted);
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .qtext{
+      font-size: 16px;
+      line-height: 1.45;
+      color: var(--ink);
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .answer{
+      margin: var(--sp-2) 0 var(--sp-2);
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .answer .label{
+      font-weight: 600;
+      margin-right: 8px;
+      color: var(--muted);
+    }
+    .answer .val{
+      color: var(--ink);
+    }
+    .answers ul{
+      margin: 6px 0 0 22px;
+      padding:0;
+    }
+    .answers li{
+      margin: 2px 0;
+      color: var(--ink);
+    }
+
+    /* Disclosure control: text-first, quiet */
+    .toggle{
+      font-size: 13px;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      display:inline-flex;
+      align-items:center;
+      gap: 6px;
+    }
+    .toggle:hover{ color: var(--ink); }
+    .toggle:focus{
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .chev{
+      width: 10px; height: 10px;
+      display:inline-block;
+      transform: translateY(1px);
+    }
+    .chev svg{ width:10px; height:10px; stroke: currentColor; fill:none; stroke-width:1.5; }
+
+    /* Solution details: subtle separation + hairline, subordinate */
+    .sol{
+      margin-top: var(--sp-3);
+      padding-top: var(--sp-3);
+      border-top: 1px solid var(--hairline);
+      color: var(--muted);
+      display:none;
+    }
+    .sol[hidden]{ display:none; }
+
+    .sol-block{
+      margin-top: var(--sp-3);
+    }
+    .sol-block:first-child{ margin-top: 0; }
+
+    .sol-label{
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .keep ul{
+      margin: 0 0 0 18px;
+      padding:0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .keep li{ margin: 2px 0; }
+    .formulae .math-line{
+      display:block;
+      margin: 4px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .work p{
+      margin: 6px 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    /* Display math underlay exception (block-level only) + containment */
+    .math-block{
+      margin: 8px 0;
+      padding: 6px 8px;
+      background: var(--soft);
+      overflow-x:auto;            /* horizontal scrolling only within math block */
+      -webkit-overflow-scrolling: touch;
+      max-width: 100%;
+    }
+    .math-block .katex-display{
+      margin: 0;
+      overflow-x: auto;           /* KaTeX display containment */
+      overflow-y: hidden;
+      max-width: 100%;
+    }
+    .math-block *{
+      max-width: 100%;
+    }
+
+    /* Tables inside workings: minimal, quiet */
+    table{
+      border-collapse: collapse;
+      margin: 8px 0;
+      width: 100%;
+      max-width: 100%;
+    }
+    td, th{
+      border-bottom: 1px solid var(--hairline);
+      padding: 6px 8px;
+      font-size: 14px;
+      color: var(--muted);
+      text-align: left;
+      vertical-align: top;
+    }
+    th{
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    /* Nesting: indentation only, decreasing separation strength */
+    .nest-1{ margin-left: 18px; }
+    .nest-2{ margin-left: 36px; }
+    .nest-3{ margin-left: 54px; }
+    .nest-1.q{ margin-bottom: 22px; }
+    .nest-2.q{ margin-bottom: 18px; }
+    .nest-3.q{ margin-bottom: 14px; }
+
+    /* Diagrams: inline SVG placeholders (grayscale), within question block */
+    .diagram{
+      margin: 10px 0 0;
+      max-width: 100%;
+    }
+    .diagram svg{
+      width: 100%;
+      height: auto;
+      stroke: var(--muted);
+      fill: none;
+      stroke-width: 1.4;
+    }
+    .diagram text{
+      fill: var(--muted);
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    /* Mobile navigation drawer (minimal drawer, not a second nav system) */
+    .drawer-backdrop{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.25);
+      display:none;
+    }
+    .drawer{
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(320px, 88vw);
+      height: 100%;
+      background: var(--paper);
+      border-left: 1px solid var(--hairline);
+      padding: 14px 14px 18px;
+      display:none;
+      overflow: hidden;
+    }
+    .drawer header{
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .drawer h2{
+      margin:0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .drawer .close{
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 1px solid var(--hairline);
+      background: var(--paper);
+      color: var(--ink);
+      border-radius: 0;
+    }
+    .drawer .close:focus{
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .drawer nav{
+      position: static;
+      top: auto;
+      max-height: calc(100vh - 90px);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    @media (max-width: 860px){
+      .frame{
+        grid-template-columns: 1fr; /* paper remains a single column; nav moves to drawer */
+        gap: 0;
+        padding-top: 18px;
+      }
+      nav.desktop-nav{ display:none; }
+      .jump-btn{ display:inline-flex; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <label for="paperSelect">Paper selector</label>
+      <select id="paperSelect" aria-label="Paper selector">
+        <option value="short">Short paper</option>
+        <option value="standard">Standard paper</option>
+        <option value="standardExpanded">Standard (Workings Expanded)</option>
+        <option value="diagram">Diagram-heavy paper</option>
+        <option value="sectioned">Sectioned paper</option>
+      </select>
+
+      <button id="jumpBtn" class="jump-btn" type="button" aria-haspopup="dialog" aria-expanded="false">
+        Jump to
+      </button>
+    </div>
+  </div>
+
+  <div class="frame" id="frame">
+    <nav class="desktop-nav" aria-label="Question navigation">
+      <div class="nav-title">Jump to</div>
+      <ul class="nav-list" id="navListDesktop"></ul>
+    </nav>
+
+    <main id="paper" tabindex="-1"></main>
+  </div>
+
+  <!-- Mobile drawer -->
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Jump to navigation" hidden>
+    <header>
+      <h2>Jump to</h2>
+      <button class="close" type="button" id="drawerClose">Close</button>
+    </header>
+    <nav aria-label="Question navigation (drawer)">
+      <ul class="nav-list" id="navListDrawer"></ul>
+    </nav>
+  </div>
+
+  <script>
+    /* ---------- Data model ---------- */
+
+    const SVG = {
+      geometry: () => `
+        <div class="diagram">
+          <svg viewBox="0 0 360 140" aria-label="Geometry diagram" role="img">
+            <circle cx="70" cy="70" r="42"></circle>
+            <text x="70" y="74" text-anchor="middle">O</text>
+
+            <path d="M200 110 L260 30 L320 110 Z"></path>
+            <text x="260" y="24" text-anchor="middle">A</text>
+            <text x="192" y="118" text-anchor="middle">B</text>
+            <text x="328" y="118" text-anchor="middle">C</text>
+
+            <path d="M205 110 L320 110"></path>
+            <text x="262" y="132" text-anchor="middle">12 cm</text>
+          </svg>
+        </div>
+      `,
+      bars: () => `
+        <div class="diagram">
+          <svg viewBox="0 0 360 140" aria-label="Ratio bars diagram" role="img">
+            <rect x="30" y="36" width="240" height="20"></rect>
+            <rect x="30" y="76" width="300" height="20"></rect>
+            <text x="30" y="30">A</text>
+            <text x="30" y="70">B</text>
+            <text x="300" y="52">4 parts</text>
+            <text x="330" y="92">5 parts</text>
+          </svg>
+        </div>
+      `,
+      grid: () => `
+        <div class="diagram">
+          <svg viewBox="0 0 360 180" aria-label="Coordinate grid diagram" role="img">
+            <path d="M40 150 H340"></path>
+            <path d="M60 20 V160"></path>
+            ${Array.from({length:6}).map((_,i)=>`<path d="M${60+i*50} 30 V150" stroke-width="0.6"></path>`).join("")}
+            ${Array.from({length:5}).map((_,i)=>`<path d="M60  ${30+i*30} H340" stroke-width="0.6"></path>`).join("")}
+
+            <circle cx="110" cy="120" r="3"></circle>
+            <circle cx="210" cy="90" r="3"></circle>
+            <circle cx="310" cy="60" r="3"></circle>
+            <path d="M110 120 L210 90 L310 60"></path>
+            <text x="110" y="136" text-anchor="middle">(1,2)</text>
+            <text x="210" y="106" text-anchor="middle">(3,3)</text>
+            <text x="310" y="76" text-anchor="middle">(5,4)</text>
+          </svg>
+        </div>
+      `,
+      array: () => `
+        <div class="diagram">
+          <svg viewBox="0 0 360 140" aria-label="Table-like grid diagram" role="img">
+            <rect x="40" y="30" width="280" height="80"></rect>
+            <path d="M40 70 H320"></path>
+            <path d="M133 30 V110"></path>
+            <path d="M226 30 V110"></path>
+            <text x="86" y="54" text-anchor="middle">x</text>
+            <text x="179" y="54" text-anchor="middle">y</text>
+            <text x="273" y="54" text-anchor="middle">total</text>
+            <text x="86" y="96" text-anchor="middle">3</text>
+            <text x="179" y="96" text-anchor="middle">5</text>
+            <text x="273" y="96" text-anchor="middle">8</text>
+          </svg>
+        </div>
+      `
+    };
+
+    function longWorkingLines(count){
+      const lines = [];
+      for(let i=1;i<=count;i++){
+        // varied but synthetic; block-level lines
+        lines.push(String.raw`\begin{aligned} 
+        ${i}. \quad 3x + ${i} &= ${i+12} \\
+        3x &= ${12} \\
+        x &= \dfrac{12}{3} = 4
+        \end{aligned}`);
+      }
+      return lines;
+    }
+
+    function Q(id, promptHTML, answer, solution){
+      return { id, promptHTML, answer, solution, children: [], depth: 0, anchorId: `q-${id}` };
+    }
+    function addChild(parent, child){
+      child.depth = parent.depth + 1;
+      parent.children.push(child);
+      return child;
+    }
+
+    function Sol({ keep=null, formulas=null, working=null, alt=null }){
+      return { keep, formulas, working, alt };
+    }
+
+    // Ensure Solution Details coverage across selected paper(s):
+    // ≥3 Keep in mind, ≥3 Formulas used, ≥3 Alternative working, ≥1 all three.
+    // Also include Deep Question Nesting identifiers.
+    const DATASETS = {
+      short: buildShort(),
+      standard: buildStandard(false),
+      standardExpanded: buildStandard(true),
+      diagram: buildDiagram(),
+      sectioned: buildSectioned()
+    };
+
+    function buildShort(){
+      const qs = [];
+
+      qs.push(Q("1",
+        `Add $308$, $86$ and $4444$.`,
+        `$4838$`,
+        Sol({
+          working: [
+            { type:"block", tex: String.raw`\begin{array}{cccc}
+              & 308\\
+              & 86\\
+              +& 4444\\ \hline
+              & 4838
+            \end{array}` }
+          ]
+        })
+      ));
+
+      qs.push(Q("2",
+        `Divide $3112$ by $8$.`,
+        `$389$`,
+        Sol({
+          keep: [
+            `Use short division and check by multiplying back.`
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              \dfrac{3112}{8} &= 389
+            \end{aligned}` },
+            { type:"inline", text: `Check: $389\\times 8 = 3112$.` }
+          ]
+        })
+      ));
+
+      qs.push(Q("3",
+        `A film starts at $6{:}45\\,\\text{pm}$ and lasts for $2\\,\\text{hours}\\;35\\,\\text{minutes}$. At what time will it finish?`,
+        `$9{:}20\\,\\text{pm}$`,
+        Sol({
+          formulas: [
+            { type:"inline", tex: String.raw`\text{end time}=\text{start time}+\text{duration}` }
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              6{:}45 + 2{:}35 &= 9{:}20
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      // Multi-part question
+      const q4 = Q("4",
+        `Solve each part.`,
+        ``, // parent-level can be empty
+        null
+      );
+      qs.push(q4);
+
+      addChild(q4, Q("4a",
+        `$55 + \\boxed{\\phantom{00}} = 82$`,
+        `$27$`,
+        Sol({
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              55 + a &= 82\\
+              a &= 82 - 55 = 27
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      addChild(q4, Q("4b",
+        `$60 \\div \\boxed{\\phantom{0}} = 12$`,
+        `$5$`,
+        Sol({
+          keep: [
+            `Undo division by multiplying.`,
+            `Keep the equation balanced on both sides.`
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              60 \div a &= 12\\
+              60 &= 12a\\
+              a &= \dfrac{60}{12} = 5
+            \end{aligned}` }
+          ],
+          alt: [
+            {
+              title: "Alternative working",
+              blocks: [
+                { type:"inline", text: `If $60\\div a=12$, then $a$ must be the number that goes into $60$ exactly $12$ times.` },
+                { type:"block", tex: String.raw`\begin{aligned}
+                  12\times 5 &= 60
+                \end{aligned}` }
+              ]
+            }
+          ]
+        })
+      ));
+
+      addChild(q4, Q("4c",
+        `A pack of $3$ lollipops costs $30\\,\\text{p}$. Single lollipops cost $12\\,\\text{p}$. You have $\\pounds 2$. What is the maximum number you can buy?`,
+        `$19$`,
+        Sol({
+          formulas: [
+            { type:"inline", tex: String.raw`\pounds 2 = 200\text{p}` }
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              200\text{p} \div 30\text{p} &= 6\ \text{remainder }20\\
+              6\times 3 &= 18\ \text{lollipops}\\
+              20\text{p} \div 12\text{p} &= 1\ \text{remainder }8\\
+              18+1 &= 19
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      // Ensure at least one question in short includes Keep+Formulas+Alt together (coverage requirement can be met elsewhere too)
+      qs.push(Q("5",
+        `Two friends buy identical trainers. One gets $10\\%$ off, the other gets $15\\%$ off. The first pays $\\pounds 1.20$ more. What was the full price?`,
+        `$\\pounds 24$`,
+        Sol({
+          keep: [
+            `A difference in discounts is a difference in the amount paid.`
+          ],
+          formulas: [
+            { type:"inline", tex: String.raw`\text{discounted price}=p-\dfrac{d}{100}p` }
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              \text{Difference} &= 5\% \text{ of } p\\
+              \dfrac{5}{100}p &= 1.20\\
+              p &= \dfrac{1.20\times 100}{5}=24
+            \end{aligned}` }
+          ],
+          alt: [
+            {
+              title: "Alternative working",
+              blocks: [
+                { type:"inline", text: `The first pays $90\\%$ of $p$, the second pays $85\\%$ of $p$.` },
+                { type:"block", tex: String.raw`\begin{aligned}
+                  0.90p - 0.85p &= 1.20\\
+                  0.05p &= 1.20\\
+                  p &= 24
+                \end{aligned}` }
+              ]
+            }
+          ]
+        })
+      ));
+
+      qs.push(Q("6",
+        `At a school, $16$ teachers travel by car, $6$ by bus, and $3$ walk. What percentage travel by car?`,
+        `$64\\%$`,
+        Sol({
+          keep: [
+            `Find the total first.`,
+            `Percentage means “out of 100”.`
+          ],
+          formulas: [
+            { type:"inline", tex: String.raw`\text{Percentage}=\dfrac{\text{part}}{\text{whole}}\times 100\%` }
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              \text{Total} &= 16+6+3=25\\
+              \text{Car \%} &= \dfrac{16}{25}\times 100 = 64\%
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      return qs;
+    }
+
+    function buildStandard(expanded){
+      const qs = [];
+
+      // 1–25: mixed small/medium with some nesting
+      qs.push(Q("1",
+        `Fill in the missing number: $\\boxed{\\phantom{00}} - 23 = 45$.`,
+        `$68$`,
+        Sol({
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              a - 23 &= 45\\
+              a &= 45+23=68
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      qs.push(Q("2",
+        `A small loaf weighs $400\\,\\text{g}$ and has $10$ equal slices. Every $100\\,\\text{g}$ contains $6\\,\\text{g}$ of fibre. How much fibre is in one slice?`,
+        `$2.4\\,\\text{g}$`,
+        Sol({
+          keep: [
+            `Scale the fibre amount to the whole loaf, then divide by slices.`
+          ],
+          formulas: [
+            { type:"inline", tex: String.raw`\text{scale factor}=\dfrac{\text{new}}{\text{original}}` }
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              400\text{g} &= 4\times 100\text{g}\\
+              \text{Fibre in loaf} &= 4\times 6 = 24\text{g}\\
+              \text{Per slice} &= \dfrac{24}{10}=2.4\text{g}
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      // Deep nesting example: 18(a)(i), 18(a)(ii), 18(b)
+      const q18 = Q("18",
+        `A recipe uses flour and sugar in the ratio $3:2$.`,
+        ``,
+        null
+      );
+      qs.push(q18);
+
+      const q18a = addChild(q18, Q("18(a)",
+        `If there are $450\\,\\text{g}$ of flour, find the mass of sugar.`,
+        `$300\\,\\text{g}$`,
+        Sol({
+          formulas: [
+            { type:"inline", tex: String.raw`\text{one part}=\dfrac{\text{total of known}}{\text{parts of known}}` }
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              3\ \text{parts} &= 450\\
+              1\ \text{part} &= 150\\
+              2\ \text{parts} &= 300
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      addChild(q18a, Q("18(a)(i)",
+        `Write the ratio flour:sugar as a fraction of flour to the total mixture.`,
+        `$\\dfrac{3}{5}$`,
+        Sol({
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              \dfrac{\text{flour}}{\text{total}} &= \dfrac{3}{3+2}=\dfrac{3}{5}
+            \end{aligned}` }
+          ],
+          alt: [
+            {
+              title: "Alternative working",
+              blocks: [
+                { type:"inline", text: `Total parts $=5$, flour parts $=3$, so the fraction is $3/5$.` }
+              ]
+            }
+          ]
+        })
+      ));
+
+      addChild(q18a, Q("18(a)(ii)",
+        `If the total mixture is $750\\,\\text{g}$, find the mass of flour.`,
+        `$450\\,\\text{g}$`,
+        Sol({
+          keep: [
+            `Use the fraction from part (i) on the total.`
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              \text{Flour} &= \dfrac{3}{5}\times 750 = 450
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      addChild(q18, Q("18(b)",
+        `If sugar increases by $20\\%$ but flour stays the same, what is the new sugar mass when flour is $450\\,\\text{g}$?`,
+        `$360\\,\\text{g}$`,
+        Sol({
+          formulas: [
+            { type:"inline", tex: String.raw`\text{new}=\text{original}\times\left(1+\dfrac{20}{100}\right)` }
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              \text{Original sugar} &= 300\\
+              \text{New sugar} &= 300\times 1.2 = 360
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      // Another deep nesting: 30(a)(i), 30(a)(ii), 30(b)
+      const q30 = Q("30",
+        `A number sequence is defined by $u_{n+1}=u_n+3$ with $u_1=2$.`,
+        ``,
+        null
+      );
+      qs.push(q30);
+
+      const q30a = addChild(q30, Q("30(a)",
+        `Find $u_4$.`,
+        `$11$`,
+        Sol({
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              u_1&=2\\
+              u_2&=5\\
+              u_3&=8\\
+              u_4&=11
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      addChild(q30a, Q("30(a)(i)",
+        `Write down a formula for $u_n$.`,
+        `$u_n=3n-1$`,
+        Sol({
+          keep: [
+            `This is an arithmetic sequence: constant difference.`
+          ],
+          formulas: [
+            { type:"inline", tex: String.raw`u_n = u_1 + (n-1)d` }
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              u_n &= 2 + (n-1)\cdot 3\\
+              &= 2 + 3n - 3\\
+              &= 3n - 1
+            \end{aligned}` }
+          ]
+        })
+      ));
+
+      addChild(q30a, Q("30(a)(ii)",
+        `Find $u_{20}$.`,
+        `$59$`,
+        Sol({
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              u_{20} &= 3\cdot 20 - 1 = 59
+            \end{aligned}` }
+          ],
+          alt: [
+            {
+              title: "Alternative working",
+              blocks: [
+                { type:"inline", text: `Add $3$ nineteen times to $2$: $2+19\\cdot 3=59$.` }
+              ]
+            }
+          ]
+        })
+      ));
+
+      addChild(q30, Q("30(b)",
+        `How many terms are less than $100$?`,
+        `$33$`,
+        Sol({
+          keep: [
+            `Use an inequality and solve for $n$.`
+          ],
+          working: [
+            { type:"block", tex: String.raw`\begin{aligned}
+              3n-1 &< 100\\
+              3n &< 101\\
+              n &< \dfrac{101}{3} \approx 33.6
+            \end{aligned}` },
+            { type:"inline", text: `So the greatest integer $n$ is $33$.` }
+          ]
+        })
+      ));
+
+      // Fill remaining up to 25 with varied medium questions
+      const existingTop = new Set(qs.filter(x=>x.depth===0).map(x=>x.id));
+      for(let i=3;i<=25;i++){
+        if(existingTop.has(String(i))) continue;
+        qs.push(Q(String(i),
+          `Calculate $\\left(9999 - 999 + 99 - 9\\right) \\div 9$.`,
+          `$1010$`,
+          Sol({
+            keep: [
+              `Work inside the brackets first.`
+            ],
+            working: [
+              { type:"block", tex: String.raw`\begin{aligned}
+                (9999 - 999 + 99 - 9) &= 9090\\
+                9090 \div 9 &= 1010
+              \end{aligned}` }
+            ],
+            alt: (i % 7 === 0) ? [{
+              title: "Alternative working",
+              blocks: [
+                { type:"inline", text: `Notice each term is a multiple of $9$: factor out $9$ then divide.` }
+              ]
+            }] : null
+          })
+        ));
+      }
+
+      // 26–35: long algebra questions, collapsed by default (except expanded dataset)
+      // Include extremely long workings (50–60 lines) in selected long questions.
+      const longIds = ["26","28","32"]; // 3 long-working (50–60 lines)
+      for(let i=26;i<=35;i++){
+        const id = String(i);
+        const includeVeryLong = longIds.includes(id);
+        const longLines = includeVeryLong ? longWorkingLines(56) : [
+          String.raw`\begin{aligned}
+            2(3x-5) &= 4x+6\\
+            6x-10 &= 4x+6\\
+            2x &= 16\\
+            x &= 8
+          \end{aligned}`,
+          String.raw`\begin{aligned}
+            \text{Check: } 2(3\cdot 8-5) &= 2(24-5)=38\\
+            4\cdot 8 + 6 &= 38
+          \end{aligned}`
+        ];
+
+        const keep = (i===27 || i===29 || i===33) ? [
+          `Expand brackets carefully before collecting like terms.`,
+          `Do the same operation to both sides.`
+        ] : null;
+
+        const formulas = (i===26 || i===30 || i===34) ? [
+          { type:"inline", tex: String.raw`ax+b=cx+d \Rightarrow (a-c)x=d-b` }
+        ] : null;
+
+        const alt = (i===31 || i===33 || i===35) ? [{
+          title: "Alternative working",
+          blocks: [
+            { type:"inline", text: `Rearrange first to group all $x$ terms on one side, then divide.` },
+            { type:"block", tex: String.raw`\begin{aligned}
+              6x-4x &= 6+10\\
+              2x &= 16\\
+              x &= 8
+            \end{aligned}` }
+          ]
+        }] : null;
+
+        qs.push(Q(id,
+          `Solve the equation and show your working: $2(3x-5)=4x+6$.`,
+          `$x=8$`,
+          Sol({
+            keep,
+            formulas,
+            working: longLines.map(tex => ({ type:"block", tex })),
+            alt
+          })
+        ));
+      }
+
+      // Mark dataset default expansion rule
+      qs.__defaults = { expandedAll: !!expanded };
+      return qs;
+    }
+
+    function buildDiagram(){
+      const qs = [];
+      // 20 questions total; exactly 8 with diagrams
+      const diagramIds = new Set(["2","4","6","8","11","13","16","19"]);
+
+      for(let i=1;i<=20;i++){
+        const id = String(i);
+        const diagram = diagramIds.has(id)
+          ? (i%4===0 ? SVG.geometry() : i%4===1 ? SVG.bars() : i%4===2 ? SVG.grid() : SVG.array())
+          : "";
+
+        const prompt = diagramIds.has(id)
+          ? `Use the diagram to answer the question.${diagram}`
+          : `Calculate the value of $7\\times ${i}+${i%5}$.`;
+
+        const answerTex = diagramIds.has(id)
+          ? `$${10 + i}$`
+          : `$${7*i + (i%5)}$`;
+
+        const solution = Sol({
+          keep: (i===6 || i===11 || i===16) ? [`Read the diagram labels first, then choose the operation.`] : null,
+          formulas: (i===4 || i===13 || i===19) ? [{ type:"inline", tex: String.raw`\text{difference}=\text{larger}-\text{smaller}` }] : null,
+          working: diagramIds.has(id)
+            ? [
+                { type:"inline", text: `From the diagram, the required total is $${10+i}$.` }
+              ]
+            : [
+                { type:"block", tex: String.raw`\begin{aligned}
+                  7\times ${i} + ${i%5} &= ${7*i + (i%5)}
+                \end{aligned}` }
+              ],
+          alt: (i===8 || i===16 || i===20) ? [{
+            title: "Alternative working",
+            blocks: [
+              { type:"inline", text: `Break it up: $7\\times ${i} = ${7*i}$, then add $${i%5}$.` }
+            ]
+          }] : null
+        });
+
+        qs.push(Q(id, prompt, answerTex, solution));
+      }
+
+      qs.__defaults = { expandedAll: false };
+      return qs;
+    }
+
+    function buildSectioned(){
+      // Section A: 35 questions, small/medium
+      // Section B: 8 questions, medium
+      // Section C: 6 questions, all very long Solution Details (collapsed by default)
+      const A = buildStandard(false).slice(0,35);
+      const B = buildDiagram().slice(0,8);
+      const C = [];
+
+      // 6 very long (50–60 lines) in Section C
+      for(let i=1;i<=6;i++){
+        const id = String(i);
+        const lines = longWorkingLines(58);
+        const keep = (i<=3) ? [
+          `Write one clear line per step.`,
+          `If you change the form, keep it equivalent.`
+        ] : null;
+
+        const formulas = (i===2 || i===5) ? [
+          { type:"inline", tex: String.raw`(x+p)^2 = x^2 + 2px + p^2` },
+          { type:"inline", tex: String.raw`\text{factorisation: } x^2+bx+c=(x+m)(x+n)` }
+        ] : null;
+
+        const alt = (i===3 || i===6) ? [{
+          title: "Alternative working",
+          blocks: [
+            { type:"inline", text: `Try substituting your value back into the original equation to check.` },
+            { type:"block", tex: String.raw`\begin{aligned}
+              \text{Check: LHS} &= \text{RHS}
+            \end{aligned}` }
+          ]
+        }] : null;
+
+        C.push(Q(`C${id}`,
+          `Long algebra derivation (Section C): simplify and solve.`,
+          `$x=4$`,
+          Sol({
+            keep,
+            formulas,
+            working: lines.map(tex => ({ type:"block", tex })),
+            alt
+          })
+        ));
+      }
+
+      return { A, B, C, __defaults: { expandedAll: false } };
+    }
+
+    /* ---------- Rendering ---------- */
+
+    const paperEl = document.getElementById("paper");
+    const navDesktop = document.getElementById("navListDesktop");
+    const navDrawer = document.getElementById("navListDrawer");
+    const selectEl = document.getElementById("paperSelect");
+
+    const jumpBtn = document.getElementById("jumpBtn");
+    const drawer = document.getElementById("drawer");
+    const backdrop = document.getElementById("drawerBackdrop");
+    const drawerClose = document.getElementById("drawerClose");
+
+    let currentDatasetKey = selectEl.value;
+    let toggleStateByDataset = new Map(); // datasetKey -> Set(anchorId) expanded
+    let observer = null;
+
+    function ensureState(key){
+      if(!toggleStateByDataset.has(key)) toggleStateByDataset.set(key, new Set());
+      return toggleStateByDataset.get(key);
+    }
+
+    function clearAndDisconnect(){
+      if(observer){ observer.disconnect(); observer = null; }
+      paperEl.innerHTML = "";
+      navDesktop.innerHTML = "";
+      navDrawer.innerHTML = "";
+    }
+
+    function render(){
+      clearAndDisconnect();
+
+      const key = selectEl.value;
+      currentDatasetKey = key;
+
+      // Switching papers must NOT auto-expand/collapse beyond defaults.
+      // Therefore: reset expanded set to defaults for this dataset each time we switch.
+      // Store per-key state but rebuild on switch: defaults only (no persistence across papers).
+      const expandedSet = new Set();
+      toggleStateByDataset.set(key, expandedSet);
+
+      if(key === "sectioned"){
+        renderSectioned(DATASETS.sectioned, expandedSet);
+      }else{
+        renderFlat(DATASETS[key], expandedSet);
+      }
+
+      // After DOM insert, render KaTeX (graceful fallback)
+      tryRenderKatex();
+
+      // Setup current nav item tracking (weight-only)
+      setupCurrentTracking();
+
+      // Ensure focus order: top controls -> nav -> content (content not auto-focused)
+    }
+
+    function renderFlat(list, expandedSet){
+      const defaults = list.__defaults || { expandedAll: false };
+
+      const flatForNav = [];
+      for(const q of list){
+        flatten(q, flatForNav);
+      }
+
+      buildNav(flatForNav, navDesktop, false);
+      buildNav(flatForNav, navDrawer, false);
+
+      for(const q of list){
+        paperEl.appendChild(renderQuestion(q, defaults, expandedSet));
+      }
+    }
+
+    function renderSectioned(sec, expandedSet){
+      const sections = [
+        { label: "A", items: sec.A },
+        { label: "B", items: sec.B },
+        { label: "C", items: sec.C }
+      ];
+
+      const navModel = [];
+      for(const s of sections){
+        navModel.push({ type:"sep", label: s.label });
+        for(const q of s.items){
+          const flat = [];
+          flatten(q, flat);
+          for(const it of flat) navModel.push({ type:"item", q: it });
+        }
+      }
+
+      buildNav(navModel, navDesktop, true);
+      buildNav(navModel, navDrawer, true);
+
+      const defaults = sec.__defaults || { expandedAll:false };
+
+      for(const s of sections){
+        // content: sections are not new containers; just structural divider text
+        const h = document.createElement("div");
+        h.className = "q";
+        h.innerHTML = `<div class="q-header"><span class="qid">${s.label}</span><div class="qtext">Section ${s.label}</div></div>`;
+        paperEl.appendChild(h);
+
+        for(const q of s.items){
+          paperEl.appendChild(renderQuestion(q, defaults, expandedSet));
+        }
+      }
+    }
+
+    function flatten(q, out){
+      out.push(q);
+      for(const c of q.children) flatten(c, out);
+    }
+
+    function buildNav(model, ul, isSectioned){
+      ul.innerHTML = "";
+
+      if(isSectioned){
+        for(const node of model){
+          if(node.type === "sep"){
+            const li = document.createElement("li");
+            li.className = "nav-sep";
+            li.textContent = node.label;
+            ul.appendChild(li);
+          }else{
+            ul.appendChild(navItem(node.q));
+          }
+        }
+        return;
+      }
+
+      for(const q of model){
+        ul.appendChild(navItem(q));
+      }
+    }
+
+    function navItem(q){
+      const li = document.createElement("li");
+      li.className = "nav-item";
+      const a = document.createElement("a");
+      a.className = "nav-link";
+      a.href = `#${q.anchorId}`;
+      a.textContent = q.id;
+      a.addEventListener("click", () => {
+        // navigation must not change expanded/collapsed state
+        closeDrawerIfOpen();
+      });
+      li.appendChild(a);
+      return li;
+    }
+
+    function renderQuestion(q, defaults, expandedSet){
+      const wrap = document.createElement("section");
+      wrap.className = `q ${q.depth===1?"nest-1":q.depth===2?"nest-2":q.depth===3?"nest-3":""}`.trim();
+      wrap.id = q.anchorId;
+
+      // Header
+      const header = document.createElement("div");
+      header.className = "q-header";
+      header.innerHTML = `
+        <span class="qid">${escapeHTML(q.id)}</span>
+        <div class="qtext">${q.promptHTML}</div>
+      `;
+      wrap.appendChild(header);
+
+      // Answer
+      const answer = document.createElement("div");
+      answer.className = "answer";
+      if(q.answer && q.answer.trim()){
+        answer.innerHTML = `<span class="label">Answer</span> <span class="val">${q.answer}</span>`;
+      }else{
+        answer.innerHTML = `<span class="label">Answer</span> <span class="val"></span>`;
+      }
+      wrap.appendChild(answer);
+
+      // Toggle + Solution
+      if(q.solution){
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "toggle";
+        btn.setAttribute("aria-expanded", "false");
+        btn.innerHTML = `
+          <span class="toggle-text">Show working</span>
+          <span class="chev" aria-hidden="true">
+            <svg viewBox="0 0 10 10"><path d="M2 3.5 L5 6.5 L8 3.5"></path></svg>
+          </span>
+        `;
+
+        const sol = document.createElement("div");
+        sol.className = "sol";
+        sol.hidden = true;
+
+        const initiallyOpen = !!defaults.expandedAll;
+        if(initiallyOpen){
+          expandedSet.add(q.anchorId);
+          sol.hidden = false;
+          btn.setAttribute("aria-expanded","true");
+          btn.querySelector(".toggle-text").textContent = "Hide working";
+        }
+
+        btn.addEventListener("click", () => {
+          const isOpen = !sol.hidden;
+          if(isOpen){
+            sol.hidden = true;
+            expandedSet.delete(q.anchorId);
+            btn.setAttribute("aria-expanded","false");
+            btn.querySelector(".toggle-text").textContent = "Show working";
+          }else{
+            sol.hidden = false;
+            expandedSet.add(q.anchorId);
+            btn.setAttribute("aria-expanded","true");
+            btn.querySelector(".toggle-text").textContent = "Hide working";
+          }
+        });
+
+        wrap.appendChild(btn);
+
+        // Solution blocks in fixed order: Keep in mind, Formulas used, Working, Alternative working
+        appendSolutionBlocks(sol, q.solution);
+
+        wrap.appendChild(sol);
+      }
+
+      // Children (sub-questions)
+      for(const c of q.children){
+        wrap.appendChild(renderQuestion(c, defaults, expandedSet));
+      }
+
+      return wrap;
+    }
+
+    function appendSolutionBlocks(solEl, sol){
+      // Keep in mind (optional)
+      if(sol.keep && sol.keep.length){
+        const b = document.createElement("div");
+        b.className = "sol-block keep";
+        b.innerHTML = `<div class="sol-label">Keep in mind</div>`;
+        const ul = document.createElement("ul");
+        for(const tip of sol.keep){
+          const li = document.createElement("li");
+          li.textContent = tip;
+          ul.appendChild(li);
+        }
+        b.appendChild(ul);
+        solEl.appendChild(b);
+      }
+
+      // Formulas used (optional)
+      if(sol.formulas && sol.formulas.length){
+        const b = document.createElement("div");
+        b.className = "sol-block formulae";
+        b.innerHTML = `<div class="sol-label">Formulas used</div>`;
+        for(const f of sol.formulas){
+          const line = document.createElement("span");
+          line.className = "math-line";
+          line.textContent = (f.type==="inline") ? `$${f.tex}$` : f.tex;
+          b.appendChild(line);
+        }
+        solEl.appendChild(b);
+      }
+
+      // Working (primary)
+      if(sol.working && sol.working.length){
+        const b = document.createElement("div");
+        b.className = "sol-block work";
+        b.innerHTML = `<div class="sol-label">Working</div>`;
+        for(const item of sol.working){
+          if(item.type === "block"){
+            const mb = document.createElement("div");
+            mb.className = "math-block";
+            mb.textContent = `$$${item.tex}$$`;
+            b.appendChild(mb);
+          }else{
+            const p = document.createElement("p");
+            p.textContent = item.text;
+            b.appendChild(p);
+          }
+        }
+        solEl.appendChild(b);
+      }
+
+      // Alternative working (0+)
+      if(sol.alt && sol.alt.length){
+        for(const alt of sol.alt){
+          const b = document.createElement("div");
+          b.className = "sol-block work";
+          b.innerHTML = `<div class="sol-label">Alternative working</div>`;
+          for(const item of alt.blocks){
+            if(item.type === "block"){
+              const mb = document.createElement("div");
+              mb.className = "math-block";
+              mb.textContent = `$$${item.tex}$$`;
+              b.appendChild(mb);
+            }else{
+              const p = document.createElement("p");
+              p.textContent = item.text;
+              b.appendChild(p);
+            }
+          }
+          solEl.appendChild(b);
+        }
+      }
+    }
+
+    /* ---------- KaTeX rendering (with graceful fallback) ---------- */
+
+    function tryRenderKatex(){
+      // If KaTeX fails to load, keep plain text; do not hide content.
+      if(typeof renderMathInElement !== "function") return;
+
+      // Render within main content only (nav is identifiers only).
+      renderMathInElement(paperEl, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        throwOnError: false
+      });
+
+      // Also render formulas inside solution blocks (they are plain text with $...$)
+      // (renderMathInElement already covers paperEl subtree)
+    }
+
+    /* ---------- Current nav item tracking (weight-only) ---------- */
+
+    function setupCurrentTracking(){
+      const allSections = Array.from(paperEl.querySelectorAll("section.q"));
+      const navLinksDesktop = Array.from(navDesktop.querySelectorAll("a.nav-link"));
+      const navLinksDrawer = Array.from(navDrawer.querySelectorAll("a.nav-link"));
+
+      const linkById = new Map();
+      for(const a of [...navLinksDesktop, ...navLinksDrawer]){
+        linkById.set(a.getAttribute("href").slice(1), a);
+      }
+
+      const setCurrent = (anchorId) => {
+        // Clear previous
+        for(const a of linkById.values()){
+          if(a.getAttribute("aria-current")==="true") a.setAttribute("aria-current","false");
+        }
+        const target = linkById.get(anchorId);
+        if(target) target.setAttribute("aria-current","true");
+      };
+
+      // IntersectionObserver to mark current based on visibility near top
+      const opts = { root: null, rootMargin: "-20% 0px -70% 0px", threshold: [0, 0.1] };
+      observer = new IntersectionObserver((entries) => {
+        // pick the first entry that is intersecting and closest to top
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a,b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if(visible.length){
+          setCurrent(visible[0].target.id);
+        }
+      }, opts);
+
+      for(const s of allSections){
+        observer.observe(s);
+      }
+    }
+
+    /* ---------- Drawer behavior (mobile) ---------- */
+
+    function openDrawer(){
+      drawer.hidden = false;
+      backdrop.hidden = false;
+      drawer.style.display = "block";
+      backdrop.style.display = "block";
+      jumpBtn.setAttribute("aria-expanded","true");
+
+      // Prevent background from being interactable via pointer; keep semantics calm
+      document.body.style.overflow = "hidden";
+
+      // Focus management: focus close button; no forced scrolling
+      drawerClose.focus();
+
+      // Basic focus trap
+      document.addEventListener("keydown", onTrapKeydown);
+    }
+
+    function closeDrawerIfOpen(){
+      if(drawer.hidden) return;
+      drawer.hidden = true;
+      backdrop.hidden = true;
+      drawer.style.display = "none";
+      backdrop.style.display = "none";
+      jumpBtn.setAttribute("aria-expanded","false");
+      document.body.style.overflow = "";
+
+      document.removeEventListener("keydown", onTrapKeydown);
+      jumpBtn.focus();
+    }
+
+    function onTrapKeydown(e){
+      if(e.key === "Escape"){
+        e.preventDefault();
+        closeDrawerIfOpen();
+        return;
+      }
+      if(e.key !== "Tab") return;
+
+      const focusables = drawer.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])');
+      const list = Array.from(focusables).filter(el => !el.hasAttribute("disabled"));
+      if(!list.length) return;
+
+      const first = list[0];
+      const last = list[list.length - 1];
+      const active = document.activeElement;
+
+      if(e.shiftKey){
+        if(active === first || !drawer.contains(active)){
+          e.preventDefault();
+          last.focus();
+        }
+      }else{
+        if(active === last){
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    jumpBtn.addEventListener("click", () => {
+      if(drawer.hidden) openDrawer();
+      else closeDrawerIfOpen();
+    });
+    drawerClose.addEventListener("click", closeDrawerIfOpen);
+    backdrop.addEventListener("click", closeDrawerIfOpen);
+
+    /* ---------- Helpers ---------- */
+
+    function escapeHTML(s){
+      return String(s).replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+      }[c]));
+    }
+
+    /* ---------- Init ---------- */
+
+    selectEl.addEventListener("change", render);
+
+    // Initial render after KaTeX scripts may still be loading; render now, then retry once.
+    render();
+    window.addEventListener("load", () => {
+      // Re-render math once KaTeX is guaranteed loaded (no layout restructuring)
+      tryRenderKatex();
+    });
+  </script>
+</body>
+</html>
