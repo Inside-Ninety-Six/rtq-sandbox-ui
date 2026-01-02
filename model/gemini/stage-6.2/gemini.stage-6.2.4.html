@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <style>
+        /* =========================================
+           STAGE 4 & 5: VISUAL FOUNDATIONS & TONE
+           ========================================= */
+        :root {
+            /* Stage 5.3: Soft-warm neutral base */
+            --c-bg-page: #F9F8F6;
+            --c-surface-paper: #FFFFFF;
+            --c-surface-details: #FAFAF9; /* Subtle differentiation */
+            --c-divider: #E5E5E5;
+            
+            /* Typography Colors */
+            --c-text-primary: #1A1A1A;
+            --c-text-secondary: #525252;
+            --c-text-tertiary: #737373;
+            
+            /* Stage 5.3.2 Override: Restrained Accent */
+            --c-accent: #2563EB; /* Calm Blue */
+            --c-focus: var(--c-accent);
+
+            /* Dimensions */
+            --w-max-content: 1024px;
+            --w-nav-col: 240px;
+            --h-header: 64px;
+
+            /* Spacing units */
+            --sp-xs: 4px;
+            --sp-sm: 8px;
+            --sp-md: 16px;
+            --sp-lg: 32px;
+            --sp-xl: 64px;
+        }
+
+        /* Reset & Base */
+        *, *::before, *::after { box-sizing: border-box; }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--c-bg-page);
+            color: var(--c-text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* =========================================
+           STAGE 3: CANONICAL LAYOUT SHELL
+           ========================================= */
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Top Controls Area */
+        .top-controls {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-color: var(--c-bg-page); /* Matches page bg per spec */
+            height: var(--h-header);
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid transparent; /* Reserved */
+            padding: 0 var(--sp-md);
+        }
+
+        .centered-frame {
+            width: 100%;
+            max-width: var(--w-max-content);
+            margin: 0 auto;
+            display: flex;
+            height: 100%;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Paper Selector */
+        .paper-selector {
+            font-size: 14px;
+            padding: var(--sp-sm);
+            border: 1px solid var(--c-divider);
+            border-radius: 4px;
+            background: var(--c-surface-paper);
+            color: var(--c-text-primary);
+            min-width: 200px;
+        }
+        
+        /* Mobile Trigger */
+        .mobile-jump-trigger {
+            display: none; /* Desktop hidden */
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--c-accent);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: var(--sp-sm);
+        }
+
+        /* Main Layout Columns */
+        .main-container {
+            flex: 1;
+            display: flex;
+            width: 100%;
+            max-width: var(--w-max-content);
+            margin: 0 auto;
+            padding-top: var(--sp-lg);
+        }
+
+        /* Navigation Column (Desktop) */
+        .nav-column {
+            width: var(--w-nav-col);
+            flex-shrink: 0;
+            display: none; /* Hidden on mobile by default */
+            padding-right: var(--sp-md);
+        }
+
+        @media (min-width: 768px) {
+            .nav-column {
+                display: block;
+                position: sticky;
+                top: calc(var(--h-header) + var(--sp-lg));
+                max-height: calc(100vh - var(--h-header) - var(--sp-lg) * 2);
+                overflow-y: auto;
+                /* Scrollbar hiding per Add-on */
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .nav-column::-webkit-scrollbar { display: none; }
+            
+            .mobile-jump-trigger { display: none; }
+        }
+        @media (max-width: 767px) {
+            .mobile-jump-trigger { display: block; }
+        }
+
+        /* Paper Content Column */
+        .paper-column {
+            flex: 1;
+            background-color: var(--c-surface-paper);
+            min-height: 50vh;
+            /* No independent centering without nav, per spec, but flex handles siblings */
+            padding-bottom: var(--sp-xl);
+            /* Ensure containment */
+            min-width: 0; 
+        }
+
+        /* Error State */
+        .payload-error {
+            padding: var(--sp-xl);
+            text-align: center;
+            color: var(--c-text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* =========================================
+           STAGE 6.1N: NAV HARDENING CSS (Authoritative)
+           ========================================= */
+        /* Ensure nav items cannot grow markers via pseudo-elements */
+        [data-nav-id]::before,
+        [data-nav-id]::after {
+            content: none !important;
+        }
+
+        /* Default nav item: no underline (hover-only), no background, no borders */
+        [data-nav-id] {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 4px 0;
+            font-size: 14px;
+            color: var(--c-text-secondary);
+            text-decoration: none;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        /* Active nav is weight-only: no marker, no colour change, no background, no border */
+        [data-nav-id][aria-current="true"] {
+            font-weight: 600;
+            color: var(--c-text-primary); /* Slight legibility bump allowed, but no accent color per hardening if conflicting */
+        }
+
+        /* Hover feedback: underline only */
+        [data-nav-id]:hover {
+            text-decoration: underline;
+            color: var(--c-text-primary);
+        }
+
+        /* Focus feedback: outline only (no background fills) */
+        [data-nav-id]:focus,
+        [data-nav-id]:focus-visible {
+            outline: 2px solid var(--c-focus);
+            outline-offset: 2px;
+            background: transparent;
+        }
+
+        .nav-section-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--c-text-tertiary);
+            margin-top: var(--sp-md);
+            margin-bottom: var(--sp-xs);
+            cursor: default;
+        }
+
+        /* =========================================
+           MOBILE DRAWER (Option A Hardening)
+           ========================================= */
+        .drawer-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .drawer-backdrop.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            width: 280px; /* 260-320px range */
+            background: var(--c-surface-paper);
+            z-index: 201;
+            transform: translateX(-100%);
+            transition: transform 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+        }
+        .drawer.open {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            padding: var(--sp-md);
+            border-bottom: 1px solid var(--c-divider);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .drawer-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+            color: var(--c-text-secondary);
+        }
+        .drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--sp-md);
+        }
+
+        /* =========================================
+           CONTENT STYLING (Stage 5.6 Hierarchy)
+           ========================================= */
+        
+        /* Question Block Spacing */
+        .question-block {
+            padding: var(--sp-lg) var(--sp-lg) 0 var(--sp-lg);
+            /* Top-level separation handled by padding/margin strategy */
+        }
+        
+        /* Clear separation between top-level questions */
+        .question-block[data-depth="0"] {
+            margin-bottom: var(--sp-xl);
+            border-bottom: 1px solid transparent; /* Placeholder to prevent collapsing margins issues */
+        }
+        
+        /* Indentation for sub-questions */
+        .question-block[data-depth="1"] { margin-left: var(--sp-md); margin-bottom: var(--sp-lg); }
+        .question-block[data-depth="2"] { margin-left: var(--sp-lg); margin-bottom: var(--sp-md); }
+
+        /* Question Header: ID + Prompt */
+        .question-header {
+            display: flex;
+            align-items: baseline;
+            gap: var(--sp-sm);
+            margin-bottom: var(--sp-md);
+        }
+        .q-id {
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            flex-shrink: 0;
+            min-width: 1.5em;
+        }
+        .q-prompt {
+            font-size: 1.125rem; /* 18px */
+            line-height: 1.6;
+            color: var(--c-text-primary);
+        }
+        .q-prompt p { margin: 0 0 0.5em 0; }
+        .q-prompt p:last-child { margin-bottom: 0; }
+
+        /* Answer Section (Stage 5.6.2) */
+        .answer-section {
+            margin-left: calc(1.5em + var(--sp-sm)); /* Align with text */
+            margin-bottom: var(--sp-md);
+        }
+        .answer-label {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: var(--c-text-tertiary);
+            display: block;
+            margin-bottom: var(--sp-xs);
+        }
+        .answer-value {
+            font-size: 1rem;
+            color: var(--c-text-primary);
+        }
+        
+        /* Solution Details (Stage 5.6.3 + 6.0.3) */
+        .solution-details-wrapper {
+            margin-left: calc(1.5em + var(--sp-sm)); /* Align with text */
+            margin-bottom: var(--sp-lg);
+        }
+
+        /* Toggle Control (Stage 5.7) */
+        .details-toggle {
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+            font-size: 0.9375rem;
+            color: var(--c-accent); /* Permitted accent usage */
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: var(--sp-sm);
+        }
+        .details-toggle:hover { text-decoration: underline; }
+        .details-toggle svg { width: 12px; height: 12px; transition: transform 0.2s; }
+        .details-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+        /* Expanded Region (Option C: Surface + Hairline) */
+        .details-region {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.3s ease-out;
+        }
+        .details-region.expanded {
+            grid-template-rows: 1fr;
+        }
+        .details-inner {
+            overflow: hidden;
+        }
+        
+        .details-content-box {
+            background-color: var(--c-surface-details);
+            border-top: 1px solid var(--c-divider);
+            padding: var(--sp-md);
+            margin-top: var(--sp-xs);
+        }
+
+        /* Subsections (Stage 5.9) */
+        .sd-section { margin-bottom: var(--sp-md); }
+        .sd-section:last-child { margin-bottom: 0; }
+        
+        .sd-label {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            margin-bottom: var(--sp-xs);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sd-body {
+            font-size: 0.9375rem;
+            color: var(--c-text-secondary);
+            line-height: 1.6;
+        }
+        .sd-body ul { margin: 0; padding-left: 1.2em; }
+        .sd-body p { margin: 0 0 0.5em 0; }
+
+        /* Workings (Stage 5.8) */
+        .working-block {
+            margin-top: var(--sp-md);
+        }
+        
+        /* KaTeX Block Overflow & Underlay (Stage 3 Override & 6.0.4) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            /* Scrollbar hiding for neatness */
+            scrollbar-width: thin;
+            padding: 4px 0;
+            margin: 0.5em 0;
+            
+            /* Stage 3 Override: Subtle Underlay for Display Math Only */
+            background-color: rgba(0, 0, 0, 0.02); 
+            border-radius: 2px;
+        }
+        
+        /* Tables (Stage 5.8.6) */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.9375rem;
+            margin: 1em 0;
+        }
+        th, td {
+            border: 1px solid var(--c-divider);
+            padding: 6px 10px;
+            text-align: left;
+        }
+        th { font-weight: 600; background: transparent; }
+        
+        /* Responsive tweaks */
+        @media (max-width: 600px) {
+            .app-shell { font-size: 15px; }
+            .question-block { padding-left: var(--sp-md); padding-right: var(--sp-md); }
+            .question-block[data-depth="1"] { margin-left: var(--sp-sm); }
+            .question-header { gap: var(--sp-xs); }
+            .answer-section, .solution-details-wrapper { margin-left: 0; padding-left: var(--sp-lg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-shell">
+        <div class="top-controls">
+            <div class="centered-frame">
+                <button class="mobile-jump-trigger" id="mobile-trigger" aria-label="Open navigation">
+                    Jump to
+                </button>
+
+                <select id="paper-selector" class="paper-selector" aria-label="Select paper">
+                    <option value="" disabled selected>Loading papers...</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="content-frame">
+            <div class="centered-frame">
+                <nav class="nav-column" id="desktop-nav" aria-label="Document navigation"></nav>
+
+                <main class="paper-column" id="paper-content">
+                    </main>
+            </div>
+        </div>
+    </div>
+
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <div class="drawer" id="mobile-drawer" role="dialog" aria-modal="true" aria-label="Navigation">
+        <div class="drawer-header">
+            <span style="font-weight:600; font-size:14px;">Jump to question</span>
+            <button class="drawer-close" id="drawer-close" aria-label="Close navigation">&times;</button>
+        </div>
+        <div class="drawer-content" id="mobile-nav-list">
+            </div>
+    </div>
+
+    <script>
+        // =========================================
+        // STAGE 0: CANONICAL CONSTANT
+        // =========================================
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.json";
+
+        // =========================================
+        // MARKDOWN & KaTeX CONFIG (Stage 6.5)
+        // =========================================
+        const md = window.markdownit
+            ? window.markdownit({
+                  html: true, // allow inline SVG
+                  linkify: true,
+                  breaks: false, // CRITICAL: Must be false for KaTeX
+              })
+            : null;
+
+        if (md) {
+            // Preserve TeX backslashes
+            md.inline.ruler.disable(["escape"]);
+        }
+
+        // =========================================
+        // NAV HARDENING (Stage 6.1N)
+        // =========================================
+        let __rtqNavObserver = null;
+        let __rtqVisibleMap = new Map(); 
+
+        function setCurrentNav(id) {
+            // Remove current from all
+            document
+                .querySelectorAll('[data-nav-id][aria-current="true"]')
+                .forEach((el) => el.removeAttribute("aria-current"));
+
+            // Set current on all matching identifiers (desktop & mobile)
+            document
+                .querySelectorAll(`[data-nav-id="${CSS.escape(id)}"]`)
+                .forEach((el) => el.setAttribute("aria-current", "true"));
+        }
+
+        function bindNav(container) {
+            if (!container) return;
+            if (container.__rtqBound) return;
+            container.__rtqBound = true;
+
+            container.addEventListener("click", (e) => {
+                const item = e.target.closest("[data-nav-id]");
+                if (!item) return;
+                
+                // Mobile specific: close drawer
+                if (container.id === 'mobile-nav-list') {
+                    closeDrawer();
+                }
+
+                const targetId = item.getAttribute("data-nav-id");
+                const targetEl = document.getElementById(targetId);
+                if (targetEl) {
+                    // Offset for sticky header
+                    const headerOffset = 80;
+                    const elementPosition = targetEl.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                  
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: "smooth"
+                    });
+                }
+            });
+        }
+
+        function enableScrollSpy(questionEls) {
+            if (__rtqNavObserver) __rtqNavObserver.disconnect();
+            __rtqVisibleMap.clear();
+
+            __rtqNavObserver = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach((en) => {
+                        const id = en.target && en.target.id;
+                        if (!id) return;
+
+                        if (en.isIntersecting) {
+                            __rtqVisibleMap.set(id, en.boundingClientRect.top);
+                        } else {
+                            __rtqVisibleMap.delete(id);
+                        }
+                    });
+
+                    if (!__rtqVisibleMap.size) return;
+
+                    // Choose visible question closest to top (with offset consideration)
+                    let bestId = null;
+                    let bestDist = Infinity;
+
+                    for (const [id, top] of __rtqVisibleMap.entries()) {
+                        const dist = Math.abs(top - 80); // roughly header height
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestId = id;
+                        }
+                    }
+
+                    if (bestId) setCurrentNav(bestId);
+                },
+                {
+                    root: null,
+                    threshold: [0.01, 0.1, 0.5], 
+                    rootMargin: "-10% 0px -80% 0px", // Trigger near top
+                }
+            );
+
+            questionEls.forEach((el) => __rtqNavObserver.observe(el));
+            
+            // Init first
+            if (questionEls.length && questionEls[0].id) setCurrentNav(questionEls[0].id);
+        }
+
+        // =========================================
+        // APP LOGIC
+        // =========================================
+        
+        let payload = null;
+        let currentPaperKey = null;
+
+        async function init() {
+            const selector = document.getElementById('paper-selector');
+            const content = document.getElementById('paper-content');
+
+            try {
+                const res = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!res.ok) throw new Error("Fetch failed");
+                payload = await res.json();
+            } catch (e) {
+                console.error(e);
+                content.innerHTML = '<div class="payload-error">PAPERS PAYLOAD MISSING</div>';
+                selector.innerHTML = '<option>Error loading</option>';
+                return;
+            }
+
+            // Populate Selector
+            selector.innerHTML = '';
+            payload.papers.forEach((p, index) => {
+                const opt = document.createElement('option');
+                opt.value = p.key;
+                opt.textContent = p.label;
+                selector.appendChild(opt);
+                
+                if (index === 0) currentPaperKey = p.key;
+            });
+
+            // Bind Selector
+            selector.addEventListener('change', (e) => {
+                currentPaperKey = e.target.value;
+                renderCurrentPaper();
+            });
+
+            // Mobile Drawer Logic
+            setupMobileDrawer();
+
+            // Initial Render
+            if (currentPaperKey) renderCurrentPaper();
+        }
+
+        function setupMobileDrawer() {
+            const trigger = document.getElementById('mobile-trigger');
+            const drawer = document.getElementById('mobile-drawer');
+            const backdrop = document.getElementById('drawer-backdrop');
+            const closeBtn = document.getElementById('drawer-close');
+
+            function open() {
+                drawer.classList.add('open');
+                backdrop.classList.add('open');
+                closeBtn.focus();
+            }
+            
+            window.closeDrawer = function() { // Expose for nav click
+                drawer.classList.remove('open');
+                backdrop.classList.remove('open');
+                trigger.focus();
+            }
+
+            trigger.addEventListener('click', open);
+            closeBtn.addEventListener('click', window.closeDrawer);
+            backdrop.addEventListener('click', window.closeDrawer);
+            
+            // Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && drawer.classList.contains('open')) {
+                    window.closeDrawer();
+                }
+            });
+        }
+
+        function renderCurrentPaper() {
+            const paper = payload.papers.find(p => p.key === currentPaperKey);
+            if (!paper) return;
+
+            const contentEl = document.getElementById('paper-content');
+            const desktopNav = document.getElementById('desktop-nav');
+            const mobileNav = document.getElementById('mobile-nav-list');
+            
+            // 1. Generate HTML for Questions
+            let paperHtml = '';
+            
+            if (paper.sections) {
+                paper.sections.forEach(section => {
+                    paperHtml += renderQuestions(section.questions, paper.defaults, 0);
+                });
+            } else if (paper.questions) {
+                paperHtml += renderQuestions(paper.questions, paper.defaults, 0);
+            }
+            
+            contentEl.innerHTML = paperHtml;
+
+            // 2. Generate Navigation
+            const navHtml = generateNavHtml(paper);
+            desktopNav.innerHTML = navHtml;
+            mobileNav.innerHTML = navHtml;
+
+            // 3. Render Math
+            renderMathInElement(contentEl, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+
+            // 4. Bind Events & Spies
+            const questionEls = Array.from(contentEl.querySelectorAll('.question-block[id]'));
+            
+            bindNav(desktopNav);
+            bindNav(mobileNav);
+            enableScrollSpy(questionEls);
+            
+            // Scroll to top
+            window.scrollTo(0,0);
+        }
+
+        function renderMarkdownContent(text) {
+            if (!text) return '';
+            return md ? md.render(text) : text;
+        }
+
+        function renderQuestions(questions, defaults, depth) {
+            if (!questions || !questions.length) return '';
+            
+            return questions.map(q => {
+                const id = q.id;
+                const isExpanded = defaults && defaults.expandedAll;
+                
+                // Question
+                const qText = renderMarkdownContent(q.question);
+                
+                // Answer
+                const aText = renderMarkdownContent(q.answer);
+                
+                // Solution Details
+                let detailsHtml = '';
+                const hasDetails = q.solutionDetails && 
+                    (q.solutionDetails.working || q.solutionDetails.alternativeWorking || q.solutionDetails.keepInMind || q.solutionDetails.formulasUsed);
+
+                if (hasDetails) {
+                    const sd = q.solutionDetails;
+                    
+                    // Keep in mind
+                    let kimHtml = '';
+                    if (sd.keepInMind) {
+                        kimHtml = `
+                            <div class="sd-section">
+                                <div class="sd-label">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                    Keep in mind
+                                </div>
+                                <div class="sd-body">${renderMarkdownContent(sd.keepInMind)}</div>
+                            </div>`;
+                    }
+                    
+                    // Formulas
+                    let formHtml = '';
+                    if (sd.formulasUsed) {
+                        formHtml = `
+                            <div class="sd-section">
+                                <div class="sd-label">Formulas used</div>
+                                <div class="sd-body">${renderMarkdownContent(sd.formulasUsed)}</div>
+                            </div>`;
+                    }
+                    
+                    // Working
+                    let workingHtml = '';
+                    if (sd.working) {
+                        workingHtml = `
+                            <div class="sd-section working-block">
+                                <div class="sd-label">Working</div>
+                                <div class="sd-body">${renderMarkdownContent(sd.working)}</div>
+                            </div>`;
+                    }
+                    
+                    // Alt Working
+                    let altHtml = '';
+                    if (sd.alternativeWorking) {
+                        altHtml = `
+                            <div class="sd-section working-block">
+                                <div class="sd-label">Alternative working</div>
+                                <div class="sd-body">${renderMarkdownContent(sd.alternativeWorking)}</div>
+                            </div>`;
+                    }
+
+                    // Toggle & Wrapper
+                    const expandedClass = isExpanded ? 'expanded' : '';
+                    const ariaState = isExpanded ? 'true' : 'false';
+                    const btnText = isExpanded ? 'Hide working' : 'Show working';
+                    
+                    detailsHtml = `
+                        <div class="solution-details-wrapper">
+                            <button class="details-toggle" aria-expanded="${ariaState}" onclick="toggleDetails(this)">
+                                <span class="btn-text">${btnText}</span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <div class="details-region ${expandedClass}">
+                                <div class="details-inner">
+                                    <div class="details-content-box">
+                                        ${kimHtml}
+                                        ${formHtml}
+                                        ${workingHtml}
+                                        ${altHtml}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Recursion
+                const childrenHtml = renderQuestions(q.children, defaults, depth + 1);
+
+                return `
+                    <div class="question-block" id="${id}" data-depth="${depth}">
+                        <div class="question-header">
+                            <span class="q-id">${id}</span>
+                            <div class="q-prompt">${qText}</div>
+                        </div>
+                        <div class="answer-section">
+                            <span class="answer-label">Answer</span>
+                            <div class="answer-value">${aText}</div>
+                        </div>
+                        ${detailsHtml}
+                        ${childrenHtml}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function generateNavHtml(paper) {
+            let html = '';
+            
+            if (paper.sections) {
+                paper.sections.forEach(sec => {
+                    html += `<div class="nav-section-label">${sec.label}</div>`;
+                    html += generateNavItems(sec.questions);
+                });
+            } else if (paper.questions) {
+                html += generateNavItems(paper.questions);
+            }
+            return html;
+        }
+
+        function generateNavItems(questions) {
+            if (!questions) return '';
+            return questions.map(q => {
+                // Flatten hierarchy for nav per brief (question identifiers only)
+                // Assuming simple list for now, recursing for children
+                let item = `<button data-nav-id="${q.id}">${q.id}</button>`;
+                if (q.children) {
+                    item += generateNavItems(q.children);
+                }
+                return item;
+            }).join('');
+        }
+
+        // Global Window Function for inline onclick
+        window.toggleDetails = function(btn) {
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+            const newState = !isExpanded;
+            
+            btn.setAttribute('aria-expanded', newState);
+            const textSpan = btn.querySelector('.btn-text');
+            textSpan.textContent = newState ? 'Hide working' : 'Show working';
+            
+            const region = btn.nextElementSibling;
+            if (newState) {
+                region.classList.add('expanded');
+            } else {
+                region.classList.remove('expanded');
+            }
+        };
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

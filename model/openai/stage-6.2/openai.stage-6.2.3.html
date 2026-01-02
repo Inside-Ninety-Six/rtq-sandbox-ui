@@ -1,0 +1,1411 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RTQ – Maths Paper Solution Viewer (Prototype)</title>
+
+    <!-- KaTeX (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        integrity="sha384-nB0miv6/jRmo5n7mU8K4dYkC6vC6zUeJ8dY2C5v8JpY3w+9mFQGk1a1a7cGzJp4V" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-6m6yZ3G3tQy3d5l7q8fKz1w4JwQpQnP0t9mKk0oUq1fFhV9j9pQH2b2g8y8w0E7T"
+        crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        integrity="sha384-+VBXD1eYHqfJ0lQw7m1K+oKcZ7z4rZQ3c0Vh8kq8g0f9m3o3P7KqvBvJgQ2VJ2cS"
+        crossorigin="anonymous"></script>
+
+    <!-- Markdown-it (CDN) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"
+        integrity="sha384-cxwA0U+q9aXHkU7k0QH6E3u4A2g9yJqv0qgM2J7zQy3nQ0v8kXWQG4mE0QH3yHkP"
+        crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            /* Soft-warm neutral base, restrained accent (non-semantic; non-content UI only) */
+            --bg: #f4f2ee;
+            --surface: #fbfaf7;
+            --ink: #1c1c1c;
+            --muted: #4b4b4b;
+            --quiet: #6a6a6a;
+            --hairline: rgba(0, 0, 0, 0.10);
+            --hairline2: rgba(0, 0, 0, 0.08);
+            --accent: #2f4f73;
+            /* calm, desaturated */
+            --focus: rgba(47, 79, 115, 0.55);
+
+            --frame-max: 1060px;
+            --gutter: 18px;
+
+            --nav-w: 140px;
+            --nav-gap: 28px;
+
+            --q-gap-top: 32px;
+            /* biggest spacing: between top-level questions */
+            --q-gap-in: 10px;
+            /* within a question unit */
+            --ans-gap: 8px;
+            --toggle-gap: 8px;
+
+            --sub-indent: 18px;
+            --text: 16px;
+            --lh: 1.55;
+            --lh-tight: 1.45;
+
+            --radius: 0px;
+            /* explicitly not card-like */
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            font-size: var(--text);
+            line-height: var(--lh);
+            overflow-x: hidden;
+            /* never allow page-level horizontal scroll */
+        }
+
+        /* Top controls aligned with centered frame */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: linear-gradient(to bottom, var(--bg), rgba(244, 242, 238, 0.94));
+            backdrop-filter: blur(2px);
+            border-bottom: 1px solid var(--hairline2);
+        }
+
+        .topbar {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 12px var(--gutter);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: space-between;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .brand {
+            font-size: 13px;
+            color: var(--quiet);
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--quiet);
+        }
+
+        select {
+            font: inherit;
+            font-size: 14px;
+            line-height: 1.2;
+            padding: 8px 10px;
+            border: 1px solid var(--hairline);
+            background: var(--surface);
+            border-radius: 8px;
+            color: var(--ink);
+            max-width: 54vw;
+        }
+
+        select:focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+        }
+
+        .jumpBtn {
+            display: none;
+            /* shown on mobile */
+            font: inherit;
+            font-size: 14px;
+            padding: 8px 10px;
+            border: 1px solid var(--hairline);
+            background: transparent;
+            border-radius: 8px;
+            color: var(--accent);
+            cursor: pointer;
+            min-height: 40px;
+            min-width: 92px;
+        }
+
+        .jumpBtn:hover {
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .jumpBtn:focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+        }
+
+        main {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 16px var(--gutter) 56px;
+            background: var(--surface);
+            /* unified surface for nav + content */
+            border-top: 1px solid var(--hairline2);
+            border-left: 1px solid var(--hairline2);
+            border-right: 1px solid var(--hairline2);
+            /* no panel chrome: no radius/shadow */
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: var(--nav-w) minmax(0, 1fr);
+            gap: var(--nav-gap);
+            align-items: start;
+        }
+
+        /* Navigation rail: quiet, no background panel */
+        nav {
+            position: sticky;
+            top: 64px;
+            /* below header */
+            align-self: start;
+            padding-top: 4px;
+            color: var(--quiet);
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .navList {
+            max-height: calc(100vh - 84px);
+            overflow-y: auto;
+            padding: 2px 0;
+            /* hide scrollbars visually */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* legacy */
+        }
+
+        .navList::-webkit-scrollbar {
+            display: none;
+        }
+
+        .navSection {
+            margin: 12px 0 6px;
+            color: var(--quiet);
+            font-size: 12px;
+            letter-spacing: 0.03em;
+            text-transform: none;
+            user-select: none;
+        }
+
+        .navItem {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            padding: 6px 6px 6px 8px;
+            cursor: pointer;
+            border-radius: 0px;
+            font: inherit;
+            min-height: 34px;
+            /* touch comfort */
+            outline-offset: 2px;
+        }
+
+        .navItem:hover {
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .navItem:focus-visible {
+            outline: 2px solid var(--focus);
+        }
+
+        .navItem[data-active="true"] {
+            font-weight: 600;
+            /* cue 1: weight */
+            color: var(--ink);
+            position: relative;
+        }
+
+        .navItem[data-active="true"]::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 9px;
+            bottom: 9px;
+            width: 2px;
+            /* cue 2: subtle marker */
+            background: var(--accent);
+            /* allowed in non-content UI */
+            opacity: 0.75;
+        }
+
+        /* Paper content */
+        .paper {
+            min-width: 0;
+            padding-right: 4px;
+        }
+
+        .paperMeta {
+            margin: 6px 0 10px;
+            color: var(--quiet);
+            font-size: 13px;
+        }
+
+        .question {
+            margin-top: var(--q-gap-top);
+            scroll-margin-top: 92px;
+            /* keep question anchored under sticky header */
+            min-width: 0;
+        }
+
+        /* Nesting without containers: indentation + subtle spacing adjustments */
+        .question[data-depth="0"] {
+            margin-top: var(--q-gap-top);
+        }
+
+        .question[data-depth="1"] {
+            margin-top: 18px;
+        }
+
+        .question[data-depth="2"] {
+            margin-top: 12px;
+        }
+
+        .question[data-depth="3"] {
+            margin-top: 10px;
+        }
+
+        .question[data-depth="4"] {
+            margin-top: 10px;
+        }
+
+        .qInner {
+            padding-left: calc(var(--sub-indent) * min(var(--depth), 4));
+            min-width: 0;
+        }
+
+        .qHead {
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            min-width: 0;
+        }
+
+        .qid {
+            flex: 0 0 auto;
+            font-size: 14px;
+            color: var(--quiet);
+            letter-spacing: 0.01em;
+            user-select: none;
+        }
+
+        .qText {
+            flex: 1 1 auto;
+            min-width: 0;
+            font-size: 16px;
+            color: var(--ink);
+            line-height: 1.65;
+            /* most generous */
+        }
+
+        .qText p {
+            margin: 0 0 10px;
+        }
+
+        .qText p:last-child {
+            margin-bottom: 0;
+        }
+
+        .answerRow {
+            margin-top: var(--ans-gap);
+            padding-left: calc(var(--sub-indent) * min(var(--depth), 4));
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            min-width: 0;
+        }
+
+        .ansLabel {
+            flex: 0 0 auto;
+            font-size: 13px;
+            color: var(--quiet);
+            font-weight: 600;
+            /* short label only */
+        }
+
+        .ansValue {
+            flex: 1 1 auto;
+            min-width: 0;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .ansValue p {
+            margin: 0 0 8px;
+        }
+
+        .ansValue p:last-child {
+            margin-bottom: 0;
+        }
+
+        .toggleRow {
+            margin-top: var(--toggle-gap);
+            padding-left: calc(var(--sub-indent) * min(var(--depth), 4));
+        }
+
+        .toggleBtn {
+            font: inherit;
+            font-size: 14px;
+            padding: 6px 0;
+            border: 0;
+            background: transparent;
+            color: var(--accent);
+            /* non-semantic affordance */
+            cursor: pointer;
+            text-decoration: none;
+            min-height: 40px;
+            /* touch comfort */
+        }
+
+        .toggleBtn:hover {
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .toggleBtn:focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+        }
+
+        .toggleBtn .chev {
+            display: inline-block;
+            width: 14px;
+            margin-right: 6px;
+            transform-origin: 50% 50%;
+        }
+
+        /* Solution Details: subtle surface separation allowed, no card chrome */
+        .solution {
+            margin-top: 8px;
+            padding-left: calc(var(--sub-indent) * min(var(--depth), 4));
+        }
+
+        .solutionInner {
+            padding: 10px 0 2px;
+            border-top: 1px solid var(--hairline2);
+            /* minimal divider */
+            background: transparent;
+            /* separation primarily via spacing; optional surface subtlety below */
+        }
+
+        .solutionInner[data-surface="true"] {
+            background: rgba(0, 0, 0, 0.02);
+            /* light, quiet separation */
+        }
+
+        .solSection {
+            margin-top: 12px;
+        }
+
+        .solSection:first-child {
+            margin-top: 0;
+        }
+
+        .solLabel {
+            font-size: 13px;
+            color: var(--quiet);
+            font-weight: 600;
+            /* label-only bold */
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .keepIcon {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+            color: var(--quiet);
+            flex: 0 0 auto;
+        }
+
+        .solBody {
+            color: var(--quiet);
+            font-size: 14px;
+            line-height: var(--lh-tight);
+            /* tighter density */
+            min-width: 0;
+        }
+
+        .solBody p {
+            margin: 0 0 8px;
+        }
+
+        .solBody p:last-child {
+            margin-bottom: 0;
+        }
+
+        .solBody ul,
+        .solBody ol {
+            margin: 0 0 8px 18px;
+            padding: 0;
+        }
+
+        .solBody li {
+            margin: 3px 0;
+        }
+
+        .solBody strong {
+            font-weight: 600;
+        }
+
+        /* markdown may include; but no paragraph-level bold rule is content-authored; we do not alter content */
+
+        /* Table rendering: minimal structure, quiet lines */
+        .solBody table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10px 0 12px;
+            font-size: 14px;
+        }
+
+        .solBody th,
+        .solBody td {
+            border: 1px solid var(--hairline2);
+            padding: 6px 8px;
+            vertical-align: top;
+        }
+
+        .solBody th {
+            font-weight: 600;
+            color: var(--muted);
+            background: transparent;
+        }
+
+        .tableWrap {
+            overflow-x: auto;
+            /* allowed only within table wrapper */
+            max-width: 100%;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .tableWrap::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* KaTeX containment invariant */
+        .katex {
+            max-width: 100%;
+        }
+
+        /* Display math: allow horizontal scroll ONLY within the block */
+        .katex-display {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 2px 0;
+            margin: 10px 0;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            /* ensure it cannot widen parent */
+            contain: content;
+        }
+
+        .katex-display::-webkit-scrollbar {
+            display: none;
+        }
+
+        .katex-display>.katex {
+            max-width: 100%;
+            display: inline-block;
+        }
+
+        /* Inline KaTeX: never background */
+        .katex-inline,
+        .katex {
+            background: transparent !important;
+        }
+
+        /* Underlay exception: display math ONLY within Working/Alternative working blocks */
+        .workings .katex-display {
+            background: rgba(0, 0, 0, 0.03);
+            /* extremely subtle underlay */
+            padding: 4px 6px;
+            /* minimal padding, no borders/radius/shadow */
+        }
+
+        /* Inline SVG diagrams: keep grayscale, responsive */
+        svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Collapsing: calm, reversible, prefers-reduced-motion respected */
+        .collapse {
+            overflow: hidden;
+            transition: max-height 160ms ease;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .collapse {
+                transition: none;
+            }
+        }
+
+        /* Failure text */
+        .missing {
+            margin-top: 22px;
+            font-size: 14px;
+            color: var(--quiet);
+            letter-spacing: 0.02em;
+        }
+
+        /* Mobile layout: nav drawer overlay */
+        .drawerOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.18);
+            z-index: 20;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: min(360px, 86vw);
+            background: var(--surface);
+            border-left: 1px solid var(--hairline2);
+            z-index: 21;
+            display: none;
+            padding: 12px 12px 10px;
+        }
+
+        .drawerHeader {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 4px 2px 10px;
+            border-bottom: 1px solid var(--hairline2);
+        }
+
+        .drawerTitle {
+            font-size: 14px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .closeBtn {
+            font: inherit;
+            font-size: 14px;
+            padding: 8px 10px;
+            border: 1px solid var(--hairline);
+            background: transparent;
+            border-radius: 8px;
+            color: var(--muted);
+            cursor: pointer;
+            min-height: 40px;
+        }
+
+        .closeBtn:hover {
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .closeBtn:focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+        }
+
+        .drawerNav {
+            margin-top: 10px;
+            max-height: calc(100vh - 72px);
+            overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .drawerNav::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Responsive switch */
+        @media (max-width: 860px) {
+            :root {
+                --nav-w: 118px;
+                --nav-gap: 18px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            main {
+                border-left: 0;
+                border-right: 0;
+            }
+
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            nav {
+                display: none;
+            }
+
+            .jumpBtn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="topbar" id="topbar">
+            <div class="topbar-left">
+                <div class="brand" aria-hidden="true">RTQ</div>
+                <div>
+                    <label for="paperSelect">Paper</label><br />
+                    <select id="paperSelect" aria-label="Paper selector">
+                        <option value="">Loading…</option>
+                    </select>
+                </div>
+            </div>
+            <button class="jumpBtn" id="jumpBtn" type="button" aria-haspopup="dialog" aria-controls="drawer"
+                aria-expanded="false">
+                Jump to
+            </button>
+        </div>
+    </header>
+
+    <main id="appMain">
+        <div class="layout" id="layout">
+            <nav aria-label="Questions">
+                <div class="navList" id="navList"></div>
+            </nav>
+
+            <div class="paper" id="paper">
+                <div class="paperMeta" id="paperMeta"></div>
+                <div id="paperContent"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Mobile drawer -->
+    <div class="drawerOverlay" id="drawerOverlay" hidden></div>
+    <div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Jump to question" hidden>
+        <div class="drawerHeader">
+            <div class="drawerTitle">Jump to</div>
+            <button class="closeBtn" id="closeDrawerBtn" type="button">Close</button>
+        </div>
+        <div class="drawerNav" id="drawerNav"></div>
+    </div>
+
+    <script>
+        // Single runtime definition with the literal string (must appear only here).
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../payload/rtq.papers.payload.json";
+
+        (function () {
+            const $ = (sel, root = document) => root.querySelector(sel);
+
+            const paperSelect = $('#paperSelect');
+            const navList = $('#navList');
+            const paperMeta = $('#paperMeta');
+            const paperContent = $('#paperContent');
+            const jumpBtn = $('#jumpBtn');
+
+            const drawer = $('#drawer');
+            const drawerOverlay = $('#drawerOverlay');
+            const drawerNav = $('#drawerNav');
+            const closeDrawerBtn = $('#closeDrawerBtn');
+            const appMain = $('#appMain');
+
+            let payload = null;
+            let currentPaperIndex = 0;
+            let activeQuestionKey = null;
+            let io = null;
+            let md = null;
+            let focusTrapCleanup = null;
+
+            const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            function initMarkdown() {
+                if (!window.markdownit) return null;
+                const inst = window.markdownit({
+                    html: true,
+                    linkify: false,
+                    typographer: false
+                });
+                // TeX backslash preservation requirement:
+                try {
+                    inst.inline.ruler.disable(['escape']);
+                } catch (e) { }
+                // Wrap tables for overflow safety.
+                const defaultTableOpen = inst.renderer.rules.table_open || function (tokens, idx, options, env, self) {
+                    return self.renderToken(tokens, idx, options);
+                };
+                const defaultTableClose = inst.renderer.rules.table_close || function (tokens, idx, options, env, self) {
+                    return self.renderToken(tokens, idx, options);
+                };
+                inst.renderer.rules.table_open = function (tokens, idx, options, env, self) {
+                    return '<div class="tableWrap">' + defaultTableOpen(tokens, idx, options, env, self);
+                };
+                inst.renderer.rules.table_close = function (tokens, idx, options, env, self) {
+                    return defaultTableClose(tokens, idx, options, env, self) + '</div>';
+                };
+                return inst;
+            }
+
+            function renderMarkdownToHtml(mdText) {
+                if (!mdText || typeof mdText !== 'string') return '';
+                if (!md) return escapeHtml(mdText);
+                return md.render(mdText);
+            }
+
+            function escapeHtml(s) {
+                return String(s)
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;')
+                    .replaceAll('"', '&quot;')
+                    .replaceAll("'", "&#039;");
+            }
+
+            function renderKaTeX(container) {
+                // Step 1: Markdown -> HTML already in DOM.
+                // Step 2: KaTeX auto-render across container.
+                if (!container) return;
+                if (!window.renderMathInElement || !window.katex) {
+                    // graceful fallback: do nothing; content stays as authored text
+                    return;
+                }
+                try {
+                    window.renderMathInElement(container, {
+                        delimiters: [
+                            { left: "$$", right: "$$", display: true },
+                            { left: "$", right: "$", display: false }
+                        ],
+                        throwOnError: false,
+                        strict: "ignore"
+                    });
+                } catch (e) {
+                    // fallback: do nothing
+                }
+            }
+
+            function setCollapsed(el, collapsed) {
+                // atomic: hide all content in Solution Details region
+                if (!el) return;
+                if (collapsed) {
+                    el.hidden = true;
+                    el.style.maxHeight = '0px';
+                    el.setAttribute('aria-hidden', 'true');
+                    // ensure hidden content not focusable by being hidden
+                } else {
+                    el.hidden = false;
+                    el.setAttribute('aria-hidden', 'false');
+                    // measure height for transition
+                    const h = el.scrollHeight;
+                    el.style.maxHeight = h + 'px';
+                    // after transition, let it be auto for dynamic (but keep stable)
+                    window.setTimeout(() => {
+                        if (!el.hidden) el.style.maxHeight = 'none';
+                    }, reducedMotion ? 0 : 180);
+                }
+            }
+
+            function toggleSolution(btn, solWrap) {
+                const expanded = btn.getAttribute('aria-expanded') === 'true';
+                const next = !expanded;
+                btn.setAttribute('aria-expanded', String(next));
+                btn.querySelector('.label').textContent = next ? 'Hide working' : 'Show working';
+                btn.querySelector('.chev').style.transform = next ? 'rotate(90deg)' : 'rotate(0deg)';
+                // keep control visible; collapse/expand inline only
+                const inner = solWrap;
+                if (next) {
+                    setCollapsed(inner, false);
+                    // re-measure after KaTeX render
+                    window.setTimeout(() => {
+                        try {
+                            if (!inner.hidden && inner.style.maxHeight !== 'none') {
+                                inner.style.maxHeight = inner.scrollHeight + 'px';
+                            }
+                        } catch (e) { }
+                    }, 0);
+                } else {
+                    // set maxHeight from current so transition works
+                    try {
+                        inner.style.maxHeight = inner.scrollHeight + 'px';
+                        // force reflow
+                        void inner.offsetHeight;
+                    } catch (e) { }
+                    setCollapsed(inner, true);
+                }
+            }
+
+            function clearIntersectionObserver() {
+                if (io) {
+                    io.disconnect();
+                    io = null;
+                }
+            }
+
+            function setupActiveTracking() {
+                clearIntersectionObserver();
+                const anchors = Array.from(document.querySelectorAll('[data-q-anchor="true"]'));
+                if (!anchors.length) return;
+
+                io = new IntersectionObserver((entries) => {
+                    // choose the entry closest to top and intersecting
+                    let best = null;
+                    for (const ent of entries) {
+                        if (!ent.isIntersecting) continue;
+                        if (!best) best = ent;
+                        else {
+                            if (ent.boundingClientRect.top < best.boundingClientRect.top) best = ent;
+                        }
+                    }
+                    if (best) {
+                        const key = best.target.getAttribute('data-q-key');
+                        if (key && key !== activeQuestionKey) {
+                            setActiveNav(key);
+                        }
+                    }
+                }, { root: null, threshold: [0.1, 0.2, 0.3], rootMargin: '-90px 0px -70% 0px' });
+
+                anchors.forEach(a => io.observe(a));
+            }
+
+            function setActiveNav(qKey) {
+                activeQuestionKey = qKey;
+                const all = document.querySelectorAll('[data-nav-key]');
+                all.forEach(btn => {
+                    btn.dataset.active = (btn.dataset.navKey === qKey) ? 'true' : 'false';
+                });
+            }
+
+            function scrollToQuestion(qKey) {
+                const target = document.querySelector('[data-q-key="' + cssEscape(qKey) + '"]');
+                if (!target) return;
+                // navigation-triggered jumps: smooth scrolling unless reduced motion
+                target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+            }
+
+            function cssEscape(s) {
+                // minimal safe escape for attribute selector
+                return String(s).replaceAll('"', '\\"');
+            }
+
+            function flattenQuestionsFlat(questions, out, depth, sectionLabel) {
+                if (!Array.isArray(questions)) return;
+                questions.forEach((q) => {
+                    if (!q || typeof q !== 'object') return;
+                    out.push({ node: q, depth, sectionLabel });
+                    if (Array.isArray(q.children) && q.children.length) {
+                        flattenQuestionsFlat(q.children, out, depth + 1, sectionLabel);
+                    }
+                });
+            }
+
+            function buildQuestionListForPaper(paper) {
+                const out = [];
+                if (!paper || typeof paper !== 'object') return out;
+
+                if (Array.isArray(paper.sections)) {
+                    paper.sections.forEach((sec) => {
+                        const label = (sec && typeof sec.label === 'string') ? sec.label : '';
+                        if (Array.isArray(sec.questions)) {
+                            flattenQuestionsFlat(sec.questions, out, 0, label);
+                        }
+                    });
+                } else if (Array.isArray(paper.questions)) {
+                    flattenQuestionsFlat(paper.questions, out, 0, '');
+                }
+                return out;
+            }
+
+            function createNav(paper) {
+                navList.innerHTML = '';
+                drawerNav.innerHTML = '';
+
+                const list = buildQuestionListForPaper(paper);
+                if (!list.length) return;
+
+                let lastSection = null;
+
+                function appendSectionLabel(container, label) {
+                    if (!label) return;
+                    const div = document.createElement('div');
+                    div.className = 'navSection';
+                    div.textContent = label;
+                    container.appendChild(div);
+                }
+
+                function appendItem(container, qKey, label, depth) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'navItem';
+                    btn.dataset.navKey = qKey;
+                    btn.textContent = label; // question identifiers only
+                    btn.style.paddingLeft = (8 + Math.min(depth, 4) * 10) + 'px';
+                    btn.addEventListener('click', () => {
+                        closeDrawer();
+                        scrollToQuestion(qKey);
+                    });
+                    container.appendChild(btn);
+                }
+
+                list.forEach((item) => {
+                    const q = item.node;
+                    const id = (q && typeof q.id === 'string') ? q.id : '';
+                    if (!id) return;
+                    const key = makeStableKey(item.sectionLabel, id);
+
+                    if (paper.sections && item.sectionLabel !== lastSection) {
+                        if (item.sectionLabel) {
+                            appendSectionLabel(navList, item.sectionLabel);
+                            appendSectionLabel(drawerNav, item.sectionLabel);
+                        }
+                        lastSection = item.sectionLabel;
+                    }
+
+                    appendItem(navList, key, id, item.depth);
+                    appendItem(drawerNav, key, id, item.depth);
+                });
+
+                // default active = first visible anchor after render
+                const firstKey = list.find(it => it.node && typeof it.node.id === 'string' && it.node.id)?.node?.id;
+                // real active set after observer; but set a baseline
+                if (firstKey) {
+                    const first = makeStableKey(list[0].sectionLabel, list[0].node.id);
+                    setActiveNav(first);
+                }
+            }
+
+            function makeStableKey(sectionLabel, id) {
+                // stable within a rendered paper instance; does not infer depth from id
+                return (sectionLabel ? (sectionLabel + '::') : '') + id;
+            }
+
+            function renderPaper(paper) {
+                paperContent.innerHTML = '';
+                paperMeta.textContent = '';
+
+                if (!paper || typeof paper !== 'object') {
+                    return;
+                }
+
+                const label = (typeof paper.label === 'string') ? paper.label : '';
+                paperMeta.textContent = label ? label : '';
+
+                const expandedAll = !!(paper.defaults && paper.defaults.expandedAll === true);
+
+                const container = document.createElement('div');
+
+                function renderQuestionNode(q, depth, sectionLabel) {
+                    if (!q || typeof q !== 'object') return;
+                    const qid = (typeof q.id === 'string') ? q.id : '';
+                    const qKey = makeStableKey(sectionLabel, qid || ('_missing_' + Math.random()));
+
+                    const qWrap = document.createElement('section');
+                    qWrap.className = 'question';
+                    qWrap.dataset.depth = String(depth);
+                    qWrap.style.setProperty('--depth', String(depth));
+                    qWrap.setAttribute('data-q-key', qKey);
+                    qWrap.setAttribute('data-q-anchor', 'true');
+
+                    // Inner content (indent only; no containers)
+                    const inner = document.createElement('div');
+                    inner.className = 'qInner';
+                    inner.style.setProperty('--depth', String(depth));
+
+                    // Question head
+                    const head = document.createElement('div');
+                    head.className = 'qHead';
+
+                    const idEl = document.createElement('div');
+                    idEl.className = 'qid';
+                    idEl.textContent = qid || '';
+
+                    const qText = document.createElement('div');
+                    qText.className = 'qText';
+                    qText.innerHTML = renderMarkdownToHtml(q.question);
+
+                    head.appendChild(idEl);
+                    head.appendChild(qText);
+                    inner.appendChild(head);
+
+                    // Answer row (visible by default)
+                    const ans = document.createElement('div');
+                    ans.className = 'answerRow';
+                    ans.style.setProperty('--depth', String(depth));
+
+                    const ansLabel = document.createElement('div');
+                    ansLabel.className = 'ansLabel';
+                    ansLabel.textContent = 'Answer';
+
+                    const ansValue = document.createElement('div');
+                    ansValue.className = 'ansValue';
+                    ansValue.innerHTML = renderMarkdownToHtml(q.answer);
+
+                    ans.appendChild(ansLabel);
+                    ans.appendChild(ansValue);
+
+                    // toggle + solution details only if solutionDetails exists
+                    const sd = q.solutionDetails && typeof q.solutionDetails === 'object' ? q.solutionDetails : null;
+
+                    qWrap.appendChild(inner);
+                    qWrap.appendChild(ans);
+
+                    if (sd) {
+                        const toggleRow = document.createElement('div');
+                        toggleRow.className = 'toggleRow';
+                        toggleRow.style.setProperty('--depth', String(depth));
+
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'toggleBtn';
+                        btn.setAttribute('aria-expanded', expandedAll ? 'true' : 'false');
+
+                        const chev = document.createElement('span');
+                        chev.className = 'chev';
+                        chev.setAttribute('aria-hidden', 'true');
+                        chev.textContent = '›';
+
+                        const labelSpan = document.createElement('span');
+                        labelSpan.className = 'label';
+                        labelSpan.textContent = expandedAll ? 'Hide working' : 'Show working';
+
+                        btn.appendChild(chev);
+                        btn.appendChild(labelSpan);
+
+                        toggleRow.appendChild(btn);
+                        qWrap.appendChild(toggleRow);
+
+                        const sol = document.createElement('div');
+                        sol.className = 'solution';
+                        sol.style.setProperty('--depth', String(depth));
+
+                        const solInner = document.createElement('div');
+                        solInner.className = 'solutionInner collapse';
+                        solInner.dataset.surface = 'true';
+                        solInner.id = 'sol-' + hashKey(qKey);
+                        btn.setAttribute('aria-controls', solInner.id);
+
+                        // build subsections in required order
+                        const parts = [];
+
+                        if (typeof sd.keepInMind === 'string' && sd.keepInMind.trim()) {
+                            parts.push({
+                                label: 'Keep in mind',
+                                kind: 'keep',
+                                html: renderMarkdownToHtml(sd.keepInMind)
+                            });
+                        }
+                        if (typeof sd.formulasUsed === 'string' && sd.formulasUsed.trim()) {
+                            parts.push({
+                                label: 'Formulas used',
+                                kind: 'formulas',
+                                html: renderMarkdownToHtml(sd.formulasUsed)
+                            });
+                        }
+                        if (typeof sd.working === 'string' && sd.working.trim()) {
+                            parts.push({
+                                label: 'Working',
+                                kind: 'working',
+                                html: renderMarkdownToHtml(sd.working)
+                            });
+                        }
+                        if (typeof sd.alternativeWorking === 'string' && sd.alternativeWorking.trim()) {
+                            parts.push({
+                                label: 'Alternative working',
+                                kind: 'alt',
+                                html: renderMarkdownToHtml(sd.alternativeWorking)
+                            });
+                        }
+
+                        parts.forEach((p) => {
+                            const sec = document.createElement('div');
+                            sec.className = 'solSection';
+
+                            const lab = document.createElement('div');
+                            lab.className = 'solLabel';
+
+                            if (p.kind === 'keep') {
+                                const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                                icon.setAttribute('viewBox', '0 0 24 24');
+                                icon.setAttribute('class', 'keepIcon');
+                                icon.setAttribute('aria-hidden', 'true');
+                                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                                path.setAttribute('fill', 'currentColor');
+                                path.setAttribute('d', 'M12 2a7 7 0 0 0-4 12.74V20a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-5.26A7 7 0 0 0 12 2zm3 11.58-.75.66V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-4.76l-.75-.66A6 6 0 1 1 15 13.58zM9.5 9h5a.5.5 0 0 1 .36.85l-2.5 2.6V16a.5.5 0 0 1-1 0v-3.75a.5.5 0 0 1 .14-.35L13.3 10H9.5a.5.5 0 0 1 0-1z');
+                                icon.appendChild(path);
+                                lab.appendChild(icon);
+                            }
+
+                            const labText = document.createElement('div');
+                            labText.textContent = p.label;
+                            lab.appendChild(labText);
+
+                            const body = document.createElement('div');
+                            body.className = 'solBody';
+                            if (p.kind === 'working' || p.kind === 'alt') {
+                                body.classList.add('workings');
+                            }
+                            body.innerHTML = p.html;
+
+                            sec.appendChild(lab);
+                            sec.appendChild(body);
+                            solInner.appendChild(sec);
+                        });
+
+                        sol.appendChild(solInner);
+                        qWrap.appendChild(sol);
+
+                        // default collapsed state
+                        if (!expandedAll) {
+                            setCollapsed(solInner, true);
+                            chev.style.transform = 'rotate(0deg)';
+                        } else {
+                            setCollapsed(solInner, false);
+                            chev.style.transform = 'rotate(90deg)';
+                        }
+
+                        btn.addEventListener('click', () => toggleSolution(btn, solInner));
+                    }
+
+                    container.appendChild(qWrap);
+
+                    // Render children (nesting derived ONLY from children[] structure)
+                    if (Array.isArray(q.children) && q.children.length) {
+                        q.children.forEach(child => renderQuestionNode(child, depth + 1, sectionLabel));
+                    }
+                }
+
+                if (Array.isArray(paper.sections)) {
+                    paper.sections.forEach((sec) => {
+                        const labelSec = (sec && typeof sec.label === 'string') ? sec.label : '';
+                        if (Array.isArray(sec.questions)) {
+                            sec.questions.forEach(q => renderQuestionNode(q, 0, labelSec));
+                        }
+                    });
+                } else if (Array.isArray(paper.questions)) {
+                    paper.questions.forEach(q => renderQuestionNode(q, 0, ''));
+                }
+
+                paperContent.appendChild(container);
+
+                // KaTeX render pass over paper content
+                renderKaTeX(paperContent);
+
+                // After KaTeX, ensure expanded items have correct max-height (if transitioning)
+                Array.from(document.querySelectorAll('.solutionInner')).forEach(el => {
+                    if (!el.hidden && el.style.maxHeight !== 'none') {
+                        try { el.style.maxHeight = el.scrollHeight + 'px'; } catch (e) { }
+                    }
+                });
+
+                setupActiveTracking();
+            }
+
+            function hashKey(s) {
+                // short deterministic-ish id for aria-controls
+                let h = 2166136261;
+                for (let i = 0; i < s.length; i++) {
+                    h ^= s.charCodeAt(i);
+                    h = Math.imul(h, 16777619);
+                }
+                return (h >>> 0).toString(16);
+            }
+
+            function renderMissing() {
+                paperSelect.innerHTML = '<option value="">(none)</option>';
+                navList.innerHTML = '';
+                drawerNav.innerHTML = '';
+                paperMeta.textContent = '';
+                paperContent.innerHTML = '<div class="missing">PAPERS PAYLOAD MISSING</div>';
+                clearIntersectionObserver();
+            }
+
+            function rebuildUIForPaperIndex(idx) {
+                if (!payload || !payload.papers || !payload.papers.length) return;
+                currentPaperIndex = Math.max(0, Math.min(idx, payload.papers.length - 1));
+                const paper = payload.papers[currentPaperIndex];
+                createNav(paper);
+                renderPaper(paper);
+            }
+
+            function populateSelector() {
+                const papers = payload && Array.isArray(payload.papers) ? payload.papers : null;
+                if (!papers || !papers.length) {
+                    renderMissing();
+                    return;
+                }
+                paperSelect.innerHTML = '';
+                papers.forEach((p, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = String(i);
+                    opt.textContent = (p && typeof p.label === 'string') ? p.label : (p && typeof p.key === 'string' ? p.key : ('Paper ' + (i + 1)));
+                    paperSelect.appendChild(opt);
+                });
+                paperSelect.value = String(currentPaperIndex);
+                paperSelect.addEventListener('change', (e) => {
+                    const next = Number(paperSelect.value);
+                    rebuildUIForPaperIndex(Number.isFinite(next) ? next : 0);
+                });
+            }
+
+            // Drawer: minimal, keyboard safe, blocks background interaction while open
+            function openDrawer() {
+                if (drawer.hidden === false) return;
+
+                drawer.hidden = false;
+                drawerOverlay.hidden = false;
+                drawer.style.display = 'block';
+                drawerOverlay.style.display = 'block';
+                jumpBtn.setAttribute('aria-expanded', 'true');
+
+                // Block background interaction: pointer + aria
+                appMain.setAttribute('aria-hidden', 'true');
+                appMain.style.pointerEvents = 'none';
+
+                // Focus management
+                const firstFocusable = closeDrawerBtn;
+                firstFocusable.focus({ preventScroll: true });
+                focusTrapCleanup = trapFocus(drawer);
+
+                document.addEventListener('keydown', onDrawerKeydown, true);
+                drawerOverlay.addEventListener('click', closeDrawer, { once: true });
+            }
+
+            function closeDrawer() {
+                if (drawer.hidden === true) return;
+
+                drawer.hidden = true;
+                drawerOverlay.hidden = true;
+                drawer.style.display = 'none';
+                drawerOverlay.style.display = 'none';
+                jumpBtn.setAttribute('aria-expanded', 'false');
+
+                appMain.removeAttribute('aria-hidden');
+                appMain.style.pointerEvents = '';
+
+                if (focusTrapCleanup) focusTrapCleanup();
+                focusTrapCleanup = null;
+
+                document.removeEventListener('keydown', onDrawerKeydown, true);
+                jumpBtn.focus({ preventScroll: true });
+            }
+
+            function onDrawerKeydown(e) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeDrawer();
+                }
+            }
+
+            function trapFocus(root) {
+                const focusableSelector = [
+                    'a[href]',
+                    'button:not([disabled])',
+                    'select:not([disabled])',
+                    'textarea:not([disabled])',
+                    'input:not([disabled])',
+                    '[tabindex]:not([tabindex="-1"])'
+                ].join(',');
+
+                function getFocusable() {
+                    return Array.from(root.querySelectorAll(focusableSelector))
+                        .filter(el => el.offsetParent !== null);
+                }
+
+                function onKeydown(e) {
+                    if (e.key !== 'Tab') return;
+                    const f = getFocusable();
+                    if (!f.length) return;
+                    const first = f[0];
+                    const last = f[f.length - 1];
+                    if (e.shiftKey) {
+                        if (document.activeElement === first) {
+                            e.preventDefault();
+                            last.focus();
+                        }
+                    } else {
+                        if (document.activeElement === last) {
+                            e.preventDefault();
+                            first.focus();
+                        }
+                    }
+                }
+
+                root.addEventListener('keydown', onKeydown, true);
+                return () => root.removeEventListener('keydown', onKeydown, true);
+            }
+
+            // Mobile Jump-to button
+            jumpBtn.addEventListener('click', () => {
+                const isOpen = jumpBtn.getAttribute('aria-expanded') === 'true';
+                if (isOpen) closeDrawer();
+                else openDrawer();
+            });
+            closeDrawerBtn.addEventListener('click', closeDrawer);
+
+            // Initialize
+            async function boot() {
+                md = initMarkdown();
+
+                try {
+                    const res = await fetch(RTQ_PAPERS_PAYLOAD_PATH, { cache: 'no-store' });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const json = await res.json();
+                    payload = json;
+                } catch (e) {
+                    payload = null;
+                }
+
+                if (!payload || !Array.isArray(payload.papers)) {
+                    renderMissing();
+                    return;
+                }
+
+                populateSelector();
+                rebuildUIForPaperIndex(currentPaperIndex);
+            }
+
+            // Ensure KaTeX loads before boot tries to render; still safe if it doesn’t.
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', boot, { once: true });
+            } else {
+                boot();
+            }
+
+        })();
+    </script>
+</body>
+
+</html>
