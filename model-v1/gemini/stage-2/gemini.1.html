@@ -1,0 +1,666 @@
+
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Viewer (Prototype)</title>
+    <style>
+        /* RESET & BASE STYLES */
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        /* LAYOUT STRUCTURE */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* NAVIGATION AID (Desktop Sidebar) */
+        .nav-aid {
+            width: 260px;
+            background-color: #fff;
+            border-right: 1px solid #ddd;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .nav-header {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .nav-item {
+            margin-bottom: 8px;
+        }
+
+        .nav-link {
+            display: block;
+            text-decoration: none;
+            color: #555;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: background 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .nav-link:hover, .nav-link:focus {
+            background-color: #eee;
+            color: #000;
+            outline: none;
+            border-color: #bbb;
+        }
+
+        .nav-sub-item {
+            margin-left: 20px;
+            font-size: 0.95em;
+        }
+
+        /* MAIN PAPER CONTAINER */
+        .paper-container {
+            flex: 1;
+            padding: 40px;
+            max-width: 900px; /* Constrain width for readability */
+            margin: 0 auto;
+        }
+
+        .paper-header {
+            background: #fff;
+            padding: 30px;
+            margin-bottom: 40px;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .paper-title {
+            margin: 0;
+            font-size: 1.5rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        /* QUESTION BLOCKS */
+        .question-block {
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 0; /* Padding handled by children */
+            margin-bottom: 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            scroll-margin-top: 20px; /* Anchor offset */
+        }
+
+        .q-header {
+            padding: 20px 25px;
+            background-color: #fafafa;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: baseline;
+            gap: 15px;
+        }
+
+        .q-number {
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #000;
+            min-width: 30px;
+        }
+
+        .q-content {
+            padding: 25px;
+        }
+
+        .q-text {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .katex-sim {
+            font-family: "Times New Roman", serif;
+            font-style: italic;
+            background: #f8f8f8;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        .diagram-placeholder {
+            width: 100%;
+            max-width: 300px;
+            height: 150px;
+            background-color: #eee;
+            border: 2px dashed #bbb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            margin: 20px 0;
+            font-size: 0.9rem;
+        }
+
+        /* ANSWER SECTION (Default Visible) */
+        .answer-section {
+            margin-top: 25px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-left: 4px solid #666;
+        }
+
+        .answer-label {
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #555;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .answer-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        /* WORKING SECTION (Default Collapsed) */
+        .working-section {
+            margin-top: 15px;
+        }
+
+        .working-toggle-btn {
+            background: none;
+            border: 2px solid #ccc;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .working-toggle-btn:hover {
+            border-color: #999;
+            background-color: #f9f9f9;
+        }
+
+        .working-toggle-btn:focus {
+            outline: 2px solid #333;
+            outline-offset: 2px;
+        }
+
+        .toggle-icon {
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        .working-toggle-btn[aria-expanded="true"] .toggle-icon {
+            transform: rotate(90deg);
+        }
+
+        .working-content {
+            margin-top: 15px;
+            padding: 20px;
+            border: 1px solid #eee;
+            background-color: #fff;
+            display: none; /* Hidden by default */
+            border-left: 4px solid #ddd;
+        }
+
+        .working-content.is-visible {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .working-step {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .working-step:last-child {
+            border-bottom: none;
+        }
+
+        /* SUB-QUESTIONS (Q3a, Q3b, etc) */
+        .sub-question {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+        }
+
+        .sub-q-label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        /* MOBILE/TABLET HEADER & MENU */
+        .mobile-header {
+            display: none;
+            position: sticky;
+            top: 0;
+            background: #fff;
+            border-bottom: 1px solid #ddd;
+            padding: 15px 20px;
+            z-index: 200;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .menu-toggle {
+            background: none;
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 60px; /* Below header */
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 150;
+        }
+
+        /* RESPONSIVE BREAKPOINTS */
+        @media (max-width: 900px) {
+            .app-container {
+                flex-direction: column;
+            }
+
+            .nav-aid {
+                display: none; /* Hide desktop sidebar */
+            }
+
+            .mobile-header {
+                display: flex;
+            }
+
+            .paper-container {
+                padding: 20px;
+                width: 100%;
+            }
+
+            /* Mobile Navigation Drawer */
+            .nav-drawer {
+                display: none;
+                position: fixed;
+                top: 60px;
+                left: 0;
+                width: 80%;
+                max-width: 300px;
+                height: calc(100vh - 60px);
+                background: #fff;
+                border-right: 1px solid #ccc;
+                z-index: 160;
+                overflow-y: auto;
+                padding: 20px;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            }
+
+            .nav-drawer.is-open {
+                display: block;
+            }
+
+            .mobile-overlay.is-open {
+                display: block;
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header class="mobile-header">
+        <div style="font-weight:bold;">Paper: Year 6 Maths A</div>
+        <button class="menu-toggle" aria-label="Toggle Navigation" aria-expanded="false">
+            Menu ☰
+        </button>
+    </header>
+
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <div class="app-container">
+        
+        <nav class="nav-aid">
+            <div class="nav-header">Question Index</div>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#q1" class="nav-link">1. Arithmetic</a></li>
+                <li class="nav-item"><a href="#q2" class="nav-link">2. Word Problem</a></li>
+                <li class="nav-item">
+                    <a href="#q3" class="nav-link">3. Algebra</a>
+                    <ul class="nav-list">
+                        <li class="nav-item nav-sub-item"><a href="#q3a" class="nav-link">3a) Find x</a></li>
+                        <li class="nav-item nav-sub-item"><a href="#q3b" class="nav-link">3b) Derive</a></li>
+                        <li class="nav-item nav-sub-item"><a href="#q3c" class="nav-link">3c) Explain</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item"><a href="#q4" class="nav-link">4. Geometry</a></li>
+                <li class="nav-item"><a href="#q5" class="nav-link">5. Probability</a></li>
+            </ul>
+        </nav>
+
+        <nav class="nav-drawer" id="mobileDrawer">
+            <div class="nav-header">Jump to Question</div>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#q1" class="nav-link mobile-link">1. Arithmetic</a></li>
+                <li class="nav-item"><a href="#q2" class="nav-link mobile-link">2. Word Problem</a></li>
+                <li class="nav-item">
+                    <div style="padding: 8px 12px; font-weight:bold; color:#777;">3. Algebra</div>
+                    <ul class="nav-list">
+                        <li class="nav-item nav-sub-item"><a href="#q3a" class="nav-link mobile-link">3a) Find x</a></li>
+                        <li class="nav-item nav-sub-item"><a href="#q3b" class="nav-link mobile-link">3b) Derive</a></li>
+                        <li class="nav-item nav-sub-item"><a href="#q3c" class="nav-link mobile-link">3c) Explain</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item"><a href="#q4" class="nav-link mobile-link">4. Geometry</a></li>
+                <li class="nav-item"><a href="#q5" class="nav-link mobile-link">5. Probability</a></li>
+            </ul>
+        </nav>
+
+        <main class="paper-container">
+            
+            <div class="paper-header">
+                <div class="paper-title">Year 6 Mathematics - Paper A</div>
+                <p style="color:#666; margin-top:10px;">Full Solutions & Working Out</p>
+            </div>
+
+            <article class="question-block" id="q1">
+                <div class="q-header">
+                    <span class="q-number">1</span>
+                    <span>Calculate the following:</span>
+                </div>
+                <div class="q-content">
+                    <p class="q-text">
+                        <span class="katex-sim">145 + 23 = ?</span>
+                    </p>
+
+                    <div class="answer-section">
+                        <span class="answer-label">Answer</span>
+                        <span class="answer-value">168</span>
+                    </div>
+
+                    <div class="working-section">
+                        <button class="working-toggle-btn" aria-expanded="false">
+                            <span class="toggle-icon">▶</span> Show Working
+                        </button>
+                        <div class="working-content">
+                            <div class="working-step">Align the numbers vertically by place value.</div>
+                            <div class="working-step">
+                                <pre style="font-family:monospace;">
+  145
++  23
+-----
+  168</pre>
+                            </div>
+                            <div class="working-step">5 + 3 = 8</div>
+                            <div class="working-step">4 + 2 = 6</div>
+                            <div class="working-step">1 + 0 = 1</div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="question-block" id="q2">
+                <div class="q-header">
+                    <span class="q-number">2</span>
+                    <span>Word Problem</span>
+                </div>
+                <div class="q-content">
+                    <p class="q-text">
+                        A train leaves the station at <span class="katex-sim">9:15 am</span>. The journey takes 90 minutes. What time does the train arrive?
+                    </p>
+
+                    <div class="answer-section">
+                        <span class="answer-label">Answer</span>
+                        <span class="answer-value">10:45 am</span>
+                    </div>
+
+                    <div class="working-section">
+                        <button class="working-toggle-btn" aria-expanded="false">
+                            <span class="toggle-icon">▶</span> Show Working
+                        </button>
+                        <div class="working-content">
+                            <div class="working-step">90 minutes is equal to 1 hour and 30 minutes.</div>
+                            <div class="working-step">Add 1 hour to 9:15 am &rarr; 10:15 am.</div>
+                            <div class="working-step">Add remaining 30 minutes to 10:15 am &rarr; 10:45 am.</div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="question-block" id="q3">
+                <div class="q-header">
+                    <span class="q-number">3</span>
+                    <span>Algebra</span>
+                </div>
+                <div class="q-content">
+                    <p class="q-text">
+                        Consider the equation: <span class="katex-sim">2x + 4y = 20</span>
+                    </p>
+
+                    <div class="sub-question" id="q3a">
+                        <p class="q-text"><span class="sub-q-label">a)</span> Find the value of <span class="katex-sim">x</span> when <span class="katex-sim">y = 2</span>.</p>
+                        
+                        <div class="answer-section">
+                            <span class="answer-label">Answer</span>
+                            <span class="answer-value">x = 6</span>
+                        </div>
+
+                        <div class="working-section">
+                            <button class="working-toggle-btn" aria-expanded="false">
+                                <span class="toggle-icon">▶</span> Show Working
+                            </button>
+                            <div class="working-content">
+                                <div class="working-step">Substitute y = 2 into the equation:</div>
+                                <div class="working-step"><span class="katex-sim">2x + 4(2) = 20</span></div>
+                                <div class="working-step"><span class="katex-sim">2x + 8 = 20</span></div>
+                                <div class="working-step">Subtract 8 from both sides: <span class="katex-sim">2x = 12</span></div>
+                                <div class="working-step">Divide by 2: <span class="katex-sim">x = 6</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sub-question" id="q3b">
+                        <p class="q-text"><span class="sub-q-label">b)</span> Rearrange the formula to make <span class="katex-sim">y</span> the subject.</p>
+                        
+                        <div class="answer-section">
+                            <span class="answer-label">Answer</span>
+                            <span class="answer-value"><span class="katex-sim">y = 5 - 0.5x</span> or <span class="katex-sim">y = (20 - 2x) / 4</span></span>
+                        </div>
+
+                        <div class="working-section">
+                            <button class="working-toggle-btn" aria-expanded="false">
+                                <span class="toggle-icon">▶</span> Show Working
+                            </button>
+                            <div class="working-content">
+                                <p style="font-style:italic; color:#666;">(This is a long derivation example)</p>
+                                <div class="working-step">Start with: <span class="katex-sim">2x + 4y = 20</span></div>
+                                <div class="working-step">Goal: Isolate <span class="katex-sim">y</span>.</div>
+                                <div class="working-step">Subtract <span class="katex-sim">2x</span> from both sides:</div>
+                                <div class="working-step"><span class="katex-sim">4y = 20 - 2x</span></div>
+                                <div class="working-step">Divide every term by 4:</div>
+                                <div class="working-step"><span class="katex-sim">y = 20/4 - 2x/4</span></div>
+                                <div class="working-step">Simplify the fractions:</div>
+                                <div class="working-step"><span class="katex-sim">y = 5 - 1/2x</span></div>
+                                <div class="working-step">Alternative format: <span class="katex-sim">y = 5 - 0.5x</span></div>
+                                <div class="working-step">Check: If x=6, y = 5 - 3 = 2. Correct.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sub-question" id="q3c">
+                        <p class="q-text"><span class="sub-q-label">c)</span> Explain why <span class="katex-sim">y</span> decreases as <span class="katex-sim">x</span> increases.</p>
+                        
+                        <div class="answer-section">
+                            <span class="answer-label">Answer</span>
+                            <span class="answer-value">Because the coefficient of x is negative.</span>
+                        </div>
+
+                        <div class="working-section">
+                            <button class="working-toggle-btn" aria-expanded="false">
+                                <span class="toggle-icon">▶</span> Show Working
+                            </button>
+                            <div class="working-content">
+                                <div class="working-step">Looking at the equation <span class="katex-sim">y = 5 - 0.5x</span></div>
+                                <div class="working-step">The gradient is -0.5.</div>
+                                <div class="working-step">A negative gradient means the line slopes downwards.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </article>
+
+            <article class="question-block" id="q4">
+                <div class="q-header">
+                    <span class="q-number">4</span>
+                    <span>Geometry</span>
+                </div>
+                <div class="q-content">
+                    <p class="q-text">Find the area of the rectangle below.</p>
+                    <div class="diagram-placeholder">[ Rectangle Diagram: 6cm x 4cm ]</div>
+                    
+                    <div class="answer-section">
+                        <span class="answer-label">Answer</span>
+                        <span class="answer-value">24 cm²</span>
+                    </div>
+
+                    <div class="working-section">
+                        <button class="working-toggle-btn" aria-expanded="false">
+                            <span class="toggle-icon">▶</span> Show Working
+                        </button>
+                        <div class="working-content">
+                            <div class="working-step">Formula: Area = width × height</div>
+                            <div class="working-step">Substitute values: <span class="katex-sim">6 × 4</span></div>
+                            <div class="working-step">Calculate: 24</div>
+                            <div class="working-step">Units: cm × cm = cm²</div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="question-block" id="q5">
+                <div class="q-header">
+                    <span class="q-number">5</span>
+                    <span>Probability</span>
+                </div>
+                <div class="q-content">
+                    <p class="q-text">A bag contains 3 red balls and 2 blue balls. What is the probability of picking a blue ball?</p>
+                    
+                    <div class="answer-section">
+                        <span class="answer-label">Answer</span>
+                        <span class="answer-value">2/5 (or 0.4 or 40%)</span>
+                    </div>
+
+                    <div class="working-section">
+                        <button class="working-toggle-btn" aria-expanded="false">
+                            <span class="toggle-icon">▶</span> Show Working
+                        </button>
+                        <div class="working-content">
+                            <div class="working-step">Total balls = 3 (red) + 2 (blue) = 5.</div>
+                            <div class="working-step">Blue balls = 2.</div>
+                            <div class="working-step">Probability = (Target Outcomes) / (Total Outcomes)</div>
+                            <div class="working-step">P(Blue) = 2 / 5</div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <div style="height: 100px;"></div> </main>
+    </div>
+
+    <script>
+        // --- 1. HANDLE SHOW/HIDE WORKING TOGGLES ---
+        document.addEventListener('click', function(e) {
+            // Check if clicked element is a working toggle button
+            const btn = e.target.closest('.working-toggle-btn');
+            if (btn) {
+                const content = btn.nextElementSibling;
+                const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+                
+                // Toggle state
+                btn.setAttribute('aria-expanded', !isExpanded);
+                content.classList.toggle('is-visible');
+                
+                // Update text icon
+                const icon = btn.querySelector('.toggle-icon');
+                if (icon) icon.textContent = isExpanded ? '▶' : '▼'; // Rotate logic handled visually by CSS too
+            }
+        });
+
+        // --- 2. HANDLE MOBILE MENU ---
+        const menuToggle = document.querySelector('.menu-toggle');
+        const drawer = document.getElementById('mobileDrawer');
+        const overlay = document.getElementById('mobileOverlay');
+
+        function toggleMenu() {
+            const isOpen = drawer.classList.contains('is-open');
+            drawer.classList.toggle('is-open');
+            overlay.classList.toggle('is-open');
+            menuToggle.setAttribute('aria-expanded', !isOpen);
+        }
+
+        if (menuToggle) {
+            menuToggle.addEventListener('click', toggleMenu);
+            overlay.addEventListener('click', toggleMenu);
+        }
+
+        // --- 3. HANDLE SMOOTH SCROLL & MOBILE MENU CLOSE ---
+        const links = document.querySelectorAll('a[href^="#"]');
+        links.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+                
+                if (targetElement) {
+                    // Close mobile menu if open
+                    if (drawer.classList.contains('is-open')) {
+                        toggleMenu();
+                    }
+
+                    // Smooth scroll
+                    targetElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                    
+                    // Update URL hash without jump
+                    history.pushState(null, null, targetId);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

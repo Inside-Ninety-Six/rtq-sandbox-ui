@@ -1,0 +1,2365 @@
+<!doctype html>
+<html lang="en-GB">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>RTQ — Maths Paper Solution Viewer (Stress Test Harness)</title>
+
+    <!-- KaTeX (Real Rendering add-on) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            /* Cool-neutral base (Stage 5 override) */
+            --page-bg: #eef1f6;
+            --frame-bg: #f7f9fc;
+            --ink-1: #101623;
+            /* question text */
+            --ink-2: #2a3242;
+            /* body */
+            --ink-3: #4a5568;
+            /* secondary */
+            --ink-4: #6b778c;
+            /* nav + quiet */
+            --line-1: rgba(16, 22, 35, .12);
+            --line-2: rgba(16, 22, 35, .08);
+
+            /* Non-semantic accent (Stage 5 override) */
+            --accent: #2f5f8f;
+
+            /* Rhythm */
+            --gap-q0: 28px;
+            /* between top-level questions (largest) */
+            --gap-q1: 18px;
+            --gap-q2: 12px;
+            --gap-inner: 10px;
+            --gap-tight: 8px;
+
+            /* Frame */
+            --frame-max: 1080px;
+            --nav-w: 140px;
+            --gutter: 18px;
+
+            /* Type */
+            --fs-0: 15.5px;
+            --fs-1: 16.5px;
+            --fs-2: 18px;
+            --lh-0: 1.45;
+            --lh-1: 1.55;
+            --lh-2: 1.6;
+
+            /* Motion (continuity only) */
+            --dur: 160ms;
+            --ease: cubic-bezier(.2, .8, .2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            background: var(--page-bg);
+            color: var(--ink-2);
+            font-size: var(--fs-0);
+            line-height: var(--lh-1);
+            overflow-x: hidden;
+            /* never allow page horizontal scroll */
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        /* Top controls aligned to the same centered frame */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(238, 241, 246, .92);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--line-2);
+        }
+
+        .topbar-inner {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 10px var(--gutter);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand {
+            font-size: 13px;
+            letter-spacing: .02em;
+            color: var(--ink-4);
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        label {
+            font-size: 12.5px;
+            color: var(--ink-3);
+        }
+
+        select {
+            font: inherit;
+            font-size: 14px;
+            line-height: 1.2;
+            padding: 8px 10px;
+            border: 1px solid var(--line-1);
+            border-radius: 10px;
+            background: #fff;
+            color: var(--ink-2);
+            max-width: min(340px, 72vw);
+        }
+
+        select:focus {
+            outline: 2px solid rgba(47, 95, 143, .35);
+            outline-offset: 2px;
+            border-color: rgba(47, 95, 143, .35);
+        }
+
+        .jump-btn {
+            display: none;
+            font: inherit;
+            font-size: 14px;
+            padding: 8px 10px;
+            border: 1px solid var(--line-1);
+            border-radius: 10px;
+            background: #fff;
+            color: var(--ink-2);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .jump-btn:hover {
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .jump-btn:focus {
+            outline: 2px solid rgba(47, 95, 143, .35);
+            outline-offset: 2px;
+            border-color: rgba(47, 95, 143, .35);
+        }
+
+        /* Centered content frame holding nav + paper on the same base surface */
+        .frame {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 14px var(--gutter) 56px;
+        }
+
+        .surface {
+            background: var(--frame-bg);
+            border: 1px solid var(--line-2);
+            border-radius: 18px;
+            padding: 16px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: var(--nav-w) 1fr;
+            gap: 22px;
+            align-items: start;
+        }
+
+        /* Navigation: quiet, no panel background */
+        nav[aria-label="Paper navigation"] {
+            position: sticky;
+            /* Navigation persistence add-on (desktop) */
+            top: 58px;
+            /* below topbar */
+            align-self: start;
+        }
+
+        .nav-title {
+            font-size: 12px;
+            color: var(--ink-4);
+            margin: 0 0 10px;
+            letter-spacing: .02em;
+            user-select: none;
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: calc(100vh - 110px);
+            overflow: auto;
+            /* only if exceeds viewport */
+            padding-right: 4px;
+            /* space for hidden scrollbar */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* legacy */
+        }
+
+        .nav-list::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* WebKit/Blink */
+
+        .nav-section {
+            font-size: 12px;
+            color: var(--ink-4);
+            margin: 14px 0 6px;
+            letter-spacing: .04em;
+            user-select: none;
+        }
+
+        .nav-item {
+            margin: 0;
+        }
+
+        .nav-link {
+            width: 100%;
+            text-align: left;
+            display: block;
+            font: inherit;
+            font-size: 13px;
+            line-height: 1.2;
+            padding: 7px 8px 7px 10px;
+            border: 0;
+            background: transparent;
+            /* no fills */
+            color: var(--ink-4);
+            cursor: pointer;
+            border-radius: 10px;
+            /* shape only for focus clipping; no fill */
+            position: relative;
+        }
+
+        .nav-link:hover {
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .nav-link:focus {
+            outline: 2px solid rgba(47, 95, 143, .35);
+            outline-offset: 2px;
+        }
+
+        /* Active state: clear but restrained, no color fill, no accent differentiation */
+        .nav-link[aria-current="true"] {
+            font-weight: 700;
+            /* one strong cue */
+            color: var(--ink-3);
+        }
+
+        .nav-link[aria-current="true"]::before {
+            content: "";
+            position: absolute;
+            left: 2px;
+            top: 7px;
+            bottom: 7px;
+            width: 2px;
+            border-radius: 2px;
+            background: rgba(16, 22, 35, .22);
+            /* neutral marker, not accent */
+        }
+
+        /* Paper */
+        main {
+            min-width: 0;
+        }
+
+        .paper-meta {
+            font-size: 12.5px;
+            color: var(--ink-4);
+            margin: 2px 0 16px;
+        }
+
+        .paper {
+            margin: 0;
+            padding: 0;
+        }
+
+        article.q {
+            padding: 0;
+            margin: 0;
+        }
+
+        article.q.depth-0 {
+            margin-top: var(--gap-q0);
+        }
+
+        article.q.depth-1 {
+            margin-top: var(--gap-q1);
+        }
+
+        article.q.depth-2 {
+            margin-top: var(--gap-q2);
+        }
+
+        .q-inner {
+            display: block;
+            padding-left: var(--indent, 0px);
+            max-width: 100%;
+        }
+
+        .q-head {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .qid {
+            flex: 0 0 auto;
+            font-size: 14px;
+            color: var(--ink-3);
+            line-height: 1.4;
+            padding-top: 1px;
+            user-select: none;
+        }
+
+        .qtext {
+            flex: 1 1 auto;
+            min-width: 0;
+            color: var(--ink-1);
+            /* question dominance */
+            font-size: var(--fs-2);
+            line-height: var(--lh-2);
+        }
+
+        .qtext p {
+            margin: 0 0 10px;
+        }
+
+        .qtext p:last-child {
+            margin-bottom: 0;
+        }
+
+        .answer {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .answer .label {
+            font-size: 13px;
+            color: var(--ink-3);
+            font-weight: 700;
+            /* label only */
+            min-width: 62px;
+            padding-top: 2px;
+        }
+
+        .answer .value {
+            font-size: var(--fs-1);
+            color: var(--ink-2);
+            line-height: var(--lh-1);
+            min-width: 0;
+        }
+
+        .answer .value ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        /* Disclosure control: text-first, not a button */
+        .toggle-row {
+            margin-top: 8px;
+        }
+
+        .toggle {
+            font: inherit;
+            font-size: 14px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--accent);
+            /* accent allowed for affordance */
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toggle:hover {
+            opacity: .92;
+        }
+
+        .toggle:focus {
+            outline: 2px solid rgba(47, 95, 143, .35);
+            outline-offset: 3px;
+            border-radius: 10px;
+        }
+
+        .chev {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+            transform: translateY(1px);
+        }
+
+        .chev svg {
+            width: 14px;
+            height: 14px;
+            display: block;
+        }
+
+        .chev path {
+            stroke: currentColor;
+            stroke-width: 2.2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Solution details: subtle surface separation, integrated */
+        .sol-wrap {
+            margin-top: 10px;
+            border-top: 1px solid var(--line-2);
+            padding-top: 10px;
+        }
+
+        .solution {
+            border-radius: 14px;
+            background: rgba(16, 22, 35, .03);
+            /* subtle */
+            padding: 10px 12px;
+            color: var(--ink-3);
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        /* Animation only for continuity, not attention (and disabled if reduced motion) */
+        .solution.animating {
+            transition: max-height var(--dur) var(--ease);
+            will-change: max-height;
+        }
+
+        .sol-section {
+            margin-top: 12px;
+        }
+
+        .sol-section:first-child {
+            margin-top: 0;
+        }
+
+        .sol-label {
+            font-size: 12.5px;
+            color: var(--ink-3);
+            font-weight: 700;
+            /* label only */
+            margin: 0 0 8px;
+        }
+
+        .sol-body {
+            font-size: 14px;
+            line-height: var(--lh-0);
+            /* tighter than question */
+            color: var(--ink-3);
+        }
+
+        .sol-body p {
+            margin: 0 0 8px;
+        }
+
+        .sol-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        .sol-body ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .sol-body li {
+            margin: 0 0 6px;
+        }
+
+        .sol-body li:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Math containment invariant */
+        .math-inline {
+            white-space: nowrap;
+        }
+
+        .math-block {
+            margin: 8px 0 10px;
+            padding: 6px 8px;
+            border: 1px solid rgba(16, 22, 35, .08);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .55);
+            max-width: 100%;
+            overflow-x: auto;
+            /* horizontal scroll only within math */
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .math-block::-webkit-scrollbar {
+            display: none;
+        }
+
+        .math-block .katex-display {
+            margin: 0;
+            /* keep calm rhythm */
+            padding: 0;
+            max-width: 100%;
+        }
+
+        .math-block .katex {
+            max-width: 100%;
+        }
+
+        .katex-display>.katex {
+            max-width: 100%;
+        }
+
+        /* Diagrams (inline SVG) */
+        .diagram {
+            margin: 10px 0 0;
+            max-width: 100%;
+        }
+
+        .diagram svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .diagram .cap {
+            font-size: 12.5px;
+            color: var(--ink-4);
+            margin-top: 6px;
+        }
+
+        /* Nested indentation only (no borders/panels) */
+        .depth-0 .q-inner {
+            --indent: 0px;
+        }
+
+        .depth-1 .q-inner {
+            --indent: 18px;
+        }
+
+        .depth-2 .q-inner {
+            --indent: 34px;
+        }
+
+        /* Make indentation adapt on small screens */
+        @media (max-width: 860px) {
+            :root {
+                --nav-w: 120px;
+            }
+
+            .qtext {
+                font-size: 17px;
+            }
+
+            .depth-1 .q-inner {
+                --indent: 14px;
+            }
+
+            .depth-2 .q-inner {
+                --indent: 24px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            nav[aria-label="Paper navigation"] {
+                display: none;
+            }
+
+            .jump-btn {
+                display: inline-flex;
+            }
+
+            .surface {
+                padding: 14px;
+            }
+
+            .qtext {
+                font-size: 17px;
+            }
+
+            .brand {
+                display: none;
+            }
+        }
+
+        /* Mobile drawer navigation */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: none;
+            background: rgba(16, 22, 35, .25);
+        }
+
+        .drawer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: min(320px, 88vw);
+            background: var(--frame-bg);
+            border-left: 1px solid var(--line-2);
+            padding: 14px 14px 14px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .drawer-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--line-2);
+        }
+
+        .drawer-title {
+            margin: 0;
+            font-size: 13px;
+            color: var(--ink-3);
+            letter-spacing: .02em;
+        }
+
+        .drawer-close {
+            font: inherit;
+            font-size: 14px;
+            padding: 6px 10px;
+            border: 1px solid var(--line-1);
+            border-radius: 10px;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .drawer-close:hover {
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .drawer-close:focus {
+            outline: 2px solid rgba(47, 95, 143, .35);
+            outline-offset: 2px;
+            border-color: rgba(47, 95, 143, .35);
+        }
+
+        .drawer .nav-list {
+            max-height: calc(100vh - 90px);
+        }
+
+        .drawer-overlay.open {
+            display: block;
+        }
+
+        /* Reduce motion */
+        @media (prefers-reduced-motion: reduce) {
+            .solution.animating {
+                transition: none !important;
+            }
+
+            html:focus-within {
+                scroll-behavior: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand" aria-hidden="true">RTQ • Paper Viewer</div>
+
+            <div class="controls">
+                <button id="jumpBtn" class="jump-btn" type="button" aria-haspopup="dialog"
+                    aria-controls="drawerOverlay">
+                    Jump to
+                </button>
+
+                <div class="selector">
+                    <label for="paperSelect">Paper</label>
+                    <select id="paperSelect">
+                        <option value="short">Short paper (6)</option>
+                        <option value="standard">Standard paper (35)</option>
+                        <option value="standardExpanded">Standard (Workings Expanded)</option>
+                        <option value="diagram">Diagram-heavy (20)</option>
+                        <option value="sectioned">Sectioned paper (A/B/C)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="frame">
+        <div class="surface">
+            <div class="layout">
+                <nav aria-label="Paper navigation">
+                    <div class="nav-title">Jump</div>
+                    <ul id="navListDesktop" class="nav-list"></ul>
+                </nav>
+
+                <main id="main" tabindex="-1">
+                    <div id="paperMeta" class="paper-meta"></div>
+                    <div id="paper" class="paper"></div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Drawer -->
+    <div id="drawerOverlay" class="drawer-overlay" role="dialog" aria-modal="true" aria-label="Paper navigation">
+        <div class="drawer" role="document">
+            <div class="drawer-head">
+                <h2 class="drawer-title">Jump</h2>
+                <button id="drawerClose" class="drawer-close" type="button">Close</button>
+            </div>
+            <ul id="navListMobile" class="nav-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const $ = (sel, root = document) => root.querySelector(sel);
+            const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+            const paperSelect = $("#paperSelect");
+            const paperEl = $("#paper");
+            const paperMeta = $("#paperMeta");
+            const navDesktop = $("#navListDesktop");
+            const navMobile = $("#navListMobile");
+
+            const jumpBtn = $("#jumpBtn");
+            const drawerOverlay = $("#drawerOverlay");
+            const drawerClose = $("#drawerClose");
+
+            const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+            // ---------- SVG diagram library (4 reusable types) ----------
+            function svgEl(tag, attrs = {}) {
+                const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+                for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+                return el;
+            }
+
+            function diagramGeometry(opts = {}) {
+                const { kind = "triangle", label = "Diagram" } = opts;
+                const wrap = document.createElement("div");
+                wrap.className = "diagram";
+
+                const svg = svgEl("svg", { viewBox: "0 0 320 200", role: "img", "aria-label": label });
+                const g = svgEl("g", { fill: "none", stroke: "rgba(16,22,35,.55)", "stroke-width": "2" });
+
+                if (kind === "triangle") {
+                    g.appendChild(svgEl("path", { d: "M70 155 L160 55 L250 155 Z" }));
+                    const a = svgEl("text", { x: "66", y: "168", fill: "rgba(16,22,35,.55)", "font-size": "12" }); a.textContent = "A";
+                    const b = svgEl("text", { x: "155", y: "46", fill: "rgba(16,22,35,.55)", "font-size": "12" }); b.textContent = "B";
+                    const c = svgEl("text", { x: "252", y: "168", fill: "rgba(16,22,35,.55)", "font-size": "12" }); c.textContent = "C";
+                    svg.appendChild(g); svg.appendChild(a); svg.appendChild(b); svg.appendChild(c);
+                    const base = svgEl("text", { x: "142", y: "176", fill: "rgba(16,22,35,.45)", "font-size": "12" }); base.textContent = "8 cm";
+                    const side = svgEl("text", { x: "98", y: "108", fill: "rgba(16,22,35,.45)", "font-size": "12", transform: "rotate(-55 98 108)" }); side.textContent = "10 cm";
+                    svg.appendChild(base); svg.appendChild(side);
+                } else {
+                    // circle with chord
+                    g.appendChild(svgEl("circle", { cx: "160", cy: "105", r: "70" }));
+                    g.appendChild(svgEl("line", { x1: "110", y1: "85", x2: "230", y2: "135" }));
+                    const t1 = svgEl("text", { x: "102", y: "78", fill: "rgba(16,22,35,.55)", "font-size": "12" }); t1.textContent = "P";
+                    const t2 = svgEl("text", { x: "236", y: "146", fill: "rgba(16,22,35,.55)", "font-size": "12" }); t2.textContent = "Q";
+                    svg.appendChild(g); svg.appendChild(t1); svg.appendChild(t2);
+                    const chord = svgEl("text", { x: "152", y: "120", fill: "rgba(16,22,35,.45)", "font-size": "12" }); chord.textContent = "12 cm";
+                    svg.appendChild(chord);
+                }
+
+                wrap.appendChild(svg);
+                const cap = document.createElement("div");
+                cap.className = "cap";
+                cap.textContent = "Diagram (not to scale)";
+                wrap.appendChild(cap);
+                return wrap;
+            }
+
+            function diagramRatioBars(opts = {}) {
+                const { label = "Ratio bars" } = opts;
+                const wrap = document.createElement("div");
+                wrap.className = "diagram";
+                const svg = svgEl("svg", { viewBox: "0 0 320 120", role: "img", "aria-label": label });
+
+                const stroke = "rgba(16,22,35,.45)";
+                const fill1 = "rgba(16,22,35,.06)";
+                const fill2 = "rgba(16,22,35,.10)";
+                const bar1 = svgEl("rect", { x: "30", y: "22", width: "260", height: "26", rx: "6", fill: fill1, stroke });
+                const bar2 = svgEl("rect", { x: "30", y: "72", width: "260", height: "26", rx: "6", fill: fill2, stroke });
+
+                // segments
+                for (let i = 1; i <= 4; i++) {
+                    svg.appendChild(svgEl("line", { x1: String(30 + i * 52), y1: "22", x2: String(30 + i * 52), y2: "48", stroke, "stroke-width": "1" }));
+                    svg.appendChild(svgEl("line", { x1: String(30 + i * 52), y1: "72", x2: String(30 + i * 52), y2: "98", stroke, "stroke-width": "1" }));
+                }
+
+                const tA = svgEl("text", { x: "30", y: "16", fill: "rgba(16,22,35,.55)", "font-size": "12" }); tA.textContent = "A";
+                const tB = svgEl("text", { x: "30", y: "66", fill: "rgba(16,22,35,.55)", "font-size": "12" }); tB.textContent = "B";
+
+                svg.appendChild(bar1); svg.appendChild(bar2);
+                svg.appendChild(tA); svg.appendChild(tB);
+
+                wrap.appendChild(svg);
+                const cap = document.createElement("div");
+                cap.className = "cap";
+                cap.textContent = "Ratio bars";
+                wrap.appendChild(cap);
+                return wrap;
+            }
+
+            function diagramGrid(opts = {}) {
+                const { label = "Coordinate grid" } = opts;
+                const wrap = document.createElement("div");
+                wrap.className = "diagram";
+                const svg = svgEl("svg", { viewBox: "0 0 320 200", role: "img", "aria-label": label });
+
+                // grid
+                for (let x = 30; x <= 290; x += 26) {
+                    svg.appendChild(svgEl("line", { x1: x, y1: "20", x2: x, y2: "180", stroke: "rgba(16,22,35,.10)" }));
+                }
+                for (let y = 20; y <= 180; y += 20) {
+                    svg.appendChild(svgEl("line", { x1: "30", y1: y, x2: "290", y2: y, stroke: "rgba(16,22,35,.10)" }));
+                }
+                // axes
+                svg.appendChild(svgEl("line", { x1: "30", y1: "180", x2: "290", y2: "180", stroke: "rgba(16,22,35,.35)", "stroke-width": "2" }));
+                svg.appendChild(svgEl("line", { x1: "30", y1: "180", x2: "30", y2: "20", stroke: "rgba(16,22,35,.35)", "stroke-width": "2" }));
+
+                // line + points
+                svg.appendChild(svgEl("line", { x1: "60", y1: "150", x2: "250", y2: "60", stroke: "rgba(16,22,35,.55)", "stroke-width": "2" }));
+                const p1 = svgEl("circle", { cx: "86", cy: "136", r: "4", fill: "rgba(16,22,35,.55)" });
+                const p2 = svgEl("circle", { cx: "198", cy: "84", r: "4", fill: "rgba(16,22,35,.55)" });
+                svg.appendChild(p1); svg.appendChild(p2);
+
+                const t = svgEl("text", { x: "92", y: "130", fill: "rgba(16,22,35,.55)", "font-size": "12" }); t.textContent = "(2,2)";
+                const u = svgEl("text", { x: "206", y: "78", fill: "rgba(16,22,35,.55)", "font-size": "12" }); u.textContent = "(6,5)";
+                svg.appendChild(t); svg.appendChild(u);
+
+                wrap.appendChild(svg);
+                const cap = document.createElement("div");
+                cap.className = "cap";
+                cap.textContent = "Coordinate grid";
+                wrap.appendChild(cap);
+                return wrap;
+            }
+
+            function diagramArrayTable(opts = {}) {
+                const { label = "Table / array" } = opts;
+                const wrap = document.createElement("div");
+                wrap.className = "diagram";
+                const svg = svgEl("svg", { viewBox: "0 0 320 150", role: "img", "aria-label": label });
+
+                const x0 = 40, y0 = 26, w = 240, h = 90, cols = 6, rows = 3;
+                svg.appendChild(svgEl("rect", { x: x0, y: y0, width: w, height: h, fill: "rgba(255,255,255,.4)", stroke: "rgba(16,22,35,.35)", rx: "10" }));
+
+                for (let i = 1; i < cols; i++) {
+                    const x = x0 + i * (w / cols);
+                    svg.appendChild(svgEl("line", { x1: x, y1: y0, x2: x, y2: y0 + h, stroke: "rgba(16,22,35,.18)" }));
+                }
+                for (let j = 1; j < rows; j++) {
+                    const y = y0 + j * (h / rows);
+                    svg.appendChild(svgEl("line", { x1: x0, y1: y, x2: x0 + w, y2: y, stroke: "rgba(16,22,35,.18)" }));
+                }
+                const t = svgEl("text", { x: "50", y: "20", fill: "rgba(16,22,35,.55)", "font-size": "12" }); t.textContent = "Array";
+                svg.appendChild(t);
+
+                wrap.appendChild(svg);
+                const cap = document.createElement("div");
+                cap.className = "cap";
+                cap.textContent = "Table / array";
+                wrap.appendChild(cap);
+                return wrap;
+            }
+
+            // ---------- Math rendering helpers ----------
+            function inlineMath(tex) {
+                const s = document.createElement("span");
+                s.className = "math-inline";
+                s.dataset.math = tex;
+                s.textContent = tex; // fallback
+                return s;
+            }
+            function blockMath(tex) {
+                const d = document.createElement("div");
+                d.className = "math-block";
+                d.dataset.mathBlock = tex;
+                d.textContent = tex; // fallback
+                return d;
+            }
+
+            function renderAllMath(root) {
+                const hasKaTeX = !!window.katex && typeof window.katex.render === "function";
+                if (!hasKaTeX) return;
+
+                $$("[data-math]", root).forEach(el => {
+                    try {
+                        window.katex.render(el.dataset.math, el, { throwOnError: false, displayMode: false });
+                    } catch (_) { }
+                });
+
+                $$("[data-math-block]", root).forEach(el => {
+                    try {
+                        window.katex.render(el.dataset.mathBlock, el, { throwOnError: false, displayMode: true });
+                    } catch (_) { }
+                });
+            }
+
+            // ---------- Solution expand/collapse ----------
+            function setSolutionCollapsed(solEl, collapsed, animate = true) {
+                const wantsAnim = animate && !prefersReducedMotion;
+
+                if (collapsed) {
+                    if (!wantsAnim) {
+                        solEl.hidden = true;
+                        solEl.style.maxHeight = "";
+                        solEl.classList.remove("animating");
+                        return;
+                    }
+                    const h = solEl.scrollHeight;
+                    solEl.classList.add("animating");
+                    solEl.style.maxHeight = h + "px";
+                    solEl.getBoundingClientRect(); // reflow
+                    solEl.style.maxHeight = "0px";
+                    const done = () => {
+                        solEl.hidden = true;
+                        solEl.style.maxHeight = "";
+                        solEl.classList.remove("animating");
+                        solEl.removeEventListener("transitionend", done);
+                    };
+                    solEl.addEventListener("transitionend", done);
+                } else {
+                    solEl.hidden = false;
+                    if (!wantsAnim) {
+                        solEl.style.maxHeight = "";
+                        solEl.classList.remove("animating");
+                        return;
+                    }
+                    solEl.classList.add("animating");
+                    solEl.style.maxHeight = "0px";
+                    solEl.getBoundingClientRect();
+                    const h = solEl.scrollHeight;
+                    solEl.style.maxHeight = h + "px";
+                    const done = () => {
+                        solEl.style.maxHeight = "";
+                        solEl.classList.remove("animating");
+                        solEl.removeEventListener("transitionend", done);
+                    };
+                    solEl.addEventListener("transitionend", done);
+                }
+            }
+
+            // ---------- Dataset builder ----------
+            function qIdToDomId(qid) {
+                return "q-" + qid.replace(/[^\w]+/g, "_");
+            }
+
+            function makeQuestion({ qid, depth = 0, prompt = [], diagram = null, answer = [], solution = null, defaultExpanded = false }) {
+                return { qid, depth, prompt, diagram, answer, solution, defaultExpanded };
+            }
+
+            function p(parts) {
+                return { type: "p", parts };
+            }
+            function t(str) { return { type: "t", value: str }; }
+            function m(tex) { return { type: "m", value: tex }; }
+
+            function longAlgebraWorking(label, lines = 14) {
+                // Produces dense but readable step lines; used for long questions.
+                const steps = [];
+                steps.push({ type: "p", parts: [t(label)] });
+                steps.push({
+                    type: "math", tex: String.raw`\begin{aligned}
+2x + 5 &= 3( x - 4 ) + 17\\
+2x + 5 &= 3x - 12 + 17\\
+2x + 5 &= 3x + 5\\
+2x &= 3x\\
+0 &= x
+\end{aligned}` });
+
+                // additional long steps (synthetic), to stress overflow + length
+                for (let i = 1; i <= lines; i++) {
+                    const a = 7 * i + 19;
+                    const b = 4 * i + 11;
+                    const c = 9 * i + 23;
+                    steps.push({
+                        type: "math", tex: String.raw`\begin{aligned}
+( x + ${a} )^2 - ( x + ${b} )^2 &= ( (${a}-${b}) )\big(2x + (${a}+${b})\big)\\
+&= ${a - b}\big(2x + ${a + b}\big)\\
+&= ${2 * (a - b)}x + ${(a - b) * (a + b)}
+\end{aligned}` });
+                }
+                return steps;
+            }
+
+            function veryLongWorking(lines = 56) {
+                const blocks = [];
+                blocks.push({ type: "p", parts: [t("We keep each step small and consistent.")] });
+                const rows = [];
+                rows.push(String.raw`\begin{aligned}`);
+                rows.push(String.raw`x &= 1`);
+                for (let i = 2; i <= lines; i++) {
+                    const add = (i % 7) + 1;
+                    const mul = (i % 5) + 2;
+                    rows.push(String.raw`x &= ${mul}x + ${add} - (${mul - 1})x`);
+                }
+                rows.push(String.raw`\end{aligned}`);
+                blocks.push({ type: "math", tex: rows.join("\n") });
+
+                // Add a second block that can overflow horizontally on mobile
+                blocks.push({
+                    type: "math", tex: String.raw`\begin{aligned}
+S &= 1 + 2 + 3 + \cdots + 60\\
+  &= \frac{60\cdot 61}{2} = 1830\\
+\text{and}\quad T &= \left(\frac{a^2 + b^2 + c^2 + d^2 + e^2 + f^2 + g^2}{h^2 + i^2 + j^2 + k^2 + \ell^2 + m^2}\right)\left(\frac{pqrstuvw}{xyz}\right)
+\end{aligned}` });
+                return blocks;
+            }
+
+            // ---------- Papers ----------
+            function buildPapers() {
+                // Short paper (6) with a multi-part
+                const short = {
+                    key: "short",
+                    title: "Short paper",
+                    sections: null,
+                    questions: [
+                        makeQuestion({
+                            qid: "1",
+                            depth: 0,
+                            prompt: [
+                                p([t("Work out "), m(String.raw`48 \div 6`), t(".")])
+                            ],
+                            answer: [m(String.raw`8`)],
+                            solution: {
+                                guidance: ["Use division facts you know."],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+48 \div 6 &= 8
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "2",
+                            depth: 0,
+                            prompt: [
+                                p([t("A shop sells pencils in packs of 5. Each pencil costs 12p. How much does one pack cost?")])
+                            ],
+                            answer: [t("60p")],
+                            solution: {
+                                guidance: ["Find the cost of 5 pencils."],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+\text{Cost} &= 5 \times 12\\
+&= 60\text{p}
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "3",
+                            depth: 0,
+                            prompt: [
+                                p([t("Write "), m(String.raw`0.375`), t(" as a fraction in its simplest form.")])
+                            ],
+                            answer: [m(String.raw`\frac{3}{8}`)],
+                            solution: {
+                                guidance: ["Turn the decimal into a fraction, then simplify."],
+                                formulae: ["A decimal can be written over a power of 10."],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+0.375 &= \frac{375}{1000}\\
+&= \frac{3 \times 125}{8 \times 125}\\
+&= \frac{3}{8}
+\end{aligned}` }
+                                ],
+                                alternative: [
+                                    {
+                                        label: "Alternative working",
+                                        blocks: [
+                                            { type: "p", parts: [t("Notice "), m(String.raw`0.125 = \frac{1}{8}`), t(", so "), m(String.raw`0.375`), t(" is three lots of that.")] },
+                                            {
+                                                type: "math", tex: String.raw`\begin{aligned}
+0.375 &= 3 \times 0.125\\
+&= 3 \times \frac{1}{8}\\
+&= \frac{3}{8}
+\end{aligned}` }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }),
+
+                        // Multi-part question 4a/4b/4c (deep nesting stress in short)
+                        makeQuestion({
+                            qid: "4",
+                            depth: 0,
+                            prompt: [
+                                p([t("A rectangle has length "), m(String.raw`12\text{ cm}`), t(" and width "), m(String.raw`7\text{ cm}`), t(".")])
+                            ],
+                            answer: [t("See parts.")],
+                            solution: {
+                                guidance: ["Each part uses the same rectangle."],
+                                formulae: ["Area of a rectangle: " + String.raw`A = lw`, "Perimeter of a rectangle: " + String.raw`P = 2(l+w)`],
+                                working: [{ type: "p", parts: [t("Work each part using the given measurements.")] }],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "4(a)",
+                            depth: 1,
+                            prompt: [p([t("Find the area of the rectangle.")])],
+                            answer: [m(String.raw`84\text{ cm}^2`)],
+                            solution: {
+                                guidance: [],
+                                formulae: ["Area: " + String.raw`A = lw`],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+A &= 12 \times 7\\
+&= 84\text{ cm}^2
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "4(b)",
+                            depth: 1,
+                            prompt: [p([t("Find the perimeter of the rectangle.")])],
+                            answer: [m(String.raw`38\text{ cm}`)],
+                            solution: {
+                                guidance: ["Add all four sides, or use the perimeter formula."],
+                                formulae: ["Perimeter: " + String.raw`P = 2(l+w)`],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+P &= 2(12+7)\\
+&= 2 \times 19\\
+&= 38\text{ cm}
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "4(c)",
+                            depth: 1,
+                            prompt: [p([t("The rectangle is cut into 3 equal strips along its length. What is the area of one strip?")])],
+                            answer: [m(String.raw`28\text{ cm}^2`)],
+                            solution: {
+                                guidance: ["Split the area into 3 equal parts."],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+\text{Whole area} &= 84\\
+\text{One strip} &= 84 \div 3\\
+&= 28\text{ cm}^2
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+
+                        makeQuestion({
+                            qid: "5",
+                            depth: 0,
+                            prompt: [
+                                p([t("A bag has red and blue counters in the ratio "), m(String.raw`3:2`), t(". There are 30 counters altogether. How many are red?")]),
+                                { type: "diagram", node: diagramRatioBars({ label: "Ratio 3:2" }) }
+                            ],
+                            answer: [m(String.raw`18`)],
+                            solution: {
+                                guidance: ["Find how many parts in total, then scale up."],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+\text{Total parts} &= 3+2 = 5\\
+\text{One part} &= 30 \div 5 = 6\\
+\text{Red} &= 3 \times 6 = 18
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+
+                        makeQuestion({
+                            qid: "6",
+                            depth: 0,
+                            prompt: [
+                                p([t("Simplify "), m(String.raw`\frac{42}{56}`), t(".")])
+                            ],
+                            answer: [m(String.raw`\frac{3}{4}`)],
+                            solution: {
+                                guidance: ["Divide top and bottom by the same number."],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+\frac{42}{56} &= \frac{42 \div 14}{56 \div 14}\\
+&= \frac{3}{4}
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                    ]
+                };
+
+                // Standard paper (35) with deep nesting + long algebra Q26–Q35
+                const standardQuestions = [];
+                for (let i = 1; i <= 25; i++) {
+                    const qid = String(i);
+                    const hasGuidance = (i % 7 === 0) || (i % 11 === 0) || (i === 5);
+                    const hasFormulae = (i % 9 === 0) || (i === 12) || (i === 15);
+                    const hasAlt = (i % 10 === 0) || (i === 8) || (i === 15);
+
+                    const prompt = [];
+                    if (i === 8) {
+                        prompt.push(p([t("A train travels "), m(String.raw`45\text{ km}`), t(" in "), m(String.raw`30\text{ minutes}`), t(". What is its speed in km/h?")]));
+                    } else if (i === 12) {
+                        prompt.push(p([t("Work out "), m(String.raw`15\%`), t(" of "), m(String.raw`240`), t(".")]));
+                    } else if (i === 15) {
+                        prompt.push(p([t("A right-angled triangle has legs "), m(String.raw`9\text{ cm}`), t(" and "), m(String.raw`12\text{ cm}`), t(". Find the hypotenuse length.")]));
+                        prompt.push({ type: "diagram", node: diagramGeometry({ kind: "triangle", label: "Right-angled triangle" }) });
+                    } else if (i === 18) {
+                        prompt.push(p([t("This question has parts. Read the information carefully.")]));
+                    } else {
+                        prompt.push(p([t("Calculate "), m(String.raw`${10 + i} + ${2 * i}`), t(".")]));
+                    }
+
+                    const ansValue = (i === 8) ? "90 km/h" :
+                        (i === 12) ? "36" :
+                            (i === 15) ? String.raw`15\text{ cm}` :
+                                String(10 + i + 2 * i);
+
+                    const sol = {
+                        guidance: hasGuidance ? [
+                            "Work in a calm sequence: write what you know, then do one step at a time.",
+                            (i === 8 ? "Convert minutes to hours before finding speed." : "Check your arithmetic once at the end.")
+                        ].filter(Boolean) : [],
+                        formulae: hasFormulae ? [
+                            (i === 8 ? String.raw`\text{Speed} = \frac{\text{distance}}{\text{time}}` : ""),
+                            (i === 12 ? String.raw`\text{Percentage} = \frac{\text{part}}{\text{whole}}\times 100\%` : ""),
+                            (i === 15 ? String.raw`a^2 + b^2 = c^2` : "")
+                        ].filter(Boolean) : [],
+                        working: [],
+                        alternative: []
+                    };
+
+                    if (i === 8) {
+                        sol.working.push({
+                            type: "math", tex: String.raw`\begin{aligned}
+30\text{ minutes} &= 0.5\text{ hours}\\
+\text{Speed} &= \frac{45}{0.5} = 90\text{ km/h}
+\end{aligned}` });
+                    } else if (i === 12) {
+                        sol.working.push({
+                            type: "math", tex: String.raw`\begin{aligned}
+15\% \text{ of } 240 &= \frac{15}{100}\times 240\\
+&= 0.15 \times 240\\
+&= 36
+\end{aligned}` });
+                    } else if (i === 15) {
+                        sol.working.push({
+                            type: "math", tex: String.raw`\begin{aligned}
+c^2 &= 9^2 + 12^2\\
+&= 81 + 144\\
+&= 225\\
+c &= \sqrt{225} = 15\text{ cm}
+\end{aligned}` });
+                        if (hasAlt) {
+                            sol.alternative.push({
+                                label: "Alternative working",
+                                blocks: [
+                                    { type: "p", parts: [t("Recognise the "), m(String.raw`9\text{–}12\text{–}15`), t(" right-triangle ratio.")] },
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+(3,4,5)\times 3 &= (9,12,15)
+\end{aligned}` }
+                                ]
+                            });
+                        }
+                    } else if (i === 18) {
+                        // Deep nesting add-on: Q18(a)(i), Q18(a)(ii), Q18(b)
+                        // We'll create the parent Q18 here; children inserted later.
+                        sol.working.push({ type: "p", parts: [t("See parts 18(a)(i), 18(a)(ii), and 18(b).")] });
+                    } else {
+                        sol.working.push({
+                            type: "math", tex: String.raw`\begin{aligned}
+${10 + i} + ${2 * i} &= ${10 + i + 2 * i}
+\end{aligned}` });
+                        if (hasAlt) {
+                            sol.alternative.push({
+                                label: "Alternative working",
+                                blocks: [
+                                    { type: "p", parts: [t("Add in two steps: first add "), m(String.raw`${10 + i}`), t(", then add "), m(String.raw`${2 * i}`), t(".")] },
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+${10 + i} + ${2 * i} &= (${10 + i} + ${i}) + ${i}\\
+&= ${10 + 2 * i} + ${i}\\
+&= ${10 + 3 * i}
+\end{aligned}` }
+                                ]
+                            });
+                        }
+                    }
+
+                    standardQuestions.push(makeQuestion({
+                        qid,
+                        depth: 0,
+                        prompt,
+                        answer: [(i === 8 || i === 15) ? m(String.raw`${ansValue}`) : t(ansValue)],
+                        solution: sol
+                    }));
+                }
+
+                // Insert deep nesting questions for standard paper
+                // Parent Q18 already exists; add parts after it
+                const idx18 = standardQuestions.findIndex(q => q.qid === "18");
+                if (idx18 !== -1) {
+                    const insert = [
+                        makeQuestion({
+                            qid: "18(a)",
+                            depth: 1,
+                            prompt: [p([t("A recipe uses flour and sugar in the ratio "), m(String.raw`5:3`), t(". If there are "), m(String.raw`240\text{ g}`), t(" of flour, how much sugar is used?")])],
+                            answer: [m(String.raw`144\text{ g}`)],
+                            solution: {
+                                guidance: ["Use the ratio parts to scale up to 240 g of flour."],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+5\text{ parts} &= 240\text{ g}\\
+1\text{ part} &= 240 \div 5 = 48\text{ g}\\
+\text{Sugar} &= 3 \times 48 = 144\text{ g}
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "18(a)(i)",
+                            depth: 2,
+                            prompt: [p([t("If the sugar is split equally into 6 small bags, how much sugar is in one bag?")])],
+                            answer: [m(String.raw`24\text{ g}`)],
+                            solution: {
+                                guidance: [],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+144 \div 6 &= 24\text{ g}
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "18(a)(ii)",
+                            depth: 2,
+                            prompt: [p([t("How many grams are used in total (flour + sugar)?")])],
+                            answer: [m(String.raw`384\text{ g}`)],
+                            solution: {
+                                guidance: [],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+240 + 144 &= 384\text{ g}
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "18(b)",
+                            depth: 1,
+                            prompt: [p([t("A new batch uses the same ratio but with "), m(String.raw`432\text{ g}`), t(" of sugar. How much flour is used?")])],
+                            answer: [m(String.raw`720\text{ g}`)],
+                            solution: {
+                                guidance: ["Sugar is 3 parts; flour is 5 parts."],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+3\text{ parts} &= 432\text{ g}\\
+1\text{ part} &= 432 \div 3 = 144\text{ g}\\
+\text{Flour} &= 5 \times 144 = 720\text{ g}
+\end{aligned}` }
+                                ],
+                                alternative: [
+                                    {
+                                        label: "Alternative working",
+                                        blocks: [
+                                            { type: "p", parts: [t("Use a single scale factor: "), m(String.raw`\frac{5}{3}`), t(" from sugar to flour.")] },
+                                            {
+                                                type: "math", tex: String.raw`\begin{aligned}
+\text{Flour} &= \frac{5}{3}\times 432\\
+&= 5 \times 144\\
+&= 720\text{ g}
+\end{aligned}` }
+                                        ]
+                                    }
+                                ]
+                            }
+                        })
+                    ];
+                    standardQuestions.splice(idx18 + 1, 0, ...insert);
+                }
+
+                // Ensure we still label as 35 questions in nav? The brief says 35 questions total,
+                // but deep nesting add-on adds extra identifiers; keep top-level 35 and show all identifiers.
+                // We'll keep the original 35 top-level plus nested parts.
+
+                // Build Q26–Q35 long algebra (and some extremely long workings)
+                for (let i = 26; i <= 35; i++) {
+                    const qid = String(i);
+                    const longPrompt = [
+                        p([t("Solve the equation for "), m(String.raw`x`), t(":")]),
+                        { type: "math", tex: String.raw`2x + 5 = 3(x - 4) + 17` }
+                    ];
+                    const solution = {
+                        guidance: [
+                            "Keep the equation balanced: whatever you do to one side, do to the other.",
+                            "Aim to collect all the x-terms on one side."
+                        ],
+                        formulae: ["If " + String.raw`a=b` + ", then " + String.raw`a+c=b+c` + " and " + String.raw`a-c=b-c` + "."],
+                        working: [],
+                        alternative: []
+                    };
+
+                    // Long working blocks
+                    const blocks = longAlgebraWorking("Working", (i <= 30 ? 3 : 6));
+                    blocks.forEach(b => {
+                        if (b.type === "p") solution.working.push({ type: "p", parts: b.parts });
+                        if (b.type === "math") solution.working.push({ type: "math", tex: b.tex });
+                    });
+
+                    // Deep nesting add-on inside long area: Q30(a)(i) etc
+                    // We'll attach as separate questions beneath Q30
+                    if (i === 30) {
+                        solution.working.push({ type: "p", parts: [t("See parts 30(a)(i), 30(a)(ii), and 30(b).")] });
+                    }
+
+                    // Extremely long workings for selected: Q32, Q35
+                    if (i === 32 || i === 35) {
+                        solution.working.push(...veryLongWorking(58));
+                    }
+
+                    // Alternative method in some
+                    if (i === 28 || i === 33) {
+                        solution.alternative.push({
+                            label: "Alternative working",
+                            blocks: [
+                                { type: "p", parts: [t("Expand and simplify, then compare both sides carefully.")] },
+                                {
+                                    type: "math", tex: String.raw`\begin{aligned}
+2x + 5 &= 3x + 5\\
+2x - 3x &= 5 - 5\\
+-x &= 0\\
+x &= 0
+\end{aligned}` }
+                            ]
+                        });
+                    }
+
+                    standardQuestions.push(makeQuestion({
+                        qid,
+                        depth: 0,
+                        prompt: longPrompt,
+                        answer: [m(String.raw`x=0`)],
+                        solution,
+                        defaultExpanded: false
+                    }));
+                }
+
+                // Add the nested parts for Q30
+                const idx30 = standardQuestions.findIndex(q => q.qid === "30");
+                if (idx30 !== -1) {
+                    standardQuestions.splice(idx30 + 1, 0,
+                        makeQuestion({
+                            qid: "30(a)",
+                            depth: 1,
+                            prompt: [p([t("Rearrange "), m(String.raw`2x+5=3(x-4)+17`), t(" into the form "), m(String.raw`ax=b`), t(".")])],
+                            answer: [m(String.raw`x=0`)],
+                            solution: {
+                                guidance: ["Expand brackets first."],
+                                formulae: [],
+                                working: [
+                                    {
+                                        type: "math", tex: String.raw`\begin{aligned}
+2x + 5 &= 3x - 12 + 17\\
+2x + 5 &= 3x + 5\\
+2x - 3x &= 5 - 5\\
+-x &= 0
+\end{aligned}` }
+                                ],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "30(a)(i)",
+                            depth: 2,
+                            prompt: [p([t("What is the value of "), m(String.raw`x`), t("?")])],
+                            answer: [m(String.raw`0`)],
+                            solution: {
+                                guidance: [],
+                                formulae: [],
+                                working: [{
+                                    type: "math", tex: String.raw`\begin{aligned}
+-x &= 0\\
+x &= 0
+\end{aligned}` }],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "30(a)(ii)",
+                            depth: 2,
+                            prompt: [p([t("Substitute your value of "), m(String.raw`x`), t(" back into the original equation to check it works.")])],
+                            answer: [t("Both sides are equal.")],
+                            solution: {
+                                guidance: ["Check by replacing x with 0 on both sides."],
+                                formulae: [],
+                                working: [{
+                                    type: "math", tex: String.raw`\begin{aligned}
+\text{LHS} &= 2(0)+5 = 5\\
+\text{RHS} &= 3(0-4)+17 = -12 + 17 = 5
+\end{aligned}` }],
+                                alternative: []
+                            }
+                        }),
+                        makeQuestion({
+                            qid: "30(b)",
+                            depth: 1,
+                            prompt: [p([t("Solve "), m(String.raw`2x+5=3(x-4)+17`), t(" again, but this time move the "), m(String.raw`x`), t("-terms to the left first.")])],
+                            answer: [m(String.raw`x=0`)],
+                            solution: {
+                                guidance: ["Keep track of signs when you move terms."],
+                                formulae: [],
+                                working: [{
+                                    type: "math", tex: String.raw`\begin{aligned}
+2x + 5 &= 3x - 12 + 17\\
+2x - 3x &= 5 - 5\\
+-x &= 0\\
+x &= 0
+\end{aligned}` }],
+                                alternative: []
+                            }
+                        })
+                    );
+                }
+
+                const standard = {
+                    key: "standard",
+                    title: "Standard paper",
+                    sections: null,
+                    questions: standardQuestions
+                };
+
+                // Standard (Workings Expanded) dataset variant
+                const standardExpanded = {
+                    key: "standardExpanded",
+                    title: "Standard (Workings Expanded)",
+                    sections: null,
+                    questions: standardQuestions.map(q => ({
+                        ...q,
+                        defaultExpanded: !!q.solution // expanded for all with solution
+                    }))
+                };
+
+                // Diagram-heavy (20) with 8 diagrams
+                const diagram = {
+                    key: "diagram",
+                    title: "Diagram-heavy paper",
+                    sections: null,
+                    questions: (function () {
+                        const qs = [];
+                        for (let i = 1; i <= 20; i++) {
+                            const qid = String(i);
+                            const includeDiagram = [1, 3, 5, 7, 9, 12, 15, 18].includes(i);
+                            let diag = null;
+
+                            if (includeDiagram) {
+                                if (i % 4 === 1) diag = diagramGeometry({ kind: "circle", label: "Circle diagram" });
+                                if (i % 4 === 3) diag = diagramGrid({ label: "Coordinate diagram" });
+                                if (i % 4 === 1 && i !== 1) diag = diagramGeometry({ kind: "triangle", label: "Triangle diagram" });
+                                if (i % 4 === 0) diag = diagramArrayTable({ label: "Array diagram" });
+                                if (i % 4 === 2) diag = diagramRatioBars({ label: "Ratio bars" });
+                            }
+
+                            const prompt = [];
+                            if (i === 3) {
+                                prompt.push(p([t("On the grid, a line goes through the points "), m(String.raw`(2,2)`), t(" and "), m(String.raw`(6,5)`), t(". What is the rise when the run is 4?")]));
+                            } else if (i === 7) {
+                                prompt.push(p([t("A shape is made from equal squares. One square is removed. Which removal would keep the perimeter the same?")]));
+                            } else if (i === 12) {
+                                prompt.push(p([t("The table shows an array with "), m(String.raw`3`), t(" rows and "), m(String.raw`6`), t(" columns. How many small squares are there?")]));
+                            } else if (i === 15) {
+                                prompt.push(p([t("In the triangle, the base is "), m(String.raw`8\text{ cm}`), t(" and the height is "), m(String.raw`10\text{ cm}`), t(". Find the area.")]));
+                            } else if (i === 18) {
+                                prompt.push(p([t("A recipe bar shows A and B. If A is 20, what is B?")]));
+                            } else {
+                                prompt.push(p([t("Work out "), m(String.raw`${i * 7} - ${i + 9}`), t(".")]));
+                            }
+
+                            const answer = (i === 3) ? [t("3")] :
+                                (i === 12) ? [t("18")] :
+                                    (i === 15) ? [m(String.raw`40\text{ cm}^2`)] :
+                                        (i === 18) ? [t("12")] :
+                                            [t(String(i * 7 - (i + 9)))];
+
+                            const solution = {
+                                guidance: (i === 15) ? ["Use the triangle area formula."] :
+                                    (i === 3) ? ["Compare the y-values for the two points."] :
+                                        (i === 18) ? ["Read the number of parts in the bars."] : [],
+                                formulae: (i === 15) ? [String.raw`A=\frac{1}{2}bh`] : [],
+                                working: [],
+                                alternative: []
+                            };
+
+                            if (i === 3) {
+                                solution.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+\text{Rise} &= 5 - 2\\
+&= 3
+\end{aligned}` });
+                            } else if (i === 12) {
+                                solution.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+\text{Squares} &= 3 \times 6\\
+&= 18
+\end{aligned}` });
+                            } else if (i === 15) {
+                                solution.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+A &= \frac{1}{2}\times 8 \times 10\\
+&= 40\text{ cm}^2
+\end{aligned}` });
+                                solution.alternative.push({
+                                    label: "Alternative working",
+                                    blocks: [
+                                        { type: "p", parts: [t("Half of "), m(String.raw`8\times 10`), t(" is the same as "), m(String.raw`4\times 10`), t(".")] },
+                                        {
+                                            type: "math", tex: String.raw`\begin{aligned}
+\frac{1}{2}\times 8\times 10 &= 4\times 10 = 40
+\end{aligned}` }
+                                    ]
+                                });
+                            } else if (i === 18) {
+                                // ratio bar: A has 5 parts, B has 3 parts; A=20 => 1 part=4 => B=12
+                                solution.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+A: B &= 5:3\\
+5\text{ parts} &= 20\\
+1\text{ part} &= 4\\
+B &= 3\times 4 = 12
+\end{aligned}` });
+                            } else {
+                                solution.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+${i * 7} - ${i + 9} &= ${i * 7 - (i + 9)}
+\end{aligned}` });
+                            }
+
+                            qs.push(makeQuestion({
+                                qid, depth: 0, prompt,
+                                diagram: includeDiagram ? diag : null,
+                                answer,
+                                solution
+                            }));
+                        }
+                        // ensure 8 diagrams by forcing if needed
+                        return qs;
+                    })()
+                };
+
+                // Sectioned paper: A (35), B (8), C (6 very long)
+                const sectioned = {
+                    key: "sectioned",
+                    title: "Sectioned paper",
+                    sections: [
+                        { label: "A", count: 35 },
+                        { label: "B", count: 8 },
+                        { label: "C", count: 6 }
+                    ],
+                    questions: (function () {
+                        const qs = [];
+                        // Section A: 35 small/medium
+                        for (let i = 1; i <= 35; i++) {
+                            const qid = String(i);
+                            const prompt = [];
+                            if (i === 9) {
+                                prompt.push(p([t("A jug contains "), m(String.raw`140\text{ ml}`), t(" of squash. How much water must be added to make "), m(String.raw`500\text{ ml}`), t(" of drink?")]));
+                                prompt.push({ type: "diagram", node: diagramArrayTable({ label: "Jug level diagram (placeholder)" }) });
+                            } else if (i === 16) {
+                                prompt.push(p([t("The total length of the edges of a cube is "), m(String.raw`240\text{ cm}`), t(". What is the length of one edge?")]));
+                                prompt.push({ type: "diagram", node: diagramGeometry({ kind: "triangle", label: "Cube edge sketch (placeholder)" }) });
+                            } else {
+                                prompt.push(p([t("Work out "), m(String.raw`${120 + i} \div ${i % 6 + 2}`), t(".")]));
+                            }
+
+                            const ans = (i === 9) ? [m(String.raw`360\text{ ml}`)] :
+                                (i === 16) ? [m(String.raw`20\text{ cm}`)] :
+                                    [t(String(Math.floor((120 + i) / (i % 6 + 2))))];
+
+                            const sol = {
+                                guidance: (i === 9) ? ["Use the total and subtract the amount already there."] :
+                                    (i === 16) ? ["A cube has 12 edges in total."] :
+                                        (i % 8 === 0 ? ["Write the division clearly, then simplify."] : []),
+                                formulae: (i === 16) ? ["Cube edges: " + String.raw`12` + " edges", "Division: " + String.raw`\frac{a}{b}`] : [],
+                                working: [],
+                                alternative: []
+                            };
+
+                            if (i === 9) {
+                                sol.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+\text{Water} &= 500 - 140\\
+&= 360\text{ ml}
+\end{aligned}` });
+                            } else if (i === 16) {
+                                sol.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+12 \times a &= 240\\
+a &= 240 \div 12\\
+&= 20\text{ cm}
+\end{aligned}` });
+                            } else {
+                                const a = 120 + i;
+                                const b = i % 6 + 2;
+                                const q = Math.floor(a / b);
+                                sol.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+${a}\div ${b} &\approx ${q}
+\end{aligned}` });
+                            }
+
+                            qs.push({ ...makeQuestion({ qid, depth: 0, prompt, answer: ans, solution: sol }), section: "A" });
+                        }
+
+                        // Section B: 8 medium (with more diagrams + alternative)
+                        for (let j = 1; j <= 8; j++) {
+                            const n = 35 + j;
+                            const qid = String(n);
+                            const prompt = [];
+                            if (j === 2) {
+                                prompt.push(p([t("A line on the coordinate grid passes through "), m(String.raw`(1,4)`), t(" and "), m(String.raw`(5,10)`), t(". What is the gradient?")]));
+                                prompt.push({ type: "diagram", node: diagramGrid({ label: "Coordinate grid (placeholder)" }) });
+                            } else if (j === 5) {
+                                prompt.push(p([t("A triangle has base "), m(String.raw`14\text{ cm}`), t(" and height "), m(String.raw`9\text{ cm}`), t(". Find the area.")]));
+                                prompt.push({ type: "diagram", node: diagramGeometry({ kind: "triangle", label: "Triangle (placeholder)" }) });
+                            } else {
+                                prompt.push(p([t("Find the value of "), m(String.raw`\frac{3}{4}\text{ of } ${64 + j * 8}`), t(".")]));
+                            }
+
+                            const ans = (j === 2) ? [t("1.5")] :
+                                (j === 5) ? [m(String.raw`63\text{ cm}^2`)] :
+                                    [t(String(((64 + j * 8) * 3) / 4))];
+
+                            const sol = {
+                                guidance: (j === 2) ? ["Gradient is rise over run."] :
+                                    (j === 5) ? ["Use the triangle area formula."] :
+                                        ["Multiply by 3, then divide by 4."],
+                                formulae: (j === 2) ? [String.raw`\text{Gradient} = \frac{\Delta y}{\Delta x}`] :
+                                    (j === 5) ? [String.raw`A=\frac{1}{2}bh`] : [],
+                                working: [],
+                                alternative: []
+                            };
+
+                            if (j === 2) {
+                                sol.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+\Delta y &= 10 - 4 = 6\\
+\Delta x &= 5 - 1 = 4\\
+m &= \frac{6}{4} = 1.5
+\end{aligned}` });
+                            } else if (j === 5) {
+                                sol.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+A &= \frac{1}{2}\times 14 \times 9\\
+&= 7 \times 9\\
+&= 63\text{ cm}^2
+\end{aligned}` });
+                                sol.alternative.push({
+                                    label: "Alternative working",
+                                    blocks: [
+                                        { type: "p", parts: [t("Half of the base is "), m(String.raw`7`), t(", then multiply by the height.")] },
+                                        {
+                                            type: "math", tex: String.raw`\begin{aligned}
+A &= 7\times 9 = 63
+\end{aligned}` }
+                                    ]
+                                });
+                            } else {
+                                const v = 64 + j * 8;
+                                sol.working.push({
+                                    type: "math", tex: String.raw`\begin{aligned}
+\frac{3}{4}\text{ of } ${v} &= ${v}\times \frac{3}{4}\\
+&= ${v * 3}\div 4\\
+&= ${(v * 3) / 4}
+\end{aligned}` });
+                            }
+
+                            qs.push({ ...makeQuestion({ qid, depth: 0, prompt, answer: ans, solution: sol }), section: "B" });
+                        }
+
+                        // Section C: 6, all very long solution details collapsed by default
+                        for (let k = 1; k <= 6; k++) {
+                            const n = 43 + k;
+                            const qid = String(n);
+                            const prompt = [
+                                p([t("A sequence is defined by "), m(String.raw`u_{n+1}=u_n+3`), t(" with "), m(String.raw`u_1=2`), t(".")]),
+                                p([t("Find "), m(String.raw`u_{20}`), t(".")])
+                            ];
+                            const ans = [m(String.raw`59`)];
+
+                            const sol = {
+                                guidance: [
+                                    "This is an arithmetic sequence: each term increases by 3.",
+                                    "Count how many steps from the first term to the 20th term."
+                                ],
+                                formulae: [
+                                    String.raw`u_n = u_1 + (n-1)d`
+                                ],
+                                working: [],
+                                alternative: []
+                            };
+
+                            sol.working.push({
+                                type: "math", tex: String.raw`\begin{aligned}
+d &= 3\\
+u_{20} &= 2 + (20-1)\times 3\\
+&= 2 + 19\times 3\\
+&= 2 + 57\\
+&= 59
+\end{aligned}` });
+
+                            // Add long stress blocks
+                            sol.working.push(...longAlgebraWorking("Extra algebra (stress content)", 7).filter(b => b.type === "math").map(b => ({ type: "math", tex: b.tex })));
+                            sol.working.push(...veryLongWorking(60));
+
+                            // Ensure combined coverage (Guidance + Formulae + Alternative)
+                            if (k === 3) {
+                                sol.alternative.push({
+                                    label: "Alternative working",
+                                    blocks: [
+                                        { type: "p", parts: [t("Write out a few terms to see the pattern, then jump to the 20th term.")] },
+                                        {
+                                            type: "math", tex: String.raw`\begin{aligned}
+u_1 &= 2\\
+u_2 &= 5\\
+u_3 &= 8\\
+\cdots\\
+u_{20} &= 2 + 19\times 3 = 59
+\end{aligned}` }
+                                    ]
+                                });
+                            }
+
+                            qs.push({ ...makeQuestion({ qid, depth: 0, prompt, answer: ans, solution: sol, defaultExpanded: false }), section: "C" });
+                        }
+
+                        return qs;
+                    })()
+                };
+
+                return { short, standard, standardExpanded, diagram, sectioned };
+            }
+
+            const PAPERS = buildPapers();
+
+            // ---------- Rendering ----------
+            function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+            function renderPromptBlocks(blocks, into) {
+                blocks.forEach(b => {
+                    if (b.type === "p") {
+                        const para = document.createElement("p");
+                        b.parts.forEach(part => {
+                            if (part.type === "t") para.appendChild(document.createTextNode(part.value));
+                            else if (part.type === "m") para.appendChild(inlineMath(part.value));
+                        });
+                        into.appendChild(para);
+                    } else if (b.type === "math") {
+                        into.appendChild(blockMath(b.tex));
+                    } else if (b.type === "diagram") {
+                        into.appendChild(b.node);
+                    }
+                });
+            }
+
+            function renderSolution(solution, defaultExpanded) {
+                const wrap = document.createElement("div");
+                wrap.className = "sol-wrap";
+
+                const toggleRow = document.createElement("div");
+                toggleRow.className = "toggle-row";
+
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "toggle";
+                btn.setAttribute("aria-expanded", String(!!defaultExpanded));
+                const chevron = document.createElement("span");
+                chevron.className = "chev";
+                chevron.innerHTML = `
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M6 8 L10 12 L14 8"></path>
+          </svg>
+        `;
+                btn.appendChild(document.createTextNode(defaultExpanded ? "Hide working" : "Show working"));
+                btn.appendChild(chevron);
+                toggleRow.appendChild(btn);
+
+                const sol = document.createElement("div");
+                sol.className = "solution";
+                sol.hidden = !defaultExpanded;
+
+                // Build sections: Guidance, Formulae Used, Working, Alternative Working
+                if (solution.guidance && solution.guidance.length) {
+                    sol.appendChild(renderSolSection("Keep in mind", (body) => {
+                        const ul = document.createElement("ul");
+                        solution.guidance.forEach(item => {
+                            const li = document.createElement("li");
+                            li.textContent = item;
+                            ul.appendChild(li);
+                        });
+                        body.appendChild(ul);
+                    }));
+                }
+
+                if (solution.formulae && solution.formulae.length) {
+                    sol.appendChild(renderSolSection("Formulas used", (body) => {
+                        const ul = document.createElement("ul");
+                        solution.formulae.forEach(item => {
+                            const li = document.createElement("li");
+                            // allow inline math in formula strings by putting math spans explicitly if they contain TeX
+                            // Keep simple: render as text + optional inline math if wrapped like `...`
+                            const asText = item;
+                            // If it looks like TeX (contains \ or _ or ^ or =), render inline math; otherwise plain.
+                            if (/[\\_^=]/.test(asText)) {
+                                li.appendChild(inlineMath(asText));
+                            } else {
+                                li.textContent = asText;
+                            }
+                            ul.appendChild(li);
+                        });
+                        body.appendChild(ul);
+                    }));
+                }
+
+                sol.appendChild(renderSolSection("Working", (body) => {
+                    solution.working.forEach(block => {
+                        if (block.type === "p") {
+                            const para = document.createElement("p");
+                            (block.parts || []).forEach(part => {
+                                if (part.type === "t") para.appendChild(document.createTextNode(part.value));
+                                else if (part.type === "m") para.appendChild(inlineMath(part.value));
+                            });
+                            body.appendChild(para);
+                        } else if (block.type === "math") {
+                            body.appendChild(blockMath(block.tex));
+                        }
+                    });
+                }));
+
+                if (solution.alternative && solution.alternative.length) {
+                    solution.alternative.forEach(alt => {
+                        sol.appendChild(renderSolSection("Alternative working", (body) => {
+                            (alt.blocks || []).forEach(block => {
+                                if (block.type === "p") {
+                                    const para = document.createElement("p");
+                                    (block.parts || []).forEach(part => {
+                                        if (part.type === "t") para.appendChild(document.createTextNode(part.value));
+                                        else if (part.type === "m") para.appendChild(inlineMath(part.value));
+                                    });
+                                    body.appendChild(para);
+                                } else if (block.type === "math") {
+                                    body.appendChild(blockMath(block.tex));
+                                }
+                            });
+                        }));
+                    });
+                }
+
+                const solId = "sol-" + Math.random().toString(36).slice(2);
+                sol.id = solId;
+                btn.setAttribute("aria-controls", solId);
+
+                btn.addEventListener("click", () => {
+                    const expanded = btn.getAttribute("aria-expanded") === "true";
+                    const next = !expanded;
+                    btn.setAttribute("aria-expanded", String(next));
+                    btn.childNodes[0].nodeValue = next ? "Hide working" : "Show working";
+                    setSolutionCollapsed(sol, !next, true);
+                    // No focus movement, no auto scroll changes.
+                });
+
+                wrap.appendChild(toggleRow);
+                wrap.appendChild(sol);
+
+                return { wrap, sol, btn };
+            }
+
+            function renderSolSection(label, fillFn) {
+                const sec = document.createElement("div");
+                sec.className = "sol-section";
+
+                const h = document.createElement("div");
+                h.className = "sol-label";
+                h.textContent = label;
+
+                const body = document.createElement("div");
+                body.className = "sol-body";
+
+                fillFn(body);
+
+                sec.appendChild(h);
+                sec.appendChild(body);
+                return sec;
+            }
+
+            function renderQuestion(q) {
+                const art = document.createElement("article");
+                art.className = `q depth-${q.depth}`;
+                art.id = qIdToDomId(q.qid);
+                art.dataset.qid = q.qid;
+
+                const inner = document.createElement("div");
+                inner.className = "q-inner";
+
+                const head = document.createElement("div");
+                head.className = "q-head";
+
+                const id = document.createElement("div");
+                id.className = "qid";
+                id.textContent = q.qid;
+
+                const qt = document.createElement("div");
+                qt.className = "qtext";
+
+                // Prompt blocks
+                renderPromptBlocks(q.prompt || [], qt);
+                if (q.diagram) {
+                    const diagWrap = document.createElement("div");
+                    diagWrap.className = "diagram";
+                    diagWrap.appendChild(q.diagram);
+                    qt.appendChild(q.diagram);
+                }
+
+                head.appendChild(id);
+                head.appendChild(qt);
+
+                // Answer
+                const ans = document.createElement("div");
+                ans.className = "answer";
+                const lab = document.createElement("div");
+                lab.className = "label";
+                lab.textContent = "Answer";
+                const val = document.createElement("div");
+                val.className = "value";
+
+                if (q.answer.length > 1) {
+                    const ul = document.createElement("ul");
+                    q.answer.forEach(a => {
+                        const li = document.createElement("li");
+                        if (typeof a === "string") {
+                            li.textContent = a;
+                        } else if (a && a.type === "m") {
+                            li.appendChild(inlineMath(a.value));
+                        } else if (a && a.nodeType) {
+                            li.appendChild(a);
+                        } else if (typeof a === "object" && a.__kind === "math") {
+                            li.appendChild(inlineMath(a.tex));
+                        } else if (typeof a === "object" && a.__kind === "text") {
+                            li.textContent = a.text;
+                        } else if (typeof a === "object" && a.value && /[\\_^=]/.test(a.value)) {
+                            li.appendChild(inlineMath(a.value));
+                        } else {
+                            // render node or fallback
+                            if (a && a.nodeType) li.appendChild(a);
+                            else li.textContent = String(a);
+                        }
+                        ul.appendChild(li);
+                    });
+                    val.appendChild(ul);
+                } else {
+                    const a = q.answer[0];
+                    if (typeof a === "string") {
+                        val.textContent = a;
+                    } else if (a && a.type === "m") {
+                        val.appendChild(inlineMath(a.value));
+                    } else if (a && a.nodeType) {
+                        val.appendChild(a);
+                    } else {
+                        val.textContent = String(a);
+                    }
+                }
+
+                ans.appendChild(lab);
+                ans.appendChild(val);
+
+                inner.appendChild(head);
+                inner.appendChild(ans);
+
+                // Solution details
+                if (q.solution) {
+                    const { wrap } = renderSolution(q.solution, !!q.defaultExpanded);
+                    inner.appendChild(wrap);
+                } else {
+                    // still include toggle? canonical says solution details collapsed by default, but if none, omit
+                }
+
+                art.appendChild(inner);
+                return art;
+            }
+
+            function buildNavItems(paper) {
+                // Return a flat list of {type:'section'|'item', label, targetId?}
+                const list = [];
+                if (paper.sections) {
+                    paper.sections.forEach(sec => {
+                        list.push({ type: "section", label: sec.label });
+                        paper.questions
+                            .filter(q => q.section === sec.label)
+                            .forEach(q => list.push({ type: "item", label: q.qid, targetId: qIdToDomId(q.qid) }));
+                    });
+                } else {
+                    paper.questions.forEach(q => list.push({ type: "item", label: q.qid, targetId: qIdToDomId(q.qid) }));
+                }
+                return list;
+            }
+
+            function renderNav(list, into, onClick) {
+                clear(into);
+                list.forEach(entry => {
+                    if (entry.type === "section") {
+                        const d = document.createElement("div");
+                        d.className = "nav-section";
+                        d.textContent = entry.label;
+                        into.appendChild(d);
+                        return;
+                    }
+                    const li = document.createElement("li");
+                    li.className = "nav-item";
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "nav-link";
+                    btn.textContent = entry.label;
+                    btn.dataset.target = entry.targetId;
+                    btn.addEventListener("click", () => onClick(entry.targetId));
+                    li.appendChild(btn);
+                    into.appendChild(li);
+                });
+            }
+
+            function smoothScrollToId(id) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const behavior = prefersReducedMotion ? "auto" : "smooth";
+                el.scrollIntoView({ behavior, block: "start" });
+            }
+
+            // Active nav tracking via IntersectionObserver
+            let io = null;
+            function setupActiveTracking() {
+                if (io) io.disconnect();
+                const items = $$("article.q").map(a => ({ qid: a.dataset.qid, el: a }));
+                const targets = items.map(x => x.el);
+
+                const setActive = (qid) => {
+                    const domId = qIdToDomId(qid);
+                    // desktop
+                    $$("button.nav-link", navDesktop).forEach(b => {
+                        b.setAttribute("aria-current", b.dataset.target === domId ? "true" : "false");
+                    });
+                    // mobile
+                    $$("button.nav-link", navMobile).forEach(b => {
+                        b.setAttribute("aria-current", b.dataset.target === domId ? "true" : "false");
+                    });
+                };
+
+                // Default active = first visible
+                if (items.length) setActive(items[0].qid);
+
+                io = new IntersectionObserver((entries) => {
+                    // choose the entry closest to top that is intersecting
+                    const visible = entries
+                        .filter(e => e.isIntersecting)
+                        .sort((a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top));
+                    if (visible.length) {
+                        const qid = visible[0].target.dataset.qid;
+                        setActive(qid);
+                    }
+                }, { root: null, threshold: [0.18, 0.35, 0.55], rootMargin: "-10% 0px -70% 0px" });
+
+                targets.forEach(t => io.observe(t));
+            }
+
+            // ---------- Drawer (mobile) with focus trap ----------
+            let lastFocus = null;
+
+            function getFocusable(root) {
+                return $$('button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])', root)
+                    .filter(el => !el.disabled && el.offsetParent !== null);
+            }
+
+            function openDrawer() {
+                lastFocus = document.activeElement;
+                drawerOverlay.classList.add("open");
+                // prevent background scroll (touch comfort)
+                document.body.style.overflow = "hidden";
+
+                // focus first item
+                const focusables = getFocusable(drawerOverlay);
+                (focusables[0] || drawerClose).focus();
+            }
+
+            function closeDrawer() {
+                drawerOverlay.classList.remove("open");
+                document.body.style.overflow = "";
+                if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+            }
+
+            function trapFocus(e) {
+                if (!drawerOverlay.classList.contains("open")) return;
+                if (e.key !== "Tab") return;
+                const focusables = getFocusable(drawerOverlay);
+                if (!focusables.length) return;
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+
+            jumpBtn.addEventListener("click", openDrawer);
+            drawerClose.addEventListener("click", closeDrawer);
+            drawerOverlay.addEventListener("click", (e) => {
+                if (e.target === drawerOverlay) closeDrawer();
+            });
+            document.addEventListener("keydown", (e) => {
+                if (drawerOverlay.classList.contains("open") && e.key === "Escape") closeDrawer();
+                trapFocus(e);
+            });
+
+            // ---------- Render paper ----------
+            function renderPaper(key) {
+                const paper = PAPERS[key];
+                if (!paper) return;
+
+                clear(paperEl);
+                clear(navDesktop);
+                clear(navMobile);
+
+                // Meta
+                const label = paper.title;
+                let meta = label;
+                if (paper.key === "standardExpanded") meta += " — all workings start expanded (dataset variant)";
+                paperMeta.textContent = meta;
+
+                // Render questions in one continuous document
+                paper.questions.forEach(q => {
+                    paperEl.appendChild(renderQuestion(q));
+                });
+
+                // Nav
+                const navItems = buildNavItems(paper);
+
+                const navClick = (targetId) => {
+                    smoothScrollToId(targetId);
+                    // Navigation must not change expanded/collapsed states.
+                    closeDrawer();
+                };
+                renderNav(navItems, navDesktop, navClick);
+                renderNav(navItems, navMobile, navClick);
+
+                // Render KaTeX (if available)
+                renderAllMath(document);
+
+                // Active tracking
+                setupActiveTracking();
+
+                // Ensure initial collapsed states are applied with no animation
+                $$("div.solution").forEach(sol => {
+                    if (sol.hidden) return;
+                    // In expanded datasets, leave open; otherwise default open/closed already set.
+                });
+            }
+
+            paperSelect.addEventListener("change", () => {
+                renderPaper(paperSelect.value);
+                // Switching papers must not auto-expand/collapse beyond dataset defaults (handled by render).
+                // Rebuild navigation accordingly (handled by render).
+                // Keep scroll stable? We'll reset to top quietly.
+                window.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
+            });
+
+            // Initial render
+            renderPaper(paperSelect.value);
+
+            // If KaTeX loads after initial render, re-render math once.
+            // (Graceful fallback: if it never loads, text remains visible.)
+            window.addEventListener("load", () => {
+                renderAllMath(document);
+            });
+
+        })();
+    </script>
+</body>
+
+</html>

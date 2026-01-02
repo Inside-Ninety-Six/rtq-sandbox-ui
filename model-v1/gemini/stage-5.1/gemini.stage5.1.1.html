@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ - Maths Paper Solution Viewer</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+        integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+        integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8"
+        crossorigin="anonymous"></script>
+
+    <style>
+        /* * STAGE 5: VISUAL TONE & SEMANTICS
+         * Soft-warm neutral base. 
+         * Hierarchy: Question > Answer > Solution Details.
+         * Interaction: Calm, text-first, no gamification.
+         */
+
+        :root {
+            /* Palette - Soft Warm Neutrals */
+            --bg-body: #F2F2F0;
+            /* Outer background */
+            --bg-frame: #FCFCFA;
+            /* Main content frame surface (unified) */
+            --bg-solution: #F7F7F5;
+            /* Subtle differentiation for solutions */
+
+            /* Typography Colors */
+            --text-primary: #1F1F1F;
+            /* Question text */
+            --text-secondary: #525252;
+            /* Answers, labels, secondary info */
+            --text-tertiary: #737373;
+            /* Nav inactive, meta */
+            --border-subtle: #E5E5E5;
+            --border-focus: #1F1F1F;
+            /* Accessibility focus */
+
+            /* Spacing Scale */
+            --space-xs: 0.25rem;
+            --space-s: 0.5rem;
+            --space-m: 1rem;
+            --space-l: 2rem;
+            --space-xl: 4rem;
+            /* Between top-level questions */
+
+            /* Layout */
+            --frame-max-width: 1024px;
+            --nav-width: 180px;
+            /* Desktop nav width */
+
+            /* Typography - Inter/System */
+            --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            --line-height-relaxed: 1.6;
+            --line-height-tight: 1.4;
+        }
+
+        /* Reset & Base */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            -webkit-font-smoothing: antialiased;
+            overflow-y: scroll;
+            /* Force scrollbar to avoid layout shift */
+        }
+
+        /* App Shell - Centered Frame */
+        .app-frame {
+            max-width: var(--frame-max-width);
+            margin: 0 auto;
+            min-height: 100vh;
+            background-color: var(--bg-frame);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.02);
+        }
+
+        /* Top Controls */
+        .top-controls {
+            padding: var(--space-m) var(--space-l);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-frame);
+            z-index: 100;
+        }
+
+        .controls-group {
+            display: flex;
+            gap: var(--space-m);
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        select,
+        button.settings-toggle {
+            font-family: inherit;
+            font-size: 0.9rem;
+            padding: var(--space-s) var(--space-m);
+            border: 1px solid var(--border-subtle);
+            background: #fff;
+            color: var(--text-primary);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        select:focus,
+        button:focus {
+            outline: 2px solid var(--border-focus);
+            outline-offset: 1px;
+        }
+
+        /* Main Layout: Nav + Content */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
+
+        /* Navigation Rail (Desktop) */
+        .doc-nav {
+            width: var(--nav-width);
+            flex-shrink: 0;
+            padding: var(--space-l) var(--space-m);
+            /* Sticky positioning */
+            position: sticky;
+            top: 60px;
+            /* Below top controls */
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+            /* Scrollbar hiding */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* IE/Edge */
+        }
+
+        .doc-nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+
+        .nav-section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+            margin-top: var(--space-m);
+            margin-bottom: var(--space-s);
+            padding-left: var(--space-s);
+            font-weight: 600;
+        }
+
+        .nav-item {
+            display: block;
+            padding: var(--space-xs) var(--space-s);
+            font-size: 0.9rem;
+            color: var(--text-tertiary);
+            text-decoration: none;
+            border-left: 2px solid transparent;
+            transition: color 0.1s ease, border-color 0.1s ease;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            color: var(--text-primary);
+            background-color: rgba(0, 0, 0, 0.02);
+            /* Very subtle hover */
+        }
+
+        .nav-item.active {
+            color: var(--text-primary);
+            border-left-color: var(--text-primary);
+            /* Restrained active state */
+            font-weight: 500;
+        }
+
+        /* Paper Content */
+        .paper-content {
+            flex: 1;
+            padding: var(--space-xl) var(--space-l);
+            /* Ensure content doesn't overflow horizontally */
+            min-width: 0;
+        }
+
+        /* Question Blocks */
+        .question-block {
+            margin-bottom: var(--space-xl);
+            /* Rhythm Rule 1.2 */
+            scroll-margin-top: 100px;
+            /* For sticky header */
+        }
+
+        /* Nesting indentation */
+        .question-block.depth-1 {
+            margin-left: var(--space-l);
+            margin-bottom: var(--space-l);
+        }
+
+        .question-block.depth-2 {
+            margin-left: calc(var(--space-l) * 2);
+            margin-bottom: var(--space-l);
+        }
+
+        .q-header {
+            display: flex;
+            gap: var(--space-m);
+            margin-bottom: var(--space-m);
+        }
+
+        .q-id {
+            font-weight: 600;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+            width: 2rem;
+            /* Alignment anchor */
+        }
+
+        .q-text {
+            font-size: 1.125rem;
+            line-height: var(--line-height-relaxed);
+            color: var(--text-primary);
+            max-width: 65ch;
+        }
+
+        /* Diagrams */
+        .diagram-container {
+            margin: var(--space-m) 0;
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .diagram-placeholder {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--border-subtle);
+            padding: var(--space-s);
+            background: #fff;
+        }
+
+        /* Answer Section */
+        .answer-section {
+            margin-left: calc(2rem + var(--space-m));
+            /* Align with text */
+            margin-bottom: var(--space-s);
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-s);
+        }
+
+        .answer-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .answer-value {
+            font-size: 1.125rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Solution Details Wrapper */
+        .solution-details-wrapper {
+            margin-left: calc(2rem + var(--space-m));
+            margin-top: var(--space-s);
+        }
+
+        /* Toggle Button */
+        .toggle-solution-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            text-decoration: underline;
+            text-decoration-color: transparent;
+            transition: color 0.2s, text-decoration-color 0.2s;
+        }
+
+        .toggle-solution-btn:hover {
+            color: var(--text-primary);
+            text-decoration-color: var(--text-primary);
+            /* Hover feedback */
+        }
+
+        .chevron {
+            transition: transform 0.2s ease;
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+        }
+
+        .toggle-solution-btn[aria-expanded="true"] .chevron {
+            transform: rotate(180deg);
+        }
+
+        /* Collapsible Region */
+        .solution-content {
+            display: none;
+            /* Default collapsed */
+            margin-top: var(--space-m);
+            padding: var(--space-m);
+            background-color: var(--bg-solution);
+            /* Subtle separation */
+            border-radius: 4px;
+            border-left: 2px solid var(--border-subtle);
+        }
+
+        .solution-content.open {
+            display: block;
+            animation: reveal 0.2s ease-out;
+        }
+
+        @keyframes reveal {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Solution Sections */
+        .sol-section {
+            margin-bottom: var(--space-m);
+        }
+
+        .sol-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .sol-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-xs);
+            text-transform: uppercase;
+        }
+
+        .sol-body {
+            font-size: 1rem;
+            line-height: var(--line-height-tight);
+            color: var(--text-secondary);
+        }
+
+        /* Math Rendering */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            margin: 0.5em 0;
+            padding-bottom: 0.5em;
+            /* Scrollbar space */
+            text-align: left;
+            /* Keep alignment aligned with text flow */
+        }
+
+        /* Force scrollbars hidden unless needed on touch */
+        .katex-display::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .katex-display::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 2px;
+        }
+
+        .math-placeholder {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.03);
+            padding: 0.1rem 0.3rem;
+            border-radius: 2px;
+            font-size: 0.9em;
+        }
+
+        .math-block-placeholder {
+            display: block;
+            background: rgba(0, 0, 0, 0.03);
+            padding: 1rem;
+            margin: 0.5rem 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .main-layout {
+                flex-direction: column;
+            }
+
+            .doc-nav {
+                display: none;
+                /* Hide sticky rail on mobile */
+            }
+
+            /* Minimal Mobile Nav Drawer/Toggle would go here, 
+               but for 'Paper Screen' scope we assume linear reading mostly. 
+               We will add a 'Jump to' select in top controls for mobile access. */
+
+            .paper-content {
+                padding: var(--space-m);
+            }
+
+            .q-header {
+                flex-direction: column;
+                gap: var(--space-xs);
+            }
+
+            .answer-section,
+            .solution-details-wrapper {
+                margin-left: 0;
+                /* Align left on small screens for width */
+            }
+
+            /* Mobile Nav Overlay (Simple CSS implementation) */
+            .mobile-nav-toggle {
+                display: block;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .mobile-jump-select {
+                display: none;
+                /* Hide jump menu on desktop */
+            }
+        }
+
+        /* Accessibility Focus */
+        :focus-visible {
+            outline: 2px solid var(--border-focus);
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-frame">
+        <header class="top-controls">
+            <div class="controls-group">
+                <h1 style="font-size:1rem; margin:0; font-weight:600; color:var(--text-secondary); margin-right: 1rem;">
+                    RTQ Viewer</h1>
+                <label for="paper-select" class="visually-hidden">Select Paper</label>
+                <select id="paper-select">
+                    <option value="short">Short Paper (6 Qs)</option>
+                    <option value="standard">Standard Paper (35 Qs)</option>
+                    <option value="diagram">Diagram-Heavy (20 Qs)</option>
+                    <option value="sectioned">Sectioned Paper (A, B, C)</option>
+                    <option value="standard-expanded">Stress Test: Workings Expanded</option>
+                </select>
+
+                <select id="mobile-jump" class="mobile-jump-select" aria-label="Jump to Question">
+                    <option value="">Jump to...</option>
+                </select>
+            </div>
+
+            <div class="controls-group">
+                <label
+                    style="font-size:0.85rem; color:var(--text-secondary); display:flex; align-items:center; gap:0.5rem;">
+                    <input type="checkbox" id="toggle-real-katex"> Real KaTeX
+                </label>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <nav class="doc-nav" aria-label="Paper Navigation">
+                <ul class="nav-list" id="nav-list-container">
+                </ul>
+            </nav>
+
+            <main class="paper-content" id="paper-container">
+            </main>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * RTQ - MATHS PAPER PROTOTYPE LOGIC
+         * * Handles data generation, rendering, rendering variants, and interaction logic.
+         * Adheres to strict "Single linear document" constraint.
+         */
+
+        // --- 1. DATA GENERATION & CONTENT ---
+
+        // Utilities to generate synthetic content based on exemplars
+        const generateSyntheticQuestion = (index, type = 'arithmetic', depth = 0, section = null) => {
+            const id = section ? `${index}` : `${index}`;
+            let prompt, answer, working, altWorking, guidance, formulas, diagram;
+
+            // Content Templates based on exemplar patterns
+            if (type === 'arithmetic') {
+                const num1 = Math.floor(Math.random() * 50) + 10;
+                const res = Math.floor(Math.random() * 40) + 60;
+                const missing = res - num1;
+                prompt = `Fill in the missing number: $${num1} + \\boxed{\\phantom{00}} = ${res}$`;
+                answer = `$${missing}$`;
+                working = `Let the missing number be $a$. \n\n$$ ${num1} + a = ${res} $$ \n$$ a = ${res} - ${num1} $$ \n$$ a = ${missing} $$`;
+            } else if (type === 'word_problem') {
+                prompt = `A train leaves London at 14:15 and arrives in Paris at 17:40. How long is the journey?`;
+                answer = `3 hours 25 minutes`;
+                working = `Start time: 14:15 \nEnd time: 17:40 \n\nHours from 14:00 to 17:00 is 3 hours. \nMinutes from 15 to 40 is $40 - 15 = 25$ minutes. \n\nTotal time = 3 hours 25 minutes.`;
+                guidance = `Remember to calculate hours and minutes separately, then combine.`;
+            } else if (type === 'algebra_long') {
+                prompt = `Solve for $x$: $$ 5(2x - 3) + 4 = 3(x + 5) + 2 $$`;
+                answer = `$x = 3$`;
+                working = `Expand the brackets on both sides: \n$$ 10x - 15 + 4 = 3x + 15 + 2 $$ \n\nSimplify the terms: \n$$ 10x - 11 = 3x + 17 $$ \n\nSubtract $3x$ from both sides: \n$$ 7x - 11 = 17 $$ \n\nAdd 11 to both sides: \n$$ 7x = 28 $$ \n\nDivide by 7: \n$$ x = 4 $$`;
+                // Intentionally adding a mistake in synthetic generation logic above? No, 28/7 is 4. I wrote answer x=3. Let's fix the math logic for consistency.
+                // 7x = 28 -> x=4. Fixed answer below.
+                answer = `$x = 4$`;
+                formulas = `Distributive Law: $a(b+c) = ab + ac$`;
+                altWorking = `Alternatively, move terms before expanding (more complex here, not recommended).`;
+            } else if (type === 'geometry_svg') {
+                prompt = `Calculate the area of the shaded region in the rectangle below.`;
+                diagram = 'rect_shade';
+                answer = `$24 \\text{ cm}^2$`;
+                working = `Area of outer rectangle = $8 \\times 5 = 40$ \nArea of inner rectangle = $4 \\times 4 = 16$ \n\nShaded area = Outer - Inner \n$$ 40 - 16 = 24 $$`;
+                formulas = `Area of rectangle = $w \\times h$`;
+            } else if (type === 'long_working_stress') {
+                prompt = `Find the sum of the first 50 terms of an arithmetic progression where the first term is 3 and the last term is 199.`;
+                answer = `$5050$`;
+                working = `Using the formula for the sum of an arithmetic series. \n\nStep 1: Identify variables. \n$a = 3$ \n$l = 199$ \n$n = 50$ \n\nStep 2: Substitute into formula. \n$$ S_n = \\frac{n}{2}(a + l) $$ \n$$ S_{50} = \\frac{50}{2}(3 + 199) $$ \n\nStep 3: Simplify brackets. \n$$ 3 + 199 = 202 $$ \n\nStep 4: Multiply by n/2. \n$$ \\frac{50}{2} = 25 $$ \n$$ S_{50} = 25 \\times 202 $$ \n\nStep 5: Long multiplication. \n$$ 200 \\times 25 = 5000 $$ \n$$ 2 \\times 25 = 50 $$ \n$$ 5000 + 50 = 5050 $$`;
+                // Adding extra padding lines to stress test layout
+                for (let i = 0; i < 20; i++) { working += `\nVerification step ${i + 1}: $25 \\times 202$ is consistent.`; }
+            }
+
+            return {
+                id: id,
+                section: section,
+                prompt: prompt,
+                diagram: diagram,
+                answer: answer,
+                details: {
+                    guidance: guidance,
+                    formulas: formulas,
+                    working: working,
+                    altWorking: altWorking
+                },
+                subQuestions: [] // Populated later if needed
+            };
+        };
+
+        // Dataset Generators
+        const generateDataset = (type) => {
+            const questions = [];
+
+            if (type === 'short') {
+                // Short: 6 questions, one nested
+                for (let i = 1; i <= 5; i++) questions.push(generateSyntheticQuestion(i, i === 2 ? 'word_problem' : 'arithmetic'));
+                const q6 = generateSyntheticQuestion(6, 'algebra_long');
+                q6.subQuestions.push({ ...generateSyntheticQuestion('6a', 'arithmetic'), id: '6a' });
+                q6.subQuestions.push({ ...generateSyntheticQuestion('6b', 'arithmetic'), id: '6b' });
+                questions.push(q6);
+            }
+            else if (type === 'standard' || type === 'standard-expanded') {
+                // Standard: 35 questions
+                for (let i = 1; i <= 25; i++) {
+                    questions.push(generateSyntheticQuestion(i, i % 5 === 0 ? 'word_problem' : 'arithmetic'));
+                }
+                // 26-35 Long
+                for (let i = 26; i <= 35; i++) {
+                    questions.push(generateSyntheticQuestion(i, 'algebra_long'));
+                }
+                // Add Deep Nesting to Q18 (Add-on)
+                const q18 = questions[17];
+                q18.subQuestions = [
+                    {
+                        ...generateSyntheticQuestion('18a', 'arithmetic'), id: '18a', subQuestions: [
+                            { ...generateSyntheticQuestion('18a(i)', 'arithmetic'), id: '18a(i)' },
+                            { ...generateSyntheticQuestion('18a(ii)', 'arithmetic'), id: '18a(ii)' }
+                        ]
+                    },
+                    { ...generateSyntheticQuestion('18b', 'arithmetic'), id: '18b' }
+                ];
+            }
+            else if (type === 'diagram') {
+                for (let i = 1; i <= 20; i++) {
+                    // 40% chance of diagram
+                    if (i % 2 === 0 || i % 5 === 0) {
+                        questions.push(generateSyntheticQuestion(i, 'geometry_svg'));
+                    } else {
+                        questions.push(generateSyntheticQuestion(i, 'word_problem'));
+                    }
+                }
+            }
+            else if (type === 'sectioned') {
+                // Section A
+                for (let i = 1; i <= 35; i++) questions.push(generateSyntheticQuestion(i, 'arithmetic', 0, 'A'));
+                // Section B
+                for (let i = 1; i <= 8; i++) questions.push(generateSyntheticQuestion(i, 'geometry_svg', 0, 'B'));
+                // Section C (Long stress)
+                for (let i = 1; i <= 6; i++) questions.push(generateSyntheticQuestion(i, 'long_working_stress', 0, 'C'));
+            }
+
+            return questions;
+        };
+
+        // --- 2. RENDERING LOGIC ---
+
+        const paperContainer = document.getElementById('paper-container');
+        const navListContainer = document.getElementById('nav-list-container');
+        const mobileJumpSelect = document.getElementById('mobile-jump');
+        const realKatexToggle = document.getElementById('toggle-real-katex');
+        const paperSelect = document.getElementById('paper-select');
+
+        let currentDataset = [];
+        let isRealKatex = false;
+        let areWorkingsExpanded = false;
+
+        // SVG Generators (Grayscale)
+        const getSVG = (type) => {
+            if (!type) return '';
+            if (type === 'rect_shade') {
+                return `<svg width="200" height="120" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="10" width="180" height="100" fill="none" stroke="#333" stroke-width="2"/>
+                <rect x="50" y="40" width="100" height="40" fill="#E0E0E0" stroke="#333" stroke-width="1"/>
+                <text x="100" y="35" font-family="sans-serif" font-size="10" text-anchor="middle" fill="#555">8 cm</text>
+                <text x="25" y="65" font-family="sans-serif" font-size="10" text-anchor="middle" fill="#555">5 cm</text>
+            </svg>`;
+            }
+            return '';
+        };
+
+        // Text processing for Maths
+        const processContent = (text) => {
+            if (!text) return '';
+
+            // Basic placeholder replacement
+            let processed = text;
+
+            if (isRealKatex && window.katex) {
+                // Use KaTeX
+                // Replace $$...$$ block
+                processed = processed.replace(/\$\$(.*?)\$\$/gs, (match, math) => {
+                    try {
+                        return `<div class="katex-display">${katex.renderToString(math, { displayMode: true, throwOnError: false })}</div>`;
+                    } catch (e) { return match; }
+                });
+                // Replace $...$ inline
+                processed = processed.replace(/\$(.*?)\$/g, (match, math) => {
+                    try {
+                        return katex.renderToString(math, { displayMode: false, throwOnError: false });
+                    } catch (e) { return match; }
+                });
+                // Newlines to breaks
+                processed = processed.replace(/\n/g, '<br>');
+            } else {
+                // Placeholders
+                processed = processed.replace(/\$\$(.*?)\$\$/gs, '<div class="math-block-placeholder">$1</div>');
+                processed = processed.replace(/\$(.*?)\$/g, '<span class="math-placeholder">$1</span>');
+                processed = processed.replace(/\n/g, '<br>');
+            }
+            return processed;
+        };
+
+        // Recursive Render Function
+        const renderQuestion = (q, depth = 0) => {
+            const el = document.createElement('div');
+            el.className = `question-block depth-${depth}`;
+            el.id = `q-${q.id}`; // Anchor ID
+
+            // Question Header
+            let html = `
+            <div class="q-header">
+                <div class="q-id">${q.id}</div>
+                <div class="q-text">
+                    ${processContent(q.prompt)}
+                    ${q.diagram ? `<div class="diagram-container"><div class="diagram-placeholder">${getSVG(q.diagram)}</div></div>` : ''}
+                </div>
+            </div>
+        `;
+
+            // Answer
+            if (q.answer) {
+                html += `
+                <div class="answer-section">
+                    <span class="answer-label">Answer</span>
+                    <span class="answer-value">${processContent(q.answer)}</span>
+                </div>
+            `;
+            }
+
+            // Solution Details
+            if (q.details) {
+                const hasDetails = q.details.working || q.details.guidance || q.details.formulas || q.details.altWorking;
+
+                if (hasDetails) {
+                    const expandedAttr = areWorkingsExpanded ? 'true' : 'false';
+                    const openClass = areWorkingsExpanded ? 'open' : '';
+                    const btnText = areWorkingsExpanded ? 'Hide working' : 'Show working';
+
+                    html += `
+                    <div class="solution-details-wrapper">
+                        <button class="toggle-solution-btn" aria-expanded="${expandedAttr}" aria-controls="sol-${q.id}" onclick="toggleSolution('${q.id}')">
+                            <span class="btn-text">${btnText}</span>
+                            <svg class="chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+                        </button>
+                        <div id="sol-${q.id}" class="solution-content ${openClass}">
+                            ${q.details.guidance ? `
+                                <div class="sol-section">
+                                    <span class="sol-label">Keep in mind</span>
+                                    <div class="sol-body">${processContent(q.details.guidance)}</div>
+                                </div>` : ''}
+                            ${q.details.formulas ? `
+                                <div class="sol-section">
+                                    <span class="sol-label">Formulas used</span>
+                                    <div class="sol-body">${processContent(q.details.formulas)}</div>
+                                </div>` : ''}
+                            ${q.details.working ? `
+                                <div class="sol-section">
+                                    <span class="sol-label">Working</span>
+                                    <div class="sol-body">${processContent(q.details.working)}</div>
+                                </div>` : ''}
+                            ${q.details.altWorking ? `
+                                <div class="sol-section">
+                                    <span class="sol-label">Alternative working</span>
+                                    <div class="sol-body">${processContent(q.details.altWorking)}</div>
+                                </div>` : ''}
+                        </div>
+                    </div>
+                `;
+                }
+            }
+
+            el.innerHTML = html;
+
+            // Sub-questions (Recursion)
+            if (q.subQuestions && q.subQuestions.length > 0) {
+                q.subQuestions.forEach(subQ => {
+                    el.appendChild(renderQuestion(subQ, depth + 1));
+                });
+            }
+
+            return el;
+        };
+
+        // Render Paper
+        const renderPaper = () => {
+            paperContainer.innerHTML = '';
+            navListContainer.innerHTML = '';
+            mobileJumpSelect.innerHTML = '<option value="">Jump to...</option>';
+
+            let currentSection = null;
+
+            // Flatten logic for navigation generation
+            const traverseForNav = (q) => {
+                // Section Header Handling
+                if (q.section && q.section !== currentSection) {
+                    currentSection = q.section;
+                    const li = document.createElement('li');
+                    li.className = 'nav-section-label';
+                    li.textContent = `Section ${currentSection}`;
+                    navListContainer.appendChild(li);
+                }
+
+                // Nav Item
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.className = 'nav-item';
+                a.href = `#q-${q.id}`;
+                a.textContent = q.id;
+                a.onclick = (e) => {
+                    e.preventDefault();
+                    document.getElementById(`q-${q.id}`).scrollIntoView({ behavior: 'smooth' });
+                    updateActiveNav(q.id);
+                };
+                li.appendChild(a);
+                navListContainer.appendChild(li);
+
+                // Mobile Option
+                const opt = document.createElement('option');
+                opt.value = `q-${q.id}`;
+                opt.textContent = q.id;
+                mobileJumpSelect.appendChild(opt);
+
+                // Sub-questions
+                if (q.subQuestions) q.subQuestions.forEach(traverseForNav);
+            };
+
+            currentDataset.forEach(q => {
+                // Render Content
+                paperContainer.appendChild(renderQuestion(q));
+                // Build Nav
+                traverseForNav(q);
+            });
+        };
+
+        // --- 3. INTERACTION LOGIC ---
+
+        // Toggle Solution Logic
+        window.toggleSolution = (id) => {
+            const content = document.getElementById(`sol-${id}`);
+            const btn = document.querySelector(`button[aria-controls="sol-${id}"]`);
+            const textSpan = btn.querySelector('.btn-text');
+
+            const isClosed = content.style.display === '' || content.style.display === 'none';
+
+            // Checking computed style for class-based toggling initial state
+            const isVisible = content.classList.contains('open');
+
+            if (isVisible) {
+                content.classList.remove('open');
+                btn.setAttribute('aria-expanded', 'false');
+                textSpan.textContent = 'Show working';
+                // Wait for animation end to hide? CSS handles display:none via class removal if we want. 
+                // Since we used display:none in css for base state, removing 'open' hides it.
+            } else {
+                content.classList.add('open');
+                btn.setAttribute('aria-expanded', 'true');
+                textSpan.textContent = 'Hide working';
+            }
+        };
+
+        // Active Nav Highlighting (ScrollSpy)
+        const updateActiveNav = (id) => {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            const activeLink = document.querySelector(`.nav-item[href="#q-${id}"]`);
+            if (activeLink) activeLink.classList.add('active');
+        };
+
+        const setupScrollSpy = () => {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.id.replace('q-', '');
+                        updateActiveNav(id);
+                    }
+                });
+            }, { rootMargin: '-10% 0px -80% 0px' }); // Trigger near top
+
+            document.querySelectorAll('.question-block').forEach(el => observer.observe(el));
+        };
+
+        // Event Listeners
+        paperSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            areWorkingsExpanded = (val === 'standard-expanded');
+            currentDataset = generateDataset(val.replace('-expanded', ''));
+            renderPaper();
+            setupScrollSpy();
+        });
+
+        realKatexToggle.addEventListener('change', (e) => {
+            isRealKatex = e.target.checked;
+            // Re-render preserving scroll? For prototype, simple re-render is fine.
+            renderPaper();
+            setupScrollSpy();
+        });
+
+        mobileJumpSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                document.getElementById(e.target.value).scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+
+        // Initial Load
+        currentDataset = generateDataset('short');
+        renderPaper();
+        setupScrollSpy();
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1501 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RTQ – Maths Paper Solution Viewer (Stress Test Harness)</title>
+
+  <!-- KaTeX (CDN) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css"
+    integrity="sha384-hIoBPJpTUs74ddp3frVqI0GqVZ9Y9ycYzaO+F6DRKCVh0b07XHtcwPa5wPLXnwI7" crossorigin="anonymous">
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #5e5e5e;
+      --faint: #9a9a9a;
+      --rule: #d8d8d8;
+      --touch: 44px;
+      --frame-max: 1120px;
+      --nav-w: 150px;
+      --gap: 28px;
+      --q-gap: 36px;
+      /* largest spacing unit between top-level questions */
+      --within-gap: 10px;
+      --indent-1: 18px;
+      --indent-2: 34px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      line-height: 1.5;
+      overflow-x: hidden;
+      /* never allow page-level horizontal scroll */
+    }
+
+    /* Top controls (aligned with the same centered frame) */
+    header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--rule);
+      background: var(--bg);
+    }
+
+    .frame {
+      max-width: var(--frame-max);
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .controls label {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    select {
+      min-height: var(--touch);
+      padding: 8px 10px;
+      font-size: 14px;
+      border: 1px solid var(--rule);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 6px;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    /* Layout: two sibling columns inside centered frame (desktop) */
+    .layout {
+      display: grid;
+      grid-template-columns: var(--nav-w) 1fr;
+      gap: var(--gap);
+      padding: 18px 16px 40px;
+      max-width: var(--frame-max);
+      margin: 0 auto;
+    }
+
+    nav[aria-label="Questions"] {
+      position: relative;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* Sticky rail without card/panel chrome */
+    .nav-rail {
+      position: sticky;
+      top: 12px;
+      align-self: start;
+    }
+
+    .nav-title {
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      color: var(--faint);
+      margin: 0 0 8px 0;
+    }
+
+    .nav-inner {
+      /* allow independent nav scrolling ONLY when it exceeds viewport height */
+      max-height: calc(100vh - 44px);
+      overflow-y: auto;
+      padding-right: 6px;
+      scrollbar-width: none;
+      /* Firefox */
+      -ms-overflow-style: none;
+      /* legacy */
+    }
+
+    .nav-inner::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* WebKit/Blink */
+
+    .nav-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .nav-sep {
+      margin: 10px 0 6px;
+      font-size: 12px;
+      color: var(--faint);
+      user-select: none;
+    }
+
+    .nav-item a {
+      display: inline-block;
+      padding: 6px 0;
+      color: var(--muted);
+      text-decoration: none;
+      min-height: 28px;
+    }
+
+    .nav-item a:focus {
+      outline: 2px solid #000;
+      outline-offset: 2px;
+    }
+
+    .nav-item a:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .nav-item[data-depth="1"] a {
+      padding-left: 12px;
+    }
+
+    .nav-item[data-depth="2"] a {
+      padding-left: 24px;
+    }
+
+    main {
+      min-width: 0;
+    }
+
+    /* Paper typography/hierarchy (grayscale, calm) */
+    .paper-title {
+      margin: 0 0 10px;
+      font-size: 18px;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+
+    .paper-subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* Questions as document rhythm (no cards/boxes) */
+    .question {
+      margin-top: var(--q-gap);
+    }
+
+    .question:first-of-type {
+      margin-top: 0;
+    }
+
+    .q-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .q-id {
+      flex: 0 0 auto;
+      font-weight: 650;
+      font-size: 14px;
+    }
+
+    .q-prompt {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 15px;
+    }
+
+    .q-depth-1 {
+      padding-left: var(--indent-1);
+    }
+
+    .q-depth-2 {
+      padding-left: var(--indent-2);
+    }
+
+    .q-meta {
+      margin-top: var(--within-gap);
+      display: grid;
+      gap: 8px;
+    }
+
+    /* Answer is visible by default, subordinate to question but above working */
+    .answer {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      color: var(--fg);
+      font-size: 14px;
+    }
+
+    .answer .label {
+      color: var(--muted);
+      font-size: 12px;
+      flex: 0 0 auto;
+      min-width: 56px;
+    }
+
+    .answer .value {
+      min-width: 0;
+    }
+
+    /* Inline "Show working" control */
+    .work-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .work-toggle {
+      min-height: var(--touch);
+      padding: 8px 10px;
+      border: 1px solid var(--rule);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .work-toggle:hover {
+      border-color: #bdbdbd;
+    }
+
+    .work-toggle:focus {
+      outline: 2px solid #000;
+      outline-offset: 2px;
+    }
+
+    /* Collapsed preview: minimal (1–2 lines) */
+    .work-preview {
+      color: var(--muted);
+      font-size: 12px;
+      max-width: 72ch;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    /* Solution details region (single expandable area) */
+    .solution-details {
+      margin-top: 10px;
+      color: var(--fg);
+      font-size: 13px;
+    }
+
+    .sd-block {
+      margin-top: 10px;
+    }
+
+    .sd-block:first-child {
+      margin-top: 0;
+    }
+
+    .sd-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0 0 4px 0;
+    }
+
+    .sd-text {
+      margin: 0;
+      color: var(--fg);
+    }
+
+    /* Math overflow: allowed only inside block-level math containers */
+    .math-inline {
+      white-space: nowrap;
+    }
+
+    .math-block {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding: 2px 0;
+      margin: 6px 0;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .math-block::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Ensure KaTeX display blocks don't introduce page horizontal scroll */
+    .math-block .katex-display {
+      margin: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    /* Diagrams are inside question block */
+    .diagram {
+      margin-top: 10px;
+      max-width: 560px;
+    }
+
+    .diagram svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .diagram .cap {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Section headers (structural dividers, not containers) */
+    .section-header {
+      margin-top: 26px;
+      padding-top: 10px;
+      border-top: 1px solid var(--rule);
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+
+    .section-header:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    /* Mobile navigation: minimal always-accessible control */
+    .jump-btn {
+      display: none;
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      min-height: var(--touch);
+      padding: 10px 12px;
+      border: 1px solid var(--rule);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 999px;
+      font-size: 13px;
+      z-index: 40;
+      cursor: pointer;
+    }
+
+    .jump-btn:focus {
+      outline: 2px solid #000;
+      outline-offset: 2px;
+    }
+
+    .drawer-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.25);
+      z-index: 50;
+    }
+
+    .drawer {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+    }
+
+    .drawer-panel {
+      position: absolute;
+      right: 0;
+      top: 0;
+      height: 100%;
+      width: min(320px, 92vw);
+      background: var(--bg);
+      border-left: 1px solid var(--rule);
+      padding: 14px 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .drawer-title {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    .drawer-close {
+      min-height: var(--touch);
+      padding: 8px 10px;
+      border: 1px solid var(--rule);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .drawer-close:focus {
+      outline: 2px solid #000;
+      outline-offset: 2px;
+    }
+
+    .drawer-nav {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      /* nav may scroll independently */
+      padding-right: 6px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .drawer-nav::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 920px) {
+      :root {
+        --nav-w: 130px;
+        --gap: 22px;
+      }
+
+      .diagram {
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .layout {
+        grid-template-columns: 1fr;
+        /* nav rail not shown in document flow */
+      }
+
+      nav[aria-label="Questions"] {
+        display: none;
+      }
+
+      .jump-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="frame">
+      <div class="controls">
+        <label for="paperSelect">Paper</label>
+        <select id="paperSelect" aria-label="Paper Selector"></select>
+        <div class="hint" aria-hidden="true">Answers shown • Working collapsed (except stress variant)</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Desktop layout -->
+  <div class="layout" id="layoutRoot">
+    <nav aria-label="Questions">
+      <div class="nav-rail" id="navRail">
+        <p class="nav-title">Jump to</p>
+        <div class="nav-inner" id="navInner">
+          <ul class="nav-list" id="navList"></ul>
+        </div>
+      </div>
+    </nav>
+
+    <main id="paperMain" tabindex="-1">
+      <!-- built by JS -->
+    </main>
+  </div>
+
+  <!-- Mobile always-accessible control -->
+  <button class="jump-btn" id="jumpBtn" type="button" aria-haspopup="dialog" aria-controls="navDrawer">Jump to</button>
+
+  <!-- Mobile drawer/overlay nav (no background interaction when open) -->
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <div class="drawer" id="navDrawer" role="dialog" aria-modal="true" aria-label="Question navigation" hidden>
+    <div class="drawer-panel">
+      <div class="drawer-head">
+        <p class="drawer-title">Jump to</p>
+        <button class="drawer-close" id="drawerClose" type="button">Close</button>
+      </div>
+      <div class="drawer-nav">
+        <ul class="nav-list" id="drawerNavList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"
+    integrity="sha384-odtC2BfYpE2HqV7lE0vZ0a6a2m7b7cS2VZ0u7wq7w3Gxw9OeO0x6pU6VZ2cK2q7r"
+    crossorigin="anonymous"></script>
+
+  <script>
+    (function () {
+      const els = {
+        paperSelect: document.getElementById('paperSelect'),
+        navList: document.getElementById('navList'),
+        drawerNavList: document.getElementById('drawerNavList'),
+        paperMain: document.getElementById('paperMain'),
+        jumpBtn: document.getElementById('jumpBtn'),
+        navDrawer: document.getElementById('navDrawer'),
+        drawerBackdrop: document.getElementById('drawerBackdrop'),
+        drawerClose: document.getElementById('drawerClose'),
+        layoutRoot: document.getElementById('layoutRoot')
+      };
+
+      function slugify(id) {
+        return String(id).toLowerCase()
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '');
+      }
+
+      function depthFromId(id) {
+        // crude depth: parentheses nesting count; 0 for plain numbers.
+        const s = String(id);
+        const count = (s.match(/\(/g) || []).length;
+        return Math.min(2, Math.max(0, count)); // 0..2
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function svgGeometry() {
+        return `
+          <svg viewBox="0 0 220 150" role="img" aria-label="Geometry diagram">
+            <rect x="1" y="1" width="218" height="148" fill="none" stroke="#bdbdbd"/>
+            <circle cx="160" cy="65" r="26" fill="none" stroke="#6f6f6f"/>
+            <path d="M30 120 L90 30 L140 120 Z" fill="none" stroke="#111" stroke-width="2"/>
+            <text x="82" y="26" font-size="12" fill="#5e5e5e">A</text>
+            <text x="24" y="132" font-size="12" fill="#5e5e5e">B</text>
+            <text x="144" y="132" font-size="12" fill="#5e5e5e">C</text>
+            <text x="150" y="66" font-size="12" fill="#5e5e5e">O</text>
+            <path d="M90 30 L160 65" stroke="#9a9a9a" stroke-dasharray="4 3"/>
+          </svg>
+          <div class="cap">Diagram: triangle and circle (placeholder)</div>
+        `;
+      }
+
+      function svgBars() {
+        return `
+          <svg viewBox="0 0 260 140" role="img" aria-label="Bar diagram">
+            <rect x="1" y="1" width="258" height="138" fill="none" stroke="#bdbdbd"/>
+            <rect x="20" y="35" width="200" height="22" fill="none" stroke="#111" stroke-width="2"/>
+            <line x1="86" y1="35" x2="86" y2="57" stroke="#6f6f6f"/>
+            <line x1="152" y1="35" x2="152" y2="57" stroke="#6f6f6f"/>
+            <text x="20" y="25" font-size="12" fill="#5e5e5e">Ratio bar</text>
+            <text x="42" y="51" font-size="12" fill="#5e5e5e">2</text>
+            <text x="108" y="51" font-size="12" fill="#5e5e5e">2</text>
+            <text x="174" y="51" font-size="12" fill="#5e5e5e">2</text>
+
+            <rect x="20" y="82" width="80" height="18" fill="none" stroke="#111" stroke-width="2"/>
+            <rect x="104" y="82" width="130" height="18" fill="none" stroke="#111" stroke-width="2"/>
+            <text x="20" y="74" font-size="12" fill="#5e5e5e">Bar comparison</text>
+          </svg>
+          <div class="cap">Diagram: ratio bars (placeholder)</div>
+        `;
+      }
+
+      function svgGrid() {
+        return `
+          <svg viewBox="0 0 240 170" role="img" aria-label="Coordinate grid diagram">
+            <rect x="1" y="1" width="238" height="168" fill="none" stroke="#bdbdbd"/>
+            <g stroke="#d0d0d0" stroke-width="1">
+              ${Array.from({ length: 11 }).map((_, i) => `<line x1="${20 + i * 18}" y1="20" x2="${20 + i * 18}" y2="150" />`).join('')}
+              ${Array.from({ length: 8 }).map((_, i) => `<line x1="20" y1="${20 + i * 18}" x2="218" y2="${20 + i * 18}" />`).join('')}
+            </g>
+            <g stroke="#111" stroke-width="2">
+              <line x1="20" y1="150" x2="218" y2="150"/>
+              <line x1="20" y1="150" x2="20" y2="20"/>
+            </g>
+            <circle cx="92" cy="96" r="4" fill="#111"/>
+            <circle cx="164" cy="60" r="4" fill="#111"/>
+            <path d="M92 96 L164 60" stroke="#6f6f6f" stroke-width="2" fill="none"/>
+            <text x="24" y="16" font-size="12" fill="#5e5e5e">y</text>
+            <text x="224" y="154" font-size="12" fill="#5e5e5e">x</text>
+          </svg>
+          <div class="cap">Diagram: coordinate grid (placeholder)</div>
+        `;
+      }
+
+      function svgTable() {
+        return `
+          <svg viewBox="0 0 260 160" role="img" aria-label="Table diagram">
+            <rect x="1" y="1" width="258" height="158" fill="none" stroke="#bdbdbd"/>
+            <rect x="20" y="28" width="220" height="100" fill="none" stroke="#111" stroke-width="2"/>
+            <g stroke="#6f6f6f" stroke-width="1">
+              <line x1="20" y1="58" x2="240" y2="58"/>
+              <line x1="20" y1="88" x2="240" y2="88"/>
+              <line x1="20" y1="118" x2="240" y2="118"/>
+              <line x1="93" y1="28" x2="93" y2="128"/>
+              <line x1="166" y1="28" x2="166" y2="128"/>
+            </g>
+            <text x="22" y="22" font-size="12" fill="#5e5e5e">Grid/table</text>
+            <text x="30" y="50" font-size="12" fill="#5e5e5e">A</text>
+            <text x="104" y="50" font-size="12" fill="#5e5e5e">B</text>
+            <text x="178" y="50" font-size="12" fill="#5e5e5e">C</text>
+          </svg>
+          <div class="cap">Diagram: table/grid (placeholder)</div>
+        `;
+      }
+
+      function mathInline(expr) { return `<span class="math-inline" data-math-inline="${escapeHtml(expr)}">${escapeHtml(expr)}</span>`; }
+      function mathBlock(expr) { return `<div class="math-block" data-math-block="${escapeHtml(expr)}">${escapeHtml(expr)}</div>`; }
+
+      function longWorkingLines(n) {
+        // 50–60 lines stress-test
+        const lines = [];
+        for (let i = 1; i <= n; i++) {
+          // alternate between shorter and very wide expressions
+          if (i % 6 === 0) {
+            lines.push(`\\displaystyle \\frac{(x+${i})^{6} - (x-${i})^{6}}{2${i}} = 6x^{5} + 60x^{3}${i}^{2} + 6x${i}^{4}`);
+          } else if (i % 5 === 0) {
+            lines.push(`\\displaystyle 7x^{2} - 5x - ${i} = 0 \\;\\Rightarrow\\; x = \\frac{5 \\pm \\sqrt{25 + 28\\cdot${i}}}{14}`);
+          } else {
+            lines.push(`\\displaystyle x_{${i + 1}} = x_{${i}} + 2 \\quad\\text{and}\\quad x_{1}=3 \\;\\Rightarrow\\; x_{${i}} = 2(${i}-1)+3`);
+          }
+        }
+        return lines.map(e => mathBlock(e)).join('');
+      }
+
+      function makeSolutionDetails(opts) {
+        // opts: {keep, formulas, workingHtml, altHtml}
+        const blocks = [];
+        if (opts.keep) {
+          blocks.push(`
+            <div class="sd-block">
+              <p class="sd-label">Keep in mind</p>
+              <p class="sd-text">${opts.keep}</p>
+            </div>
+          `);
+        }
+        if (opts.formulas) {
+          blocks.push(`
+            <div class="sd-block">
+              <p class="sd-label">Formulas used</p>
+              <div class="sd-text">${opts.formulas}</div>
+            </div>
+          `);
+        }
+        blocks.push(`
+          <div class="sd-block">
+            <p class="sd-label">Working</p>
+            <div class="sd-text">${opts.workingHtml || ''}</div>
+          </div>
+        `);
+        if (opts.altHtml) {
+          blocks.push(`
+            <div class="sd-block">
+              <p class="sd-label">Alternative working</p>
+              <div class="sd-text">${opts.altHtml}</div>
+            </div>
+          `);
+        }
+        return blocks.join('');
+      }
+
+      function qHtml(q, expandedByDefault) {
+        const qSlug = slugify(q.id);
+        const anchorId = `q-${qSlug}`;
+        const sdId = `sd-${qSlug}`;
+        const previewId = `pv-${qSlug}`;
+        const depth = q.depth ?? depthFromId(q.id);
+        const qDepthClass = depth === 2 ? 'q-depth-2' : depth === 1 ? 'q-depth-1' : '';
+        const expanded = !!expandedByDefault;
+
+        const promptPieces = [
+          `<div class="q-row">`,
+          `<div class="q-id">${escapeHtml(q.id)}</div>`,
+          `<div class="q-prompt">${q.promptHtml || ''}</div>`,
+          `</div>`
+        ];
+
+        const diagramHtml = q.diagramHtml ? `<div class="diagram">${q.diagramHtml}</div>` : '';
+
+        const answerHtml = `
+          <div class="answer">
+            <div class="label">Answer</div>
+            <div class="value">${q.answerHtml || ''}</div>
+          </div>
+        `;
+
+        const previewText = q.previewText || 'Working steps shown here when expanded.';
+        const previewHtml = `<div class="work-preview" id="${previewId}">${escapeHtml(previewText)}</div>`;
+
+        const toggleLabel = expanded ? 'Hide working' : 'Show working';
+
+        const solutionDetailsHtml = `
+          <div class="solution-details" id="${sdId}" ${expanded ? '' : 'hidden'}>
+            ${q.solutionDetailsHtml || ''}
+          </div>
+        `;
+
+        return `
+          <section class="question ${qDepthClass}" id="${anchorId}" data-qid="${escapeHtml(q.id)}" data-depth="${depth}">
+            ${promptPieces.join('')}
+            ${diagramHtml}
+            <div class="q-meta">
+              ${answerHtml}
+              <div class="work-toggle-row">
+                <button class="work-toggle" type="button"
+                  data-toggle="${sdId}"
+                  aria-controls="${sdId}"
+                  aria-expanded="${expanded ? 'true' : 'false'}"
+                >${toggleLabel}</button>
+                ${expanded ? '' : previewHtml}
+              </div>
+              ${solutionDetailsHtml}
+            </div>
+          </section>
+        `;
+      }
+
+      function buildNavItems(items) {
+        // items: array of {type:'sep'|'q', label, href, depth}
+        return items.map(it => {
+          if (it.type === 'sep') {
+            return `<li class="nav-sep" aria-hidden="true">${escapeHtml(it.label)}</li>`;
+          }
+          return `
+            <li class="nav-item" data-depth="${it.depth || 0}">
+              <a href="${it.href}">${escapeHtml(it.label)}</a>
+            </li>
+          `;
+        }).join('');
+      }
+
+      // DATASETS (stress-test content)
+      function datasetShort() {
+        return {
+          key: 'short',
+          title: 'Short paper',
+          subtitle: '6 questions • mix of short arithmetic + one multi-part question',
+          defaultExpanded: false,
+          structure: { type: 'flat' },
+          questions: [
+            {
+              id: '1',
+              promptHtml: `Calculate ${mathInline('37 + 58')}.`,
+              answerHtml: `${mathInline('95')}`,
+              previewText: 'Add tens then ones.',
+              solutionDetailsHtml: makeSolutionDetails({
+                keep: 'Work in parts to avoid small mistakes.',
+                formulas: `${mathInline('a+b = (a+10)+(b-10)')} (rearrangement idea)`,
+                workingHtml: `${mathBlock('37+58 = (30+7)+(50+8)=80+15=95')}`,
+              })
+            },
+            {
+              id: '2',
+              promptHtml: `Write ${mathInline('\\frac{3}{4}')} of 48.`,
+              answerHtml: `${mathInline('36')}`,
+              previewText: 'Multiply by 3 then divide by 4.',
+              solutionDetailsHtml: makeSolutionDetails({
+                formulas: `${mathInline('\\frac{3}{4}\\times 48')}`,
+                workingHtml: `${mathBlock('\\frac{3}{4}\\times 48 = 3\\times 12 = 36')}`,
+                altHtml: `${mathBlock('48\\div 4 = 12,\\; 12\\times 3 = 36')}`
+              })
+            },
+            {
+              id: '3',
+              promptHtml: `Simplify ${mathInline('5x + 2x - 3')}.`,
+              answerHtml: `${mathInline('7x-3')}`,
+              previewText: 'Collect like terms.',
+              solutionDetailss: true,
+              solutionDetailsHtml: makeSolutionDetails({
+                workingHtml: `${mathBlock('5x+2x-3 = 7x-3')}`
+              })
+            },
+            {
+              id: '4',
+              promptHtml: `A bag has 6 red and 4 blue counters. What fraction are blue?`,
+              answerHtml: `${mathInline('\\frac{2}{5}')}`,
+              previewText: 'Blue / total.',
+              solutionDetailsHtml: makeSolutionDetails({
+                keep: 'Fraction is part over whole.',
+                workingHtml: `${mathBlock('\\text{Total} = 6+4=10')}${mathBlock('\\text{Blue fraction} = \\frac{4}{10}=\\frac{2}{5}')}`
+              })
+            },
+            {
+              id: '5',
+              promptHtml: `Convert ${mathInline('0.35')} to a fraction in simplest form.`,
+              answerHtml: `${mathInline('\\frac{7}{20}')}`,
+              previewText: 'Write over 100 then simplify.',
+              solutionDetailsHtml: makeSolutionDetails({
+                formulas: `${mathInline('0.35 = \\frac{35}{100}')}`,
+                workingHtml: `${mathBlock('0.35 = \\frac{35}{100} = \\frac{7}{20}')}`
+              })
+            },
+            {
+              id: '6',
+              promptHtml: `Solve: ${mathInline('2n + 5 = 19')}.`,
+              answerHtml: `${mathInline('n=7')}`,
+              previewText: 'Undo +5, then divide by 2.',
+              solutionDetailsHtml: makeSolutionDetails({
+                keep: 'Do the same thing to both sides.',
+                workingHtml: `${mathBlock('2n+5=19')}${mathBlock('2n=14')}${mathBlock('n=7')}`,
+                altHtml: `${mathBlock('19-5=14,\\; 14\\div 2=7')}`
+              })
+            },
+
+            // Multi-part (stress) with deep nesting in short set (still 6 top-level questions total in this dataset)
+            // We keep it as one question with sub-questions inside, but still show each sub-part as separate semantic unit.
+          ]
+        };
+      }
+
+      function datasetStandard(expandedVariant) {
+        const base = {
+          key: expandedVariant ? 'standard_expanded' : 'standard',
+          title: expandedVariant ? 'Standard (Workings Expanded)' : 'Standard paper',
+          subtitle: expandedVariant
+            ? '35 questions • all workings start expanded (stress-test variant)'
+            : '35 questions • Q26–Q35 long algebra (workings collapsed by default)',
+          defaultExpanded: !!expandedVariant,
+          structure: { type: 'flat' },
+          questions: []
+        };
+
+        // Q1–Q17: small/medium mix, include diagrams and variants for Solution Details coverage
+        const quick = [
+          { id: '1', p: `Calculate ${mathInline('8\\times 7')}.`, a: mathInline('56') },
+          { id: '2', p: `Find ${mathInline('15\\%')} of 200.`, a: mathInline('30') },
+          { id: '3', p: `Write the next two numbers: 3, 7, 11, 15, ...`, a: `19, 23` },
+          { id: '4', p: `Simplify ${mathInline('\\frac{12}{18}')}.`, a: mathInline('\\frac{2}{3}') },
+          { id: '5', p: `A rectangle is ${mathInline('9')} cm by ${mathInline('4')} cm. Find the perimeter.`, a: mathInline('26\\text{ cm}') },
+          { id: '6', p: `Solve ${mathInline('x-9=14')}.`, a: mathInline('x=23') },
+          { id: '7', p: `Estimate ${mathInline('198\\times 51')} to 1 significant figure each.`, a: `${mathInline('200\\times 50=10000')}` },
+          { id: '8', p: `Convert ${mathInline('3.6')} to a mixed number.`, a: mathInline('3\\frac{3}{5}') },
+          { id: '9', p: `If ${mathInline('y=3x')} and ${mathInline('x=8')}, find ${mathInline('y')}.`, a: mathInline('24') },
+          { id: '10', p: `Find the mean of 4, 9, 11, 16.`, a: mathInline('10') },
+          { id: '11', p: `A circle has radius ${mathInline('5')} cm. Write the area in terms of ${mathInline('\\pi')}.`, a: mathInline('25\\pi\\text{ cm}^2') },
+          { id: '12', p: `Solve ${mathInline('\\frac{n}{6}=5')}.`, a: mathInline('n=30') },
+          { id: '13', p: `Write ${mathInline('0.125')} as a fraction.`, a: mathInline('\\frac{1}{8}') },
+          { id: '14', p: `Simplify ${mathInline('2(a+3)-a')}.`, a: mathInline('a+6') },
+          { id: '15', p: `A bag has 5 green and 15 yellow. What fraction are green?`, a: mathInline('\\frac{1}{4}') },
+          { id: '16', p: `Find the value of ${mathInline('3^4')}.`, a: mathInline('81') },
+          { id: '17', p: `Find ${mathInline('\\frac{2}{3}')} of ${mathInline('90')}.`, a: mathInline('60') },
+        ];
+
+        quick.forEach((q, i) => {
+          const hasDiagram = (q.id === '5' || q.id === '11');
+          const diagramHtml = hasDiagram ? (q.id === '5' ? svgTable() : svgGeometry()) : null;
+
+          const includeKeep = (q.id === '2' || q.id === '7' || q.id === '15');
+          const includeFormulas = (q.id === '11' || q.id === '14' || q.id === '13');
+          const includeAlt = (q.id === '4' || q.id === '10' || q.id === '12');
+
+          // Ensure at least one question includes Keep in mind + Formulas used + Alternative working
+          const comboAll = (q.id === '11');
+
+          const keep = includeKeep || comboAll ? (
+            q.id === '7'
+              ? 'Rounding first is fine for an estimate.'
+              : q.id === '2'
+                ? '15% is 10% + 5%.'
+                : q.id === '15'
+                  ? 'Fraction is part over whole.'
+                  : 'Check units and labels.'
+          ) : null;
+
+          const formulas = includeFormulas || comboAll ? (
+            q.id === '11'
+              ? `${mathInline('A=\\pi r^2')}`
+              : q.id === '14'
+                ? `${mathInline('2(a+3)=2a+6')}`
+                : q.id === '13'
+                  ? `${mathInline('0.125=\\frac{125}{1000}')}`
+                  : `${mathInline('A=bh')}`
+          ) : null;
+
+          const workingHtml = (function () {
+            switch (q.id) {
+              case '1': return `${mathBlock('8\\times 7 = 56')}`;
+              case '2': return `${mathBlock('10\\%\\text{ of }200 = 20')}${mathBlock('5\\%\\text{ of }200 = 10')}${mathBlock('15\\%\\text{ of }200 = 30')}`;
+              case '3': return `${mathBlock('\\text{Difference is }4\\text{ each time: }15+4=19,\\;19+4=23')}`;
+              case '4': return `${mathBlock('\\frac{12}{18} = \\frac{12\\div 6}{18\\div 6} = \\frac{2}{3}')}`;
+              case '5': return `${mathBlock('P=2(9+4)=26\\text{ cm}')}`;
+              case '6': return `${mathBlock('x-9=14')}${mathBlock('x=23')}`;
+              case '7': return `${mathBlock('198\\approx 200,\\; 51\\approx 50')}${mathBlock('200\\times 50 = 10000')}`;
+              case '8': return `${mathBlock('3.6 = 3 + 0.6 = 3 + \\frac{6}{10} = 3 + \\frac{3}{5} = 3\\frac{3}{5}')}`;
+              case '9': return `${mathBlock('y=3x=3\\times 8=24')}`;
+              case '10': return `${mathBlock('\\text{Sum}=4+9+11+16=40')}${mathBlock('\\text{Mean}=40\\div 4=10')}`;
+              case '11': return `${mathBlock('A=\\pi r^2')}${mathBlock('A=\\pi\\times 5^2=25\\pi')}`;
+              case '12': return `${mathBlock('\\frac{n}{6}=5')}${mathBlock('n=30')}`;
+              case '13': return `${mathBlock('0.125=\\frac{125}{1000}=\\frac{1}{8}')}`;
+              case '14': return `${mathBlock('2(a+3)-a=2a+6-a=a+6')}`;
+              case '15': return `${mathBlock('\\text{Total}=5+15=20')}${mathBlock('\\text{Green fraction}=\\frac{5}{20}=\\frac{1}{4}')}`;
+              case '16': return `${mathBlock('3^4=3\\times 3\\times 3\\times 3=81')}`;
+              case '17': return `${mathBlock('\\frac{2}{3}\\times 90=2\\times 30=60')}`;
+              default: return '';
+            }
+          })();
+
+          const altHtml = includeAlt || comboAll ? (
+            q.id === '4'
+              ? `${mathBlock('\\frac{12}{18}=\\frac{2}{3}\\;\\text{(divide top and bottom by 6)}')}`
+              : q.id === '10'
+                ? `${mathBlock('\\text{Mean} = \\frac{\\text{total}}{\\text{how many numbers}}')}`
+                : q.id === '12'
+                  ? `${mathBlock('n=5\\times 6=30')}`
+                  : `${mathBlock('Use a different valid method.')}`
+          ) : null;
+
+          base.questions.push({
+            id: q.id,
+            promptHtml: q.p,
+            diagramHtml,
+            answerHtml: q.a,
+            previewText: (q.id === '11') ? 'Use A = πr².' : (q.id === '7') ? 'Round first, then multiply.' : 'Working steps shown here when expanded.',
+            solutionDetailsHtml: makeSolutionDetails({ keep, formulas, workingHtml, altHtml })
+          });
+        });
+
+        // Deep nesting add-on inside standard (include sub-questions)
+        base.questions.push({
+          id: '18',
+          promptHtml: `A recipe uses flour and sugar in the ratio ${mathInline('3:2')}. The total mixture is 250g.`,
+          answerHtml: `See parts below.`,
+          previewText: 'Split total into ratio parts.',
+          solutionDetailsHtml: makeSolutionDetails({
+            keep: 'Add the ratio parts first.',
+            workingHtml: `${mathBlock('\\text{Total parts}=3+2=5')}${mathBlock('\\text{One part}=250\\div 5=50')}`
+          })
+        });
+
+        // Sub-questions
+        const q18a_i = {
+          id: '18(a)(i)',
+          depth: 2,
+          promptHtml: `Find the mass of flour.`,
+          answerHtml: `${mathInline('150\\text{ g}')}`,
+          previewText: 'Flour is 3 parts.',
+          solutionDetailsHtml: makeSolutionDetails({
+            workingHtml: `${mathBlock('\\text{Flour}=3\\times 50=150\\text{ g}')}`
+          })
+        };
+        const q18a_ii = {
+          id: '18(a)(ii)',
+          depth: 2,
+          promptHtml: `Find the mass of sugar.`,
+          answerHtml: `${mathInline('100\\text{ g}')}`,
+          previewText: 'Sugar is 2 parts.',
+          solutionDetailsHtml: makeSolutionDetails({
+            workingHtml: `${mathBlock('\\text{Sugar}=2\\times 50=100\\text{ g}')}`
+          })
+        };
+        const q18b = {
+          id: '18(b)',
+          depth: 1,
+          promptHtml: `If you increase the total to 400g with the same ratio, find the flour mass.`,
+          answerHtml: `${mathInline('240\\text{ g}')}`,
+          previewText: 'Same parts, new total.',
+          solutionDetailsHtml: makeSolutionDetails({
+            workingHtml: `${mathBlock('\\text{Total parts}=5')}${mathBlock('\\text{One part}=400\\div 5=80')}${mathBlock('\\text{Flour}=3\\times 80=240\\text{ g}')}`
+          })
+        };
+        base.questions.push(q18a_i, q18a_ii, q18b);
+
+        // Fill Q19–Q25 medium mix + some diagrams
+        const mids = [
+          {
+            id: '19',
+            p: `On a grid, the point P is at ${mathInline('(2,3)')} and Q is at ${mathInline('(6,5)')}. Write the rise and run from P to Q.`,
+            a: `Rise 2, run 4`,
+            d: svgGrid(),
+            keep: 'Rise is change in y; run is change in x.',
+            w: `${mathBlock('\\Delta y = 5-3=2')}${mathBlock('\\Delta x = 6-2=4')}`
+          },
+          {
+            id: '20',
+            p: `A triangle has base ${mathInline('10')} cm and height ${mathInline('7')} cm. Find the area.`,
+            a: `${mathInline('35\\text{ cm}^2')}`,
+            keep: null,
+            formulas: `${mathInline('A=\\frac{1}{2}bh')}`,
+            w: `${mathBlock('A=\\frac{1}{2}\\times 10\\times 7=35')}`
+          },
+          {
+            id: '21',
+            p: `Simplify ${mathInline('(x+4)(x-4)')}.`,
+            a: `${mathInline('x^2-16')}`,
+            keep: 'This is a difference of squares.',
+            formulas: `${mathInline('(a+b)(a-b)=a^2-b^2')}`,
+            w: `${mathBlock('(x+4)(x-4)=x^2-16')}`
+          },
+          {
+            id: '22',
+            p: `A table shows distances (km) for 5 days: 3, 7, 6, 9, 5. Find the median.`,
+            a: `${mathInline('6')}`,
+            d: svgTable(),
+            w: `${mathBlock('\\text{Order: }3,5,6,7,9')}${mathBlock('\\text{Median}=6')}`
+          },
+          {
+            id: '23',
+            p: `If ${mathInline('3x-2=19')}, find ${mathInline('x')}.`,
+            a: `${mathInline('7')}`,
+            w: `${mathBlock('3x-2=19')}${mathBlock('3x=21')}${mathBlock('x=7')}`
+          },
+          {
+            id: '24',
+            p: `Write ${mathInline('\\frac{5}{8}')} as a decimal.`,
+            a: `${mathInline('0.625')}`,
+            w: `${mathBlock('\\frac{5}{8}=\\frac{5\\times 125}{8\\times 125}=\\frac{625}{1000}=0.625')}`,
+            alt: `${mathBlock('5\\div 8 = 0.625')}`
+          },
+          {
+            id: '25',
+            p: `A bar diagram represents a ratio of boys:girls. Use the diagram to write the ratio.`,
+            a: `${mathInline('3:5')}`,
+            d: svgBars(),
+            w: `${mathBlock('\\text{Count equal parts: }3\\text{ vs }5')}`
+          }
+        ];
+        mids.forEach(m => {
+          base.questions.push({
+            id: m.id,
+            promptHtml: m.p,
+            diagramHtml: m.d || null,
+            answerHtml: m.a,
+            previewText: 'Working steps shown here when expanded.',
+            solutionDetailsHtml: makeSolutionDetails({
+              keep: m.keep || null,
+              formulas: m.formulas || null,
+              workingHtml: m.w || '',
+              altHtml: m.alt || null
+            })
+          });
+        });
+
+        // Q26–Q35: long algebra questions (collapsed by default unless expandedVariant)
+        for (let n = 26; n <= 35; n++) {
+          const wide = `\\displaystyle \\frac{(2x+${n})^4-(2x-${n})^4}{4${n}} = 8x^3 + 12x${n}^2`;
+          const baseEq = `\\displaystyle 4x^2 - (${n - 20})x - ${n} = 0`;
+          const keep = (n === 28 || n === 33) ? 'Keep equations tidy: one line per step.' : null;
+          const formulas = (n === 27 || n === 31 || n === 35) ? `${mathInline('ax^2+bx+c=0\\;\\Rightarrow\\;x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}')}` : null;
+          const alt = (n === 30 || n === 34) ? `${mathBlock('Check by substitution after solving.')}${mathBlock('Substitute your value back into the original equation.')}` : null;
+
+          // extremely long workings for selected long questions
+          const veryLong = (n === 32 || n === 35);
+
+          const workingHtml = `
+            <p class="sd-text">Solve and simplify the following, showing clear algebraic steps.</p>
+            ${mathBlock(baseEq)}
+            ${mathBlock(`\\displaystyle 4x^2 - (${n - 20})x - ${n} = 0`)}
+            ${mathBlock(`\\displaystyle x = \\frac{(${n - 20}) \\pm \\sqrt{(${n - 20})^2 + 16${n}}}{8}`)}
+            ${mathBlock(wide)}
+            ${mathBlock(`\\displaystyle \\text{Then simplify carefully and check units/values where relevant.}`)}
+            ${veryLong ? `
+              <div class="sd-block">
+                <p class="sd-label" style="margin-top:12px;">(Long working stress block)</p>
+                ${longWorkingLines(58)}
+              </div>
+            ` : ''}
+          `;
+
+          base.questions.push({
+            id: String(n),
+            promptHtml: `Long algebra: simplify and solve expressions involving ${mathInline('x')}.`,
+            answerHtml: (n % 2 === 0)
+              ? `${mathInline('x=\\frac{(${n-20}) + \\sqrt{(${n-20})^2 + 16' + n + '}}{8}')} or ${mathInline('x=\\frac{(${n-20}) - \\sqrt{(${n-20})^2 + 16' + n + '}}{8}')}`
+              : `${mathInline('x=\\frac{(${n-20}) \\pm \\sqrt{(${n-20})^2 + 16' + n + '}}{8}')}`,
+            previewText: 'Several algebra steps (hidden until expanded).',
+            solutionDetailsHtml: makeSolutionDetails({
+              keep,
+              formulas,
+              workingHtml,
+              altHtml: alt
+            })
+          });
+        }
+
+        return base;
+      }
+
+      function datasetDiagramHeavy() {
+        const qs = [];
+        for (let i = 1; i <= 20; i++) {
+          const id = String(i);
+          const withDiagram = [2, 4, 6, 8, 11, 13, 16, 19].includes(i); // 8 questions with diagrams
+          const diagramType = i % 4;
+          const diagramHtml = withDiagram
+            ? (diagramType === 0 ? svgTable() : diagramType === 1 ? svgGeometry() : diagramType === 2 ? svgBars() : svgGrid())
+            : null;
+
+          const promptHtml = withDiagram
+            ? `Use the diagram to answer. ${i === 8 ? `Also simplify ${mathInline('(x+2)^2')}.` : ''}`
+            : `Compute ${mathInline(`${i + 12} + ${i * 3}`)}.`;
+
+          const answerHtml = withDiagram
+            ? (i === 8 ? `${mathInline('x^2+4x+4')}` : `See diagram-based result.`)
+            : `${mathInline(String((i + 12) + (i * 3)))}`;
+
+          const keep = (i === 6 || i === 13 || i === 19) ? 'Read labels carefully before calculating.' : null;
+          const formulas = (i === 4 || i === 11 || i === 16) ? `${mathInline('A=\\frac{1}{2}bh')} / ${mathInline('A=\\pi r^2')} / ${mathInline('P=2(l+w)')}` : null;
+          const alt = (i === 2 || i === 8 || i === 14) ? `${mathBlock('Explain the same result using a different method shown by the diagram.')}` : null;
+
+          const workingHtml = withDiagram
+            ? `${mathBlock('\\text{Identify the labelled values from the diagram.}')}${mathBlock('\\text{Set up your calculation clearly.}')}${i === 8 ? mathBlock('(x+2)^2 = x^2+4x+4') : ''}`
+            : `${mathBlock(`${i + 12}+${i * 3}=${(i + 12) + (i * 3)}`)}`;
+
+          qs.push({
+            id,
+            promptHtml,
+            diagramHtml,
+            answerHtml,
+            previewText: withDiagram ? 'Read labels, then calculate.' : 'Add the two numbers.',
+            solutionDetailsHtml: makeSolutionDetails({ keep, formulas, workingHtml, altHtml: alt })
+          });
+        }
+
+        return {
+          key: 'diagram',
+          title: 'Diagram-heavy paper',
+          subtitle: '20 questions • 8 questions contain diagrams',
+          defaultExpanded: false,
+          structure: { type: 'flat' },
+          questions: qs
+        };
+      }
+
+      function datasetSectioned() {
+        // Section A: 35 small/medium
+        // Section B: 8 medium
+        // Section C: 6 very long workings (collapsed by default)
+        const sectionA = [];
+        for (let i = 1; i <= 35; i++) {
+          sectionA.push({
+            id: String(i),
+            promptHtml: `Section A: ${i <= 10 ? `Compute ${mathInline(`${i * 4}+${i * 3}`)}.` : `Simplify ${mathInline(`${i}x + ${i + 1}x`)}.`}`,
+            answerHtml: i <= 10 ? `${mathInline(String(i * 7))}` : `${mathInline(`${2 * i + 1}x`)}`,
+            previewText: 'Short working.',
+            solutionDetailsHtml: makeSolutionDetails({
+              workingHtml: i <= 10
+                ? `${mathBlock(`${i * 4}+${i * 3}=${i * 7}`)}`
+                : `${mathBlock(`${i}x+${i + 1}x=${2 * i + 1}x`)}`
+            })
+          });
+        }
+
+        const sectionB = [];
+        for (let j = 1; j <= 8; j++) {
+          const id = String(35 + j);
+          sectionB.push({
+            id,
+            promptHtml: `Section B: A coordinate problem with points and lines.`,
+            diagramHtml: (j % 2 === 0) ? svgGrid() : null,
+            answerHtml: `A correct value consistent with working.`,
+            previewText: 'Find differences / gradients.',
+            solutionDetailsHtml: makeSolutionDetails({
+              keep: (j === 2 || j === 6) ? 'Use (change in y)/(change in x) for gradient.' : null,
+              formulas: (j === 4) ? `${mathInline('m=\\frac{y_2-y_1}{x_2-x_1}')}` : null,
+              workingHtml: `${mathBlock('P(2,3),\\;Q(6,5)')}${mathBlock('\\Delta y=2,\\;\\Delta x=4')}${mathBlock('m=\\frac{2}{4}=\\frac{1}{2}')}`,
+              altHtml: (j === 8) ? `${mathBlock('Draw a right-angled step on the grid to see rise and run.')}` : null
+            })
+          });
+        }
+
+        const sectionC = [];
+        for (let k = 1; k <= 6; k++) {
+          const id = `C${k}`; // NOTE: content semantics require number-based identifiers; use 36.. etc instead
+          // Adjust to number-based identifiers: continue numbering after Section B
+        }
+        const sectionC2 = [];
+        for (let k = 1; k <= 6; k++) {
+          const idNum = 35 + 8 + k; // 44..49
+          const keep = (k === 1 || k === 4) ? 'Write one transformation per line.' : null;
+          const formulas = (k === 2 || k === 5) ? `${mathInline('(a+b)^2=a^2+2ab+b^2')} • ${mathInline('(a-b)^2=a^2-2ab+b^2')}` : null;
+          const alt = (k === 3) ? `${mathBlock('Alternative: expand fully, then collect like terms.')}` : null;
+
+          const workingHtml = `
+            <p class="sd-text">Very long solution details (stress-test). Expand, simplify, and solve.</p>
+            ${mathBlock(`\\displaystyle (x+${k})^2 - (x-${k})^2`)}
+            ${mathBlock(`\\displaystyle (x^2+2${k}x+${k * k})-(x^2-2${k}x+${k * k})`)}
+            ${mathBlock(`\\displaystyle =4${k}x`)}
+            ${mathBlock(`\\displaystyle 4${k}x = ${8 * k} \\Rightarrow x=2`)}
+            <div class="sd-block">
+              <p class="sd-label" style="margin-top:12px;">(Long working stress block)</p>
+              ${longWorkingLines(56)}
+            </div>
+          `;
+
+          sectionC2.push({
+            id: String(idNum),
+            promptHtml: `Section C: Long algebra derivation (collapsed by default).`,
+            answerHtml: `${mathInline('x=2')} (example)`,
+            previewText: 'Long derivation (hidden until expanded).',
+            solutionDetailsHtml: makeSolutionDetails({ keep, formulas, workingHtml, altHtml: alt })
+          });
+        }
+
+        return {
+          key: 'sectioned',
+          title: 'Sectioned paper',
+          subtitle: 'Section A: 35 • Section B: 8 • Section C: 6 (very long workings)',
+          defaultExpanded: false,
+          structure: {
+            type: 'sectioned',
+            sections: [
+              { label: 'Section A', key: 'A', questions: sectionA },
+              { label: 'Section B', key: 'B', questions: sectionB },
+              { label: 'Section C', key: 'C', questions: sectionC2 }
+            ]
+          }
+        };
+      }
+
+      const datasets = [
+        datasetShort(),
+        datasetStandard(false),
+        datasetDiagramHeavy(),
+        datasetSectioned(),
+        datasetStandard(true)
+      ];
+
+      function renderPaper(ds) {
+        // Build main content (single continuous document)
+        const parts = [];
+        parts.push(`<h1 class="paper-title">${escapeHtml(ds.title)}</h1>`);
+        parts.push(`<p class="paper-subtitle">${escapeHtml(ds.subtitle)}</p>`);
+
+        const navItems = [];
+
+        if (ds.structure.type === 'sectioned') {
+          ds.structure.sections.forEach(sec => {
+            parts.push(`<h2 class="section-header">${escapeHtml(sec.label)}</h2>`);
+
+            // Nav separator A/B/C (non-clickable)
+            navItems.push({ type: 'sep', label: sec.key });
+
+            sec.questions.forEach(q => {
+              const depth = q.depth ?? depthFromId(q.id);
+              const href = `#q-${slugify(q.id)}`;
+              navItems.push({ type: 'q', label: q.id, href, depth });
+
+              parts.push(qHtml(q, ds.defaultExpanded));
+            });
+          });
+        } else {
+          ds.questions.forEach(q => {
+            const depth = q.depth ?? depthFromId(q.id);
+            const href = `#q-${slugify(q.id)}`;
+            navItems.push({ type: 'q', label: q.id, href, depth });
+            parts.push(qHtml(q, ds.defaultExpanded));
+          });
+        }
+
+        els.paperMain.innerHTML = parts.join('');
+        els.navList.innerHTML = buildNavItems(navItems);
+        els.drawerNavList.innerHTML = buildNavItems(navItems);
+
+        wireToggles(els.paperMain, ds.defaultExpanded);
+        wireDrawerNavLinks();
+        renderKatex(els.paperMain);
+      }
+
+      function wireToggles(root, expandedByDefault) {
+        root.querySelectorAll('button.work-toggle').forEach(btn => {
+          const targetId = btn.getAttribute('data-toggle');
+          const target = document.getElementById(targetId);
+          const qSection = btn.closest('.question');
+          const preview = qSection ? qSection.querySelector('.work-preview') : null;
+
+          // Ensure initial
+          const isExpanded = (btn.getAttribute('aria-expanded') === 'true');
+          if (target) {
+            if (isExpanded) target.removeAttribute('hidden');
+            else target.setAttribute('hidden', '');
+          }
+          if (preview) {
+            preview.style.display = isExpanded ? 'none' : '';
+          }
+
+          btn.addEventListener('click', () => {
+            const nowExpanded = (btn.getAttribute('aria-expanded') !== 'true');
+            btn.setAttribute('aria-expanded', nowExpanded ? 'true' : 'false');
+            btn.textContent = nowExpanded ? 'Hide working' : 'Show working';
+
+            if (target) {
+              if (nowExpanded) target.removeAttribute('hidden');
+              else target.setAttribute('hidden', '');
+            }
+            if (preview) {
+              preview.style.display = nowExpanded ? 'none' : '';
+            }
+
+            // No cross-question effects. No forced scrolling/focus changes.
+            if (nowExpanded && target) {
+              // Render KaTeX within newly revealed region (if KaTeX loaded)
+              renderKatex(target);
+            }
+          });
+        });
+      }
+
+      function renderKatex(container) {
+        // Graceful fallback: if KaTeX fails to load, leave plain text.
+        if (!window.katex || !window.katex.render) {
+          return;
+        }
+
+        // Inline math
+        container.querySelectorAll('[data-math-inline]').forEach(el => {
+          const expr = el.getAttribute('data-math-inline') || '';
+          try {
+            window.katex.render(expr, el, { throwOnError: false, displayMode: false });
+          } catch (e) {
+            // fallback: do nothing (plain text stays)
+          }
+        });
+
+        // Block math
+        container.querySelectorAll('[data-math-block]').forEach(el => {
+          const expr = el.getAttribute('data-math-block') || '';
+          try {
+            window.katex.render(expr, el, { throwOnError: false, displayMode: true });
+          } catch (e) {
+            // fallback: do nothing
+          }
+        });
+      }
+
+      // Mobile drawer (focus + background lock)
+      let lastFocus = null;
+
+      function openDrawer() {
+        lastFocus = document.activeElement;
+        els.drawerBackdrop.hidden = false;
+        els.navDrawer.hidden = false;
+        els.drawerBackdrop.style.display = 'block';
+        els.navDrawer.style.display = 'block';
+
+        // Prevent background interaction: apply aria-hidden to layout root
+        els.layoutRoot.setAttribute('aria-hidden', 'true');
+
+        // Focus close button
+        els.drawerClose.focus();
+
+        // Basic focus trap
+        document.addEventListener('keydown', trapFocus, true);
+      }
+
+      function closeDrawer() {
+        els.drawerBackdrop.hidden = true;
+        els.navDrawer.hidden = true;
+        els.drawerBackdrop.style.display = 'none';
+        els.navDrawer.style.display = 'none';
+
+        els.layoutRoot.removeAttribute('aria-hidden');
+
+        document.removeEventListener('keydown', trapFocus, true);
+
+        if (lastFocus && typeof lastFocus.focus === 'function') {
+          lastFocus.focus();
+        }
+      }
+
+      function trapFocus(e) {
+        if (els.navDrawer.hidden) return;
+
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeDrawer();
+          return;
+        }
+        if (e.key !== 'Tab') return;
+
+        const focusables = els.navDrawer.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+        if (!focusables.length) return;
+
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+
+      function wireDrawerNavLinks() {
+        els.drawerNavList.querySelectorAll('a[href^="#"]').forEach(a => {
+          a.addEventListener('click', () => {
+            // Close drawer after jump (no change to expand/collapse states)
+            closeDrawer();
+          });
+        });
+      }
+
+      // Paper selector
+      function populateSelector() {
+        const opts = datasets.map(ds => `<option value="${escapeHtml(ds.key)}">${escapeHtml(ds.title)}</option>`).join('');
+        els.paperSelect.innerHTML = opts;
+      }
+
+      function getDatasetByKey(key) {
+        return datasets.find(d => d.key === key) || datasets[0];
+      }
+
+      function init() {
+        populateSelector();
+        els.paperSelect.value = datasets[0].key;
+        renderPaper(datasets[0]);
+
+        els.paperSelect.addEventListener('change', () => {
+          const ds = getDatasetByKey(els.paperSelect.value);
+          renderPaper(ds);
+          // Switching papers: uses dataset defaults only; no auto expand/collapse beyond defaults.
+          // (No persistence required.)
+        });
+
+        // Mobile jump control
+        els.jumpBtn.addEventListener('click', openDrawer);
+        els.drawerClose.addEventListener('click', closeDrawer);
+        els.drawerBackdrop.addEventListener('click', closeDrawer);
+
+        // On hash navigation, do not change expanded states (browser default jump is fine)
+      }
+
+      // Wait for KaTeX script load (but don’t block if it fails)
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ - Maths Paper Solution Viewer (Prototype)</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+        integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+        integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8"
+        crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05"
+        crossorigin="anonymous"></script>
+
+    <style>
+        /* ===== DESIGN SYSTEM & SURFACES (Stage 4.9) ===== 
+           Grayscale only. Focus on hierarchy, spacing, and rhythm.
+        */
+        :root {
+            /* Palette */
+            --color-page-bg: #F5F5F5;
+            /* Surface 1 */
+            --color-paper-bg: #FFFFFF;
+            /* Surface 2 */
+            --color-details-bg: #FAFAFA;
+            /* Surface 3 */
+            --color-nav-bg: transparent;
+            /* Surface 4 */
+
+            --color-text-primary: #111111;
+            --color-text-secondary: #555555;
+            --color-text-tertiary: #767676;
+            --color-border: #E0E0E0;
+            --color-focus: #333333;
+
+            /* Spacing Rhythm */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 48px;
+            /* Between top-level questions */
+            --space-xxl: 80px;
+
+            /* Typography */
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-size-base: 18px;
+            /* Comfortable reading size */
+            --font-size-sm: 15px;
+            --line-height-relaxed: 1.6;
+            --line-height-tight: 1.4;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+            background-color: var(--color-page-bg);
+            color: var(--color-text-primary);
+            line-height: var(--line-height-relaxed);
+            font-size: var(--font-size-base);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== SHELL LAYOUT ===== */
+        .app-shell {
+            max-width: 1100px;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Controls (Paper Selector) */
+        .top-controls {
+            padding: var(--space-md) var(--space-lg);
+            background-color: var(--color-page-bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            /* Visual alignment with content frame */
+        }
+
+        .paper-selector {
+            font-family: inherit;
+            font-size: 1rem;
+            padding: var(--space-sm) var(--space-md);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            background: var(--color-paper-bg);
+            min-width: 250px;
+        }
+
+        .mobile-nav-toggle {
+            display: none;
+            /* Desktop default */
+            background: none;
+            border: 1px solid var(--color-text-primary);
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            border-radius: 4px;
+        }
+
+        /* Main Content Area (2-Column Grid) */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            /* Nav | Paper */
+            gap: var(--space-lg);
+            padding: 0 var(--space-lg) var(--space-xxl) var(--space-lg);
+            flex: 1;
+        }
+
+        /* ===== NAVIGATION (Stage 3 & 4.4) ===== */
+        .nav-rail {
+            position: sticky;
+            top: 80px;
+            /* Offset for top controls */
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            padding-right: var(--space-md);
+            /* Scrollbar hiding (Add-on) */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* IE/Edge */
+        }
+
+        .nav-rail::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Chrome/Safari */
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-item {
+            display: block;
+            padding: var(--space-xs) var(--space-sm);
+            text-decoration: none;
+            color: var(--color-text-tertiary);
+            font-size: var(--font-size-sm);
+            border-radius: 4px;
+            transition: color 0.2s, background-color 0.2s;
+        }
+
+        .nav-item:hover {
+            color: var(--color-text-primary);
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+
+        .nav-item:focus {
+            outline: 2px solid var(--color-focus);
+            outline-offset: -2px;
+        }
+
+        .nav-section-label {
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-top: var(--space-md);
+            margin-bottom: var(--space-xs);
+            padding-left: var(--space-sm);
+            font-size: var(--font-size-sm);
+            cursor: default;
+        }
+
+        /* ===== PAPER CONTENT (Stage 3 & 4.9.3) ===== */
+        .paper-content {
+            background-color: var(--color-paper-bg);
+            padding: var(--space-xl);
+            min-height: 80vh;
+            /* Elevation via subtle spacing/contrast, not shadow */
+        }
+
+        /* Question Blocks */
+        .question-block {
+            margin-bottom: var(--space-xl);
+            scroll-margin-top: 100px;
+            /* For anchor jumping */
+        }
+
+        .question-header {
+            display: flex;
+            gap: var(--space-md);
+            align-items: baseline;
+        }
+
+        .question-id {
+            font-weight: 700;
+            color: var(--color-text-secondary);
+            flex-shrink: 0;
+            width: 3ch;
+        }
+
+        /* Indentation for nested questions (Add-on) */
+        .question-block.depth-1 .question-header {
+            padding-left: var(--space-lg);
+        }
+
+        .question-block.depth-2 .question-header {
+            padding-left: calc(var(--space-lg) * 2);
+        }
+
+        .question-text {
+            flex: 1;
+            font-size: var(--font-size-base);
+            color: var(--color-text-primary);
+        }
+
+        .question-diagram {
+            margin: var(--space-md) 0;
+            max-width: 100%;
+            display: block;
+        }
+
+        .diagram-svg {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #eee;
+            /* Light boundary for clarity */
+        }
+
+        /* Answer Section (Stage 3 Default Visibility) */
+        .answer-section {
+            margin-top: var(--space-md);
+            margin-left: calc(3ch + var(--space-md));
+            /* Align with text */
+            padding-left: var(--space-md);
+            border-left: 2px solid var(--color-border);
+        }
+
+        .question-block.depth-1 .answer-section {
+            margin-left: calc(3ch + var(--space-md) + var(--space-lg));
+        }
+
+        .question-block.depth-2 .answer-section {
+            margin-left: calc(3ch + var(--space-md) + var(--space-lg) * 2);
+        }
+
+        .answer-label {
+            font-size: var(--font-size-sm);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-tertiary);
+            display: block;
+            margin-bottom: var(--space-xs);
+        }
+
+        .answer-value {
+            font-size: var(--font-size-base);
+            font-weight: 500;
+        }
+
+        /* Solution Details (Expandable) */
+        .solution-details-container {
+            margin-top: var(--space-md);
+            margin-left: calc(3ch + var(--space-md));
+            /* Align with text */
+        }
+
+        .question-block.depth-1 .solution-details-container {
+            margin-left: calc(3ch + var(--space-md) + var(--space-lg));
+        }
+
+        .question-block.depth-2 .solution-details-container {
+            margin-left: calc(3ch + var(--space-md) + var(--space-lg) * 2);
+        }
+
+        .toggle-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            font-family: inherit;
+        }
+
+        .toggle-btn:hover {
+            text-decoration: underline;
+            color: var(--color-text-primary);
+        }
+
+        .toggle-icon {
+            transition: transform 0.2s ease;
+            width: 12px;
+            height: 12px;
+            fill: currentColor;
+        }
+
+        .toggle-btn[aria-expanded="true"] .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        /* The expandable content */
+        .solution-content {
+            display: none;
+            margin-top: var(--space-sm);
+            background-color: var(--color-details-bg);
+            /* Surface 3 */
+            padding: var(--space-md);
+            border-radius: 4px;
+        }
+
+        .solution-content.is-visible {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .details-section {
+            margin-bottom: var(--space-md);
+        }
+
+        .details-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .details-label {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xs);
+            display: block;
+        }
+
+        .details-body {
+            font-size: var(--font-size-base);
+            color: var(--color-text-primary);
+            overflow-x: auto;
+            /* Horizontal scroll for math blocks */
+        }
+
+        /* KaTeX Overflow handling */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0.5em 0;
+            scrollbar-width: thin;
+        }
+
+        /* ===== MOBILE RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .app-shell {
+                display: block;
+            }
+
+            .main-layout {
+                display: block;
+                padding: 0 var(--space-sm) var(--space-xxl) var(--space-sm);
+            }
+
+            .nav-rail {
+                display: none;
+                /* Hidden by default, toggled via JS */
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                width: 80%;
+                max-width: 300px;
+                background: white;
+                z-index: 200;
+                padding: var(--space-lg);
+                box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
+            }
+
+            .nav-rail.is-open {
+                display: block;
+            }
+
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.4);
+                z-index: 150;
+            }
+
+            .overlay.is-open {
+                display: block;
+            }
+
+            .mobile-nav-toggle {
+                display: block;
+            }
+
+            .paper-content {
+                padding: var(--space-md);
+            }
+
+            /* Tighter indentation on mobile */
+            .question-header {
+                gap: var(--space-sm);
+            }
+
+            .question-block.depth-1 .question-header {
+                padding-left: var(--space-md);
+            }
+
+            .question-block.depth-2 .question-header {
+                padding-left: calc(var(--space-md) * 2);
+            }
+
+            .answer-section,
+            .solution-details-container {
+                margin-left: 0;
+                /* Align left on mobile to save space */
+                padding-left: 0;
+                border-left: none;
+            }
+
+            .answer-section {
+                border-left: 2px solid var(--color-border);
+                padding-left: var(--space-sm);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-shell">
+        <header class="top-controls">
+            <button class="mobile-nav-toggle" id="navToggle" aria-label="Open Navigation">Menu</button>
+            <label for="paperSelect" class="sr-only">Select Paper</label>
+            <select id="paperSelect" class="paper-selector">
+                <option value="short">Short Paper (6 Questions)</option>
+                <option value="standard">Standard Paper (35 Questions)</option>
+                <option value="diagrams">Diagram-Heavy Paper</option>
+                <option value="sectioned">Sectioned Paper (A/B/C)</option>
+                <option value="expanded">Standard (Workings Expanded)</option>
+            </select>
+        </header>
+
+        <div class="overlay" id="overlay"></div>
+
+        <div class="main-layout">
+            <nav class="nav-rail" id="navRail" aria-label="Paper Navigation">
+                <ul class="nav-list" id="navList">
+                </ul>
+            </nav>
+
+            <main class="paper-content" id="paperContent">
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // ===== DATASETS ===== //
+
+        const createQuestion = (id, type = 'standard', nesting = 0, long = false, diagramType = null, multiDetails = false) => {
+            const data = {
+                id: id,
+                type: type, // standard, section-header
+                nesting: nesting,
+                question: `Calculate the value of $x$ given that $2x + 4 = 12$. Explain your reasoning step-by-step.`,
+                answer: `$x = 4$`,
+                details: {
+                    working: `$$ \\begin{aligned} 2x + 4 &= 12 \\\\ 2x &= 12 - 4 \\\\ 2x &= 8 \\\\ x &= 4 \\end{aligned} $$`,
+                    alternatives: [],
+                    keepInMind: null,
+                    formulas: null
+                }
+            };
+
+            // Variation: Long Question
+            if (long) {
+                data.question = "A particle moves along a straight line such that its displacement $s$ meters from a fixed point $O$ at time $t$ seconds is given by $s = t^3 - 6t^2 + 9t + 2$. Find the total distance travelled by the particle in the first 4 seconds.";
+                data.answer = "Total distance = 24 meters";
+                // Generate a very long working block (simulating 50+ lines)
+                let longMath = `$$ \\begin{aligned} s &= t^3 - 6t^2 + 9t + 2 \\\\ v &= \\frac{ds}{dt} = 3t^2 - 12t + 9 \\\\ \\text{Set } v &= 0 \\text{ to find turning points:} \\\\ 3(t^2 - 4t + 3) &= 0 \\\\ 3(t-1)(t-3) &= 0 \\\\ t &= 1, t = 3 \\\\ \\text{Calculate } s \\text{ at critical points:} \\\\ s(0) &= 2 \\\\ s(1) &= 1 - 6 + 9 + 2 = 6 \\\\ s(3) &= 27 - 54 + 27 + 2 = 2 \\\\ s(4) &= 64 - 96 + 36 + 2 = 6 \\\\ \\text{Distance } 0 \\to 1: &|6 - 2| = 4 \\\\ \\text{Distance } 1 \\to 3: &|2 - 6| = 4 \\\\ \\text{Distance } 3 \\to 4: &|6 - 2| = 4 \\\\ \\text{Total} &= 4 + 4 + 4 = 12 \\\\ &\\dots \\text{(extended logical derivation steps)} \\\\ &\\dots \\text{Checking boundary conditions...} \\\\ &\\dots \\text{Verifying acceleration...} \\\\ a &= \\frac{dv}{dt} = 6t - 12 \\\\ &\\dots \\text{Sign check at } t=1: a = -6 < 0 (max) \\\\ &\\dots \\text{Sign check at } t=3: a = 6 > 0 (min) \\end{aligned} $$`;
+                data.details.working = longMath;
+            }
+
+            // Variation: Diagrams
+            if (diagramType) {
+                data.diagram = diagramType;
+                data.question = "Refer to the diagram below. Determine the area of the shaded region.";
+            }
+
+            // Variation: Multi Details
+            if (multiDetails) {
+                data.details.keepInMind = "Remember that distance is always positive, even if displacement decreases.";
+                data.details.formulas = "$$ v = \\frac{ds}{dt}, \\quad a = \\frac{dv}{dt} $$";
+                data.details.alternatives = ["$$ \\text{Graphical method: Sketch } v(t) \\text{ and integrate absolute area.} $$"];
+            }
+
+            return data;
+        };
+
+        const createSectionHeader = (label) => ({ id: label, type: 'section' });
+
+        // Generators
+        const generateShortPaper = () => [
+            createQuestion("1"),
+            createQuestion("2"),
+            createQuestion("3"),
+            createQuestion("4", 'standard', 0, false, null, true), // Multi details
+            createQuestion("5a", 'standard', 1),
+            createQuestion("5b", 'standard', 1)
+        ];
+
+        const generateStandardPaper = (expanded = false) => {
+            const qs = [];
+            for (let i = 1; i <= 25; i++) qs.push(createQuestion(i.toString()));
+            // Long questions Q26-35
+            for (let i = 26; i <= 35; i++) qs.push(createQuestion(i.toString(), 'standard', 0, true));
+            return qs;
+        };
+
+        const generateDiagramPaper = () => {
+            const qs = [];
+            const types = ['geometry', 'bar', 'graph', 'table'];
+            for (let i = 1; i <= 20; i++) {
+                // Every 3rd question has a diagram
+                const diag = (i % 3 === 0) ? types[i % 4] : null;
+                qs.push(createQuestion(i.toString(), 'standard', 0, false, diag));
+            }
+            return qs;
+        };
+
+        const generateSectionedPaper = () => {
+            const qs = [];
+            qs.push(createSectionHeader("Section A"));
+            for (let i = 1; i <= 35; i++) qs.push(createQuestion(i.toString()));
+            qs.push(createSectionHeader("Section B"));
+            for (let i = 1; i <= 8; i++) qs.push(createQuestion(`B${i}`, 'standard', 0, false, 'geometry'));
+            qs.push(createSectionHeader("Section C"));
+            // Deep nesting example
+            qs.push(createQuestion("1(a)", 'standard', 1, true));
+            qs.push(createQuestion("1(b)(i)", 'standard', 2, true));
+            qs.push(createQuestion("1(b)(ii)", 'standard', 2, true));
+            qs.push(createQuestion("2", 'standard', 0, true, null, true));
+            qs.push(createQuestion("3", 'standard', 0, true));
+            return qs;
+        };
+
+        // ===== SVG DIAGRAM BUILDER ===== //
+        const getDiagramSVG = (type) => {
+            const props = 'width="100%" height="auto" viewBox="0 0 400 200" style="background:#f9f9f9"';
+            if (type === 'geometry') return `<svg ${props}><circle cx="200" cy="100" r="50" fill="none" stroke="#333" stroke-width="2"/><text x="195" y="105" font-family="sans-serif" fill="#333">r</text><path d="M 200,100 L 250,100" stroke="#333" stroke-dasharray="4"/></svg>`;
+            if (type === 'bar') return `<svg ${props}><rect x="50" y="50" width="30" height="100" fill="#ccc"/><rect x="100" y="80" width="30" height="70" fill="#999"/><rect x="150" y="20" width="30" height="130" fill="#666"/><line x1="20" y1="150" x2="380" y2="150" stroke="#333" stroke-width="2"/><text x="50" y="170" fill="#333" font-size="12">A</text><text x="100" y="170" fill="#333" font-size="12">B</text><text x="150" y="170" fill="#333" font-size="12">C</text></svg>`;
+            if (type === 'graph') return `<svg ${props}><line x1="20" y1="180" x2="380" y2="180" stroke="#333"/><line x1="20" y1="10" x2="20" y2="180" stroke="#333"/><path d="M 20,180 Q 200,10 380,180" fill="none" stroke="#555" stroke-width="2"/><circle cx="200" cy="95" r="4" fill="#111"/></svg>`;
+            if (type === 'table') return `<svg ${props}><rect x="40" y="40" width="320" height="120" fill="none" stroke="#333"/><line x1="40" y1="80" x2="360" y2="80" stroke="#333"/><line x1="100" y1="40" x2="100" y2="160" stroke="#333"/><text x="50" y="65" font-weight="bold" fill="#333">x</text><text x="50" y="110" fill="#333">y</text><text x="120" y="65" fill="#333">1</text><text x="120" y="110" fill="#333">2</text><text x="160" y="65" fill="#333">2</text><text x="160" y="110" fill="#333">4</text></svg>`;
+            return '';
+        };
+
+        // ===== RENDERING LOGIC ===== //
+        const renderApp = (datasetName) => {
+            const paperContent = document.getElementById('paperContent');
+            const navList = document.getElementById('navList');
+
+            // Clear current
+            paperContent.innerHTML = '';
+            navList.innerHTML = '';
+
+            let data;
+            let forceExpanded = false;
+
+            switch (datasetName) {
+                case 'short': data = generateShortPaper(); break;
+                case 'standard': data = generateStandardPaper(); break;
+                case 'diagrams': data = generateDiagramPaper(); break;
+                case 'sectioned': data = generateSectionedPaper(); break;
+                case 'expanded':
+                    data = generateStandardPaper();
+                    forceExpanded = true;
+                    break;
+                default: data = generateShortPaper();
+            }
+
+            // Build DOM
+            data.forEach(item => {
+                if (item.type === 'section') {
+                    // Nav Section Header
+                    const li = document.createElement('li');
+                    li.className = 'nav-section-label';
+                    li.textContent = item.id;
+                    navList.appendChild(li);
+
+                    // Paper Section Header (Optional visual separator)
+                    const div = document.createElement('div');
+                    div.style.padding = 'var(--space-lg) 0 var(--space-md) 0';
+                    div.style.borderBottom = '1px solid var(--color-border)';
+                    div.style.marginBottom = 'var(--space-xl)';
+                    div.innerHTML = `<h2 style="font-size:1.2rem; margin:0; color:#333;">${item.id}</h2>`;
+                    paperContent.appendChild(div);
+
+                } else {
+                    // 1. Navigation Item
+                    const navLi = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.className = 'nav-item';
+                    a.href = `#q-${item.id}`;
+                    a.textContent = item.id;
+                    a.onclick = (e) => {
+                        e.preventDefault();
+                        document.getElementById(`q-${item.id}`).scrollIntoView({ behavior: 'smooth' });
+                        // Mobile: close drawer
+                        if (window.innerWidth <= 768) toggleMobileNav(false);
+                    };
+                    navLi.appendChild(a);
+                    navList.appendChild(navLi);
+
+                    // 2. Question Article
+                    const article = document.createElement('article');
+                    article.id = `q-${item.id}`;
+                    article.className = `question-block depth-${item.nesting}`;
+
+                    // Diagram HTML
+                    const diagramHTML = item.diagram ?
+                        `<div class="question-diagram" role="img" aria-label="Diagram for question ${item.id}">${getDiagramSVG(item.diagram)}</div>` : '';
+
+                    // Workings HTML construction
+                    const workingsHTML = `
+                        <div class="solution-details-container">
+                            <button class="toggle-btn" aria-expanded="${forceExpanded}" onclick="toggleWorking(this)">
+                                <span class="toggle-text">${forceExpanded ? 'Hide working' : 'Show working'}</span>
+                                <svg class="toggle-icon" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                            </button>
+                            <div class="solution-content ${forceExpanded ? 'is-visible' : ''}">
+                                ${item.details.keepInMind ? `
+                                    <div class="details-section">
+                                        <span class="details-label">Keep in mind</span>
+                                        <div class="details-body">${item.details.keepInMind}</div>
+                                    </div>` : ''}
+                                
+                                ${item.details.formulas ? `
+                                    <div class="details-section">
+                                        <span class="details-label">Formulas used</span>
+                                        <div class="details-body">${item.details.formulas}</div>
+                                    </div>` : ''}
+
+                                <div class="details-section">
+                                    <span class="details-label">Working</span>
+                                    <div class="details-body">${item.details.working}</div>
+                                </div>
+
+                                ${item.details.alternatives && item.details.alternatives.length > 0 ? `
+                                    <div class="details-section">
+                                        <span class="details-label">Alternative working</span>
+                                        ${item.details.alternatives.map(alt => `<div class="details-body" style="margin-bottom:8px">${alt}</div>`).join('')}
+                                    </div>` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                    article.innerHTML = `
+                        <div class="question-header">
+                            <span class="question-id">${item.id}</span>
+                            <div class="question-text">
+                                <div>${item.question}</div>
+                                ${diagramHTML}
+                            </div>
+                        </div>
+                        <div class="answer-section">
+                            <span class="answer-label">Answer</span>
+                            <span class="answer-value">${item.answer}</span>
+                        </div>
+                        ${workingsHTML}
+                    `;
+                    paperContent.appendChild(article);
+                }
+            });
+
+            // Trigger KaTeX Rendering
+            renderMathInElement(paperContent, {
+                delimiters: [
+                    { left: '$$', right: '$$', display: true },
+                    { left: '$', right: '$', display: false }
+                ],
+                throwOnError: false
+            });
+        };
+
+        // ===== INTERACTIONS ===== //
+
+        // Toggle Working logic
+        window.toggleWorking = (btn) => {
+            const content = btn.nextElementSibling;
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+
+            // Invert state
+            btn.setAttribute('aria-expanded', !isExpanded);
+            btn.querySelector('.toggle-text').textContent = !isExpanded ? 'Hide working' : 'Show working';
+
+            if (!isExpanded) {
+                content.classList.add('is-visible');
+            } else {
+                content.classList.remove('is-visible');
+            }
+        };
+
+        // Mobile Nav Logic
+        const navRail = document.getElementById('navRail');
+        const overlay = document.getElementById('overlay');
+
+        function toggleMobileNav(show) {
+            if (show) {
+                navRail.classList.add('is-open');
+                overlay.classList.add('is-open');
+            } else {
+                navRail.classList.remove('is-open');
+                overlay.classList.remove('is-open');
+            }
+        }
+
+        document.getElementById('navToggle').addEventListener('click', () => toggleMobileNav(true));
+        overlay.addEventListener('click', () => toggleMobileNav(false));
+
+        // Paper Selector Logic
+        document.getElementById('paperSelect').addEventListener('change', (e) => {
+            renderApp(e.target.value);
+            // Reset scroll to top
+            window.scrollTo(0, 0);
+        });
+
+        // Initialize
+        renderApp('short');
+
+    </script>
+</body>
+
+</html>

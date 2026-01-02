@@ -1,0 +1,1258 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RTQ — Maths Paper Solution Viewer</title>
+
+    <!-- KaTeX (via CDN as required). If it fails, content remains as plain text delimiters. -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+
+    <style>
+        :root {
+            /* Soft-warm neutral base (subtle, desaturated) */
+            --bg: #f4f2ee;
+            --paper: #fbfaf8;
+            --ink: #1f2328;
+            --muted: #5a6067;
+            --quiet: #707780;
+
+            --hairline: rgba(40, 45, 50, 0.14);
+            --hairline2: rgba(40, 45, 50, 0.10);
+
+            /* Subtle solution surface differentiation */
+            --solution-bg: rgba(40, 45, 50, 0.035);
+
+            /* Display-math underlay (very subtle) */
+            --math-underlay: rgba(40, 45, 50, 0.045);
+
+            /* Restrained non-semantic accent (non-content UI only) */
+            --accent: #2f5f73;
+
+            --frame-max: 1120px;
+            --nav-w: 96px;
+            --gutter: 18px;
+
+            --fs-base: 16px;
+            --lh: 1.45;
+
+            --q-gap: 18px;
+            --qa-gap: 10px;
+            --a-toggle-gap: 8px;
+            --sd-gap: 10px;
+            --sd-inner-gap: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font: 400 var(--fs-base)/var(--lh) system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            color: var(--ink);
+            background: var(--bg);
+            overflow-x: hidden;
+            /* containment invariant: never allow page-level horizontal scroll */
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
+        }
+
+        a:focus-visible,
+        button:focus-visible,
+        select:focus-visible {
+            outline: 2px solid rgba(47, 95, 115, 0.35);
+            outline-offset: 2px;
+            border-radius: 3px;
+        }
+
+        /* Top controls aligned to centered frame */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: var(--bg);
+            border-bottom: 1px solid var(--hairline2);
+        }
+
+        .topbar-inner {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 10px var(--gutter);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: space-between;
+        }
+
+        .controls-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .label {
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+        }
+
+        select {
+            font: inherit;
+            font-size: 14px;
+            color: var(--ink);
+            background: var(--paper);
+            border: 1px solid var(--hairline);
+            border-radius: 6px;
+            padding: 6px 10px;
+            max-width: 280px;
+        }
+
+        .mobile-jump {
+            display: none;
+            font: inherit;
+            font-size: 14px;
+            background: transparent;
+            border: 1px solid var(--hairline);
+            border-radius: 8px;
+            padding: 6px 10px;
+            color: var(--ink);
+        }
+
+        .mobile-jump .chev {
+            display: inline-block;
+            transform: translateY(-1px);
+            margin-left: 6px;
+            color: var(--quiet);
+        }
+
+        /* Centered frame containing nav + content on same surface */
+        .frame {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 14px var(--gutter) 42px var(--gutter);
+        }
+
+        .paper-surface {
+            background: var(--paper);
+            border: 1px solid rgba(40, 45, 50, 0.10);
+            border-radius: 12px;
+            padding: 16px 14px;
+        }
+
+        .columns {
+            display: grid;
+            grid-template-columns: var(--nav-w) 1fr;
+            gap: 18px;
+            align-items: start;
+        }
+
+        /* Navigation rail: quiet, no panel background */
+        nav {
+            position: sticky;
+            top: 58px;
+            /* below topbar */
+            max-height: calc(100vh - 74px);
+            overflow: auto;
+            padding-right: 6px;
+            /* hide scrollbar, keep functional */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            background: transparent;
+        }
+
+        nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-section {
+            margin: 10px 0 6px 0;
+            font-size: 12px;
+            color: var(--quiet);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            user-select: none;
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 2px;
+        }
+
+        .nav-item a {
+            display: block;
+            padding: 4px 4px;
+            font-size: 13px;
+            color: rgba(31, 35, 40, 0.62);
+            border-radius: 4px;
+        }
+
+        .nav-item a:hover {
+            color: rgba(31, 35, 40, 0.78);
+            text-decoration: underline;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
+        }
+
+        .nav-item a:focus-visible {
+            outline-offset: 1px;
+        }
+
+        .nav-item.current a {
+            /* weight-only primary indication */
+            font-weight: 600;
+            color: rgba(31, 35, 40, 0.72);
+        }
+
+        /* Paper content */
+        main {
+            min-width: 0;
+        }
+
+        .status {
+            margin: 0 0 12px 0;
+            padding: 10px 12px;
+            border: 1px solid var(--hairline);
+            border-radius: 10px;
+            background: rgba(40, 45, 50, 0.02);
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .section-header {
+            margin: 22px 0 8px 0;
+            padding: 10px 0 8px 0;
+            border-bottom: 1px solid var(--hairline2);
+            color: rgba(31, 35, 40, 0.78);
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .question {
+            margin: 0 0 var(--q-gap) 0;
+            padding: 0;
+        }
+
+        .q-row {
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+        }
+
+        .q-id {
+            font-weight: 600;
+            min-width: 48px;
+            color: rgba(31, 35, 40, 0.88);
+        }
+
+        .q-prompt {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .answer-block {
+            margin-top: var(--qa-gap);
+            padding-left: 58px;
+        }
+
+        .subtle-label {
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 0.02em;
+            margin: 0 0 6px 0;
+            font-weight: 600;
+        }
+
+        .answer-body {
+            color: rgba(31, 35, 40, 0.78);
+            font-size: 15px;
+        }
+
+        .toggle-row {
+            margin-top: var(--a-toggle-gap);
+            padding-left: 58px;
+        }
+
+        .toggle {
+            appearance: none;
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+            font-size: 14px;
+            color: var(--accent);
+            /* permitted in non-content UI affordance */
+            cursor: pointer;
+        }
+
+        .toggle:hover {
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            text-decoration-thickness: 1px;
+        }
+
+        .toggle .chev {
+            display: inline-block;
+            margin-left: 6px;
+            transform: translateY(-1px);
+            color: rgba(47, 95, 115, 0.7);
+        }
+
+        /* Solution Details: subtle background differentiation + quiet divider */
+        .solution {
+            margin-top: var(--sd-gap);
+            margin-left: 58px;
+            padding: 10px 12px 12px 12px;
+            background: var(--solution-bg);
+            border-top: 1px solid var(--hairline2);
+        }
+
+        .solution[hidden] {
+            display: none !important;
+        }
+
+        .sd-block {
+            margin-top: var(--sd-inner-gap);
+        }
+
+        .sd-label {
+            font-size: 12px;
+            color: rgba(31, 35, 40, 0.72);
+            letter-spacing: 0.02em;
+            margin: 0 0 6px 0;
+            font-weight: 700;
+            /* short label only */
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .km-icon {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+            color: rgba(31, 35, 40, 0.55);
+            flex: 0 0 auto;
+        }
+
+        /* Keep in mind: slightly more prominent than Working, still subordinate */
+        .keep-in-mind {
+            color: rgba(31, 35, 40, 0.70);
+        }
+
+        .keep-in-mind .sd-label {
+            color: rgba(31, 35, 40, 0.76);
+        }
+
+        /* Formulas used: quieter than Keep in mind */
+        .formulas-used {
+            color: rgba(31, 35, 40, 0.66);
+        }
+
+        /* Optional quiet divider between formulas and working when both exist */
+        .quiet-divider {
+            height: 1px;
+            background: var(--hairline2);
+            margin: 10px 0 6px 0;
+        }
+
+        .working,
+        .altworking {
+            color: rgba(31, 35, 40, 0.64);
+        }
+
+        /* Sub-questions: visual subordination via indentation + hairline */
+        .children {
+            margin-top: 10px;
+            padding-left: 14px;
+            border-left: 1px solid var(--hairline2);
+        }
+
+        /* Markdown defaults: keep calm, readable, tables minimal */
+        .md p {
+            margin: 0 0 10px 0;
+        }
+
+        .md p:last-child {
+            margin-bottom: 0;
+        }
+
+        .md ul,
+        .md ol {
+            margin: 0 0 10px 18px;
+            padding: 0;
+        }
+
+        .md li {
+            margin: 3px 0;
+        }
+
+        .md strong {
+            font-weight: 600;
+        }
+
+        /* may occur in authored content; keep restrained */
+        .md code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.95em;
+        }
+
+        .md pre {
+            margin: 0 0 10px 0;
+            padding: 10px 12px;
+            overflow: auto;
+            border: 1px solid var(--hairline2);
+            background: rgba(40, 45, 50, 0.02);
+        }
+
+        .md table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 0 10px 0;
+            font-size: 0.95em;
+            color: inherit;
+        }
+
+        .md th,
+        .md td {
+            border: 1px solid rgba(40, 45, 50, 0.12);
+            padding: 6px 8px;
+            vertical-align: top;
+        }
+
+        .md th {
+            font-weight: 600;
+            background: transparent;
+            /* no header fill */
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .table-wrap::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* KaTeX containment invariant */
+        .katex,
+        .katex-display {
+            max-width: 100%;
+        }
+
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .katex-display::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Display-math underlay only in Working/Alternative working */
+        .working .katex-display,
+        .altworking .katex-display {
+            background: var(--math-underlay);
+            padding: 3px 4px;
+            /* minimal internal padding */
+            margin: 8px 0;
+        }
+
+        /* Ensure inline math never gets background */
+        .working .katex:not(.katex-display) {
+            background: transparent !important;
+        }
+
+        .altworking .katex:not(.katex-display) {
+            background: transparent !important;
+        }
+
+        /* Mobile drawer */
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(25, 28, 32, 0.32);
+            display: none;
+            z-index: 50;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: min(320px, 86vw);
+            background: var(--paper);
+            border-right: 1px solid var(--hairline);
+            transform: translateX(-105%);
+            transition: transform 160ms ease;
+            z-index: 60;
+            display: grid;
+            grid-template-rows: auto 1fr;
+        }
+
+        .drawer header {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--hairline2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .drawer-title {
+            font-size: 13px;
+            color: var(--muted);
+            letter-spacing: 0.02em;
+            font-weight: 600;
+        }
+
+        .drawer-close {
+            font: inherit;
+            font-size: 14px;
+            background: transparent;
+            border: 1px solid var(--hairline);
+            border-radius: 8px;
+            padding: 6px 10px;
+            color: var(--ink);
+        }
+
+        .drawer nav {
+            position: static;
+            top: auto;
+            max-height: none;
+            overflow: auto;
+            padding: 12px 10px;
+        }
+
+        .drawer-open .drawer-backdrop {
+            display: block;
+        }
+
+        .drawer-open .drawer {
+            transform: translateX(0);
+        }
+
+        /* Responsive: switch to drawer on small screens */
+        @media (max-width: 860px) {
+            .columns {
+                grid-template-columns: 1fr;
+            }
+
+            nav.desktop-nav {
+                display: none;
+            }
+
+            .mobile-jump {
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .paper-surface {
+                padding: 14px 12px;
+            }
+
+            .q-id {
+                min-width: 40px;
+            }
+
+            .answer-block,
+            .toggle-row,
+            .solution {
+                margin-left: 0;
+                padding-left: 50px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .drawer {
+                transition: none;
+            }
+
+            html:focus-within {
+                scroll-behavior: auto;
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="topbar" role="banner">
+        <div class="topbar-inner">
+            <div class="controls-left">
+                <span class="label">Paper</span>
+                <select id="paperSelect" aria-label="Paper Selector" disabled></select>
+            </div>
+            <button id="jumpBtn" class="mobile-jump" type="button" aria-haspopup="dialog" aria-controls="navDrawer"
+                aria-expanded="false">
+                Jump to <span class="chev">▾</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="paper-surface">
+            <div class="columns">
+                <nav class="desktop-nav" aria-label="Question navigation">
+                    <div id="desktopNav"></div>
+                </nav>
+
+                <main aria-label="Paper content">
+                    <div id="status" class="status" hidden></div>
+                    <div id="content"></div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile drawer (Option A) -->
+    <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+    <div id="navDrawer" class="drawer" role="dialog" aria-modal="true" aria-label="Jump to" hidden>
+        <header>
+            <div class="drawer-title">Jump to</div>
+            <button id="drawerClose" class="drawer-close" type="button">Close</button>
+        </header>
+        <nav aria-label="Question navigation (drawer)">
+            <div id="mobileNav"></div>
+        </nav>
+    </div>
+
+    <!-- Optional inline payload (Method B). If you use Method A, leave this empty. -->
+    <script type="application/json" id="rtq-dataset-payload"></script>
+
+    <!-- Markdown + KaTeX via CDN as required (graceful fallback if unavailable) -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"
+        crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        crossorigin="anonymous"></script>
+
+    <script>
+        (function () {
+            const els = {
+                paperSelect: document.getElementById('paperSelect'),
+                desktopNav: document.getElementById('desktopNav'),
+                mobileNav: document.getElementById('mobileNav'),
+                content: document.getElementById('content'),
+                status: document.getElementById('status'),
+                jumpBtn: document.getElementById('jumpBtn'),
+                drawer: document.getElementById('navDrawer'),
+                backdrop: document.getElementById('drawerBackdrop'),
+                drawerClose: document.getElementById('drawerClose'),
+            };
+
+            const md = (window.markdownit ? window.markdownit({
+                html: true,
+                linkify: true,
+                breaks: false
+            }) : null);
+            md.inline.ruler.disable(['escape']);
+
+
+            const state = {
+                payload: null,
+                activeKey: null,
+                expandedMap: new Map(), // questionUid -> boolean (per dataset rebuild)
+                navItems: [], // {label, targetId, isSeparator, sectionLabel?}
+                qIdToElementId: new Map(), // label -> domId (for current marker)
+            };
+
+            function showFailure(msg) {
+                els.status.hidden = false;
+                els.status.textContent = msg;
+                els.content.innerHTML = '';
+                els.desktopNav.innerHTML = '';
+                els.mobileNav.innerHTML = '';
+                els.paperSelect.disabled = true;
+                els.paperSelect.innerHTML = '';
+            }
+
+            function setStatusHidden() {
+                els.status.hidden = true;
+                els.status.textContent = '';
+            }
+
+            async function loadPayload() {
+                // Method B: inline JSON
+                const inline = document.getElementById('rtq-dataset-payload');
+                const inlineText = (inline && inline.textContent || '').trim();
+                if (inlineText) {
+                    try {
+                        return JSON.parse(inlineText);
+                    } catch (e) {
+                        return null;
+                    }
+                }
+
+                // Method A: external local file
+                try {
+                    const res = await fetch('../../payload/rtq.papers.payload.json', { cache: 'no-store' });
+                    if (!res.ok) return null;
+                    return await res.json();
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function safeRenderMarkdown(mdText) {
+                if (!md) {
+                    // Fallback: plain text
+                    const pre = document.createElement('pre');
+                    pre.textContent = (mdText == null ? '' : String(mdText));
+                    return pre;
+                }
+                const wrapper = document.createElement('div');
+                wrapper.className = 'md';
+                wrapper.innerHTML = md.render(mdText == null ? '' : String(mdText));
+                // Wrap tables to allow horizontal scroll ONLY within table wrapper
+                wrapper.querySelectorAll('table').forEach(tbl => {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'table-wrap';
+                    tbl.parentNode.insertBefore(wrap, tbl);
+                    wrap.appendChild(tbl);
+                });
+                return wrapper;
+            }
+
+            function applyKatex(container) {
+                // Required pipeline: Markdown -> DOM then KaTeX render.
+                if (!window.renderMathInElement) return;
+                try {
+                    window.renderMathInElement(container, {
+                        delimiters: [
+                            { left: "$$", right: "$$", display: true },
+                            { left: "$", right: "$", display: false }
+                        ],
+                        // throwOnError: true
+                        throwOnError: false
+                    });
+                } catch (e) {
+                    // graceful fallback: do nothing (plain text remains)
+                    // console.error(`Uday: failed parsing for: ${container}`)
+                }
+            }
+
+            function makeKeepInMindIcon() {
+                const span = document.createElement('span');
+                span.className = 'km-icon';
+                // Neutral icon (same for all Keep in mind), grayscale
+                span.innerHTML = `
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path fill="currentColor" d="M12 2a7 7 0 0 0-4 12.74V17a2 2 0 0 0 2 2h.5v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1H14a2 2 0 0 0 2-2v-2.26A7 7 0 0 0 12 2zm3 11.6-.8.5V17a1 1 0 0 1-1 1h-2.4a1 1 0 0 1-1-1v-2.9l-.8-.5A5.7 5.7 0 1 1 15 13.6z"/>
+          </svg>
+        `;
+                return span;
+            }
+
+            function mk(tag, attrs, ...children) {
+                const el = document.createElement(tag);
+                if (attrs) {
+                    for (const [k, v] of Object.entries(attrs)) {
+                        if (v == null) continue;
+                        if (k === 'class') el.className = v;
+                        else if (k === 'html') el.innerHTML = v;
+                        else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+                        else el.setAttribute(k, String(v));
+                    }
+                }
+                for (const ch of children) {
+                    if (ch == null) continue;
+                    if (typeof ch === 'string') el.appendChild(document.createTextNode(ch));
+                    else el.appendChild(ch);
+                }
+                return el;
+            }
+
+            function buildSelector(payload) {
+                els.paperSelect.innerHTML = '';
+                payload.papers.forEach(ds => {
+                    els.paperSelect.appendChild(mk('option', { value: ds.key }, ds.label || ds.key));
+                });
+                els.paperSelect.disabled = false;
+                els.paperSelect.addEventListener('change', () => {
+                    const nextKey = els.paperSelect.value;
+                    setActiveDataset(nextKey);
+                }, { passive: true });
+            }
+
+            function datasetByKey(key) {
+                if (!state.payload || !Array.isArray(state.payload.papers)) return null;
+                return state.payload.papers.find(d => d && d.key === key) || null;
+            }
+
+            function normalizeQuestionNode(q) {
+                // Do not invent missing fields; tolerate absence.
+                return q || {};
+            }
+
+            function getQuestionsForDataset(ds) {
+                if (!ds) return { type: 'none', questions: [], sections: [] };
+                if (Array.isArray(ds.sections)) return { type: 'sectioned', sections: ds.sections };
+                if (Array.isArray(ds.questions)) return { type: 'flat', questions: ds.questions };
+                return { type: 'none', questions: [], sections: [] };
+            }
+
+            function uidForPath(pathArr) {
+                return pathArr.join('__');
+            }
+
+            function collectNavItemsForDataset(ds) {
+                const items = [];
+                const mapping = new Map();
+
+                const addQuestion = (label, domId) => {
+                    items.push({ label, targetId: domId, isSeparator: false });
+                    mapping.set(label, domId);
+                };
+
+                const walk = (qNode, path) => {
+                    const q = normalizeQuestionNode(qNode);
+                    const label = (q.id == null ? '' : String(q.id));
+                    const domId = `q-${uidForPath(path)}`;
+                    addQuestion(label, domId);
+
+                    const children = Array.isArray(q.children) ? q.children : [];
+                    children.forEach((c, idx) => walk(c, path.concat(idx)));
+                };
+
+                const structure = getQuestionsForDataset(ds);
+
+                if (structure.type === 'sectioned') {
+                    (structure.sections || []).forEach((sec, sIdx) => {
+                        const secLabel = (sec && sec.label != null) ? String(sec.label) : '';
+                        items.push({ isSeparator: true, sectionLabel: secLabel });
+                        const qs = (sec && Array.isArray(sec.questions)) ? sec.questions : [];
+                        qs.forEach((q, qIdx) => walk(q, [sIdx, qIdx]));
+                    });
+                } else {
+                    (structure.questions || []).forEach((q, idx) => walk(q, [idx]));
+                }
+
+                state.qIdToElementId = mapping;
+                return items;
+            }
+
+            function renderNav(container, navItems, onClick) {
+                container.innerHTML = '';
+                let ul = mk('ul', { class: 'nav-list' });
+
+                navItems.forEach(item => {
+                    if (item.isSeparator) {
+                        container.appendChild(mk('div', { class: 'nav-section' }, item.sectionLabel || ''));
+                        container.appendChild(ul);
+                        ul = mk('ul', { class: 'nav-list' });
+                        return;
+                    }
+                    const li = mk('li', { class: 'nav-item' });
+                    const a = mk('a', { href: `#${item.targetId}` }, item.label);
+                    a.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        onClick(item.targetId);
+                    });
+                    li.appendChild(a);
+                    ul.appendChild(li);
+                });
+
+                container.appendChild(ul);
+            }
+
+            function setActiveNavCurrent(domId) {
+                // Desktop
+                document.querySelectorAll('nav.desktop-nav .nav-item').forEach(li => li.classList.remove('current'));
+                // Drawer
+                document.querySelectorAll('#navDrawer .nav-item').forEach(li => li.classList.remove('current'));
+
+                const markIn = (root) => {
+                    const a = root.querySelector(`a[href="#${CSS.escape(domId)}"]`);
+                    if (a && a.parentElement && a.parentElement.classList.contains('nav-item')) {
+                        a.parentElement.classList.add('current');
+                    }
+                };
+                markIn(document.querySelector('nav.desktop-nav'));
+                markIn(document.getElementById('navDrawer'));
+            }
+
+            function setExpandedDefaults(ds) {
+                state.expandedMap.clear();
+                const expandedAll = !!(ds && ds.defaults && ds.defaults.expandedAll);
+
+                const structure = getQuestionsForDataset(ds);
+
+                const walk = (qNode, path) => {
+                    const q = normalizeQuestionNode(qNode);
+                    const uid = uidForPath(path);
+                    // Only meaningful if solutionDetails exists; but keep a value anyway
+                    state.expandedMap.set(uid, expandedAll);
+                    const children = Array.isArray(q.children) ? q.children : [];
+                    children.forEach((c, idx) => walk(c, path.concat(idx)));
+                };
+
+                if (structure.type === 'sectioned') {
+                    (structure.sections || []).forEach((sec, sIdx) => {
+                        const qs = (sec && Array.isArray(sec.questions)) ? sec.questions : [];
+                        qs.forEach((q, qIdx) => walk(q, [sIdx, qIdx]));
+                    });
+                } else {
+                    (structure.questions || []).forEach((q, idx) => walk(q, [idx]));
+                }
+            }
+
+            function renderSolutionDetails(q, uid) {
+                const sd = q.solutionDetails;
+                if (!sd) return null;
+
+                const region = mk('div', { class: 'solution', hidden: 'hidden' });
+                const isExpanded = !!state.expandedMap.get(uid);
+                if (isExpanded) region.hidden = false;
+
+                const hasKM = sd.keepInMind != null && String(sd.keepInMind).length > 0;
+                const hasFU = sd.formulasUsed != null && String(sd.formulasUsed).length > 0;
+                const hasW = sd.working != null && String(sd.working).length > 0;
+                const hasAW = sd.alternativeWorking != null && String(sd.alternativeWorking).length > 0;
+
+                // Keep in mind (optional)
+                if (hasKM) {
+                    const block = mk('div', { class: 'sd-block keep-in-mind' });
+                    const label = mk('div', { class: 'sd-label' }, makeKeepInMindIcon(), mk('span', null, 'Keep in mind'));
+                    block.appendChild(label);
+                    block.appendChild(safeRenderMarkdown(sd.keepInMind));
+                    region.appendChild(block);
+                }
+
+                // Formulas used (optional)
+                if (hasFU) {
+                    const block = mk('div', { class: 'sd-block formulas-used' });
+                    const label = mk('div', { class: 'sd-label' }, mk('span', null, 'Formulas used'));
+                    block.appendChild(label);
+                    block.appendChild(safeRenderMarkdown(sd.formulasUsed));
+                    region.appendChild(block);
+                }
+
+                if (hasFU && (hasW || hasAW)) {
+                    region.appendChild(mk('div', { class: 'quiet-divider' }));
+                }
+
+                // Working (primary)
+                if (hasW) {
+                    const block = mk('div', { class: 'sd-block working' });
+                    const label = mk('div', { class: 'sd-label' }, mk('span', null, 'Working'));
+                    block.appendChild(label);
+
+                    // console.log(`Uday: ${JSON.stringify(sd.working)}`);
+                    const mdEl = safeRenderMarkdown(sd.working);
+                    block.appendChild(mdEl);
+                    region.appendChild(block);
+                }
+
+                // Alternative working (0+; payload provides a single field; render if present)
+                if (hasAW) {
+                    const block = mk('div', { class: 'sd-block altworking' });
+                    const label = mk('div', { class: 'sd-label' }, mk('span', null, 'Alternative working'));
+                    block.appendChild(label);
+                    const mdEl = safeRenderMarkdown(sd.alternativeWorking);
+                    block.appendChild(mdEl);
+                    region.appendChild(block);
+                }
+
+                // KaTeX render after markdown is in DOM
+                applyKatex(region);
+
+                return region;
+            }
+
+            function renderQuestionNode(qNode, path) {
+                const q = normalizeQuestionNode(qNode);
+                const uid = uidForPath(path);
+                const domId = `q-${uid}`;
+
+                const wrap = mk('section', { class: 'question', id: domId, 'data-uid': uid });
+
+                const qRow = mk('div', { class: 'q-row' },
+                    mk('div', { class: 'q-id' }, (q.id == null ? '' : String(q.id))),
+                    mk('div', { class: 'q-prompt' }, safeRenderMarkdown(q.question))
+                );
+                wrap.appendChild(qRow);
+
+                // Render KaTeX for prompt
+                applyKatex(qRow);
+
+                // Answer
+                const ans = mk('div', { class: 'answer-block' },
+                    mk('div', { class: 'subtle-label' }, 'Answer'),
+                    mk('div', { class: 'answer-body' }, safeRenderMarkdown(q.answer))
+                );
+                wrap.appendChild(ans);
+                applyKatex(ans);
+
+                // Solution Details toggle + region (if present)
+                const sd = q.solutionDetails;
+                if (sd) {
+                    const toggleRow = mk('div', { class: 'toggle-row' });
+                    const btn = mk('button', { class: 'toggle', type: 'button' }, 'Show working', mk('span', { class: 'chev', 'aria-hidden': 'true' }, '▸'));
+                    btn.setAttribute('aria-expanded', 'false');
+                    btn.setAttribute('aria-controls', `${domId}-solution`);
+
+                    const solution = renderSolutionDetails(q, uid);
+                    if (solution) {
+                        solution.id = `${domId}-solution`;
+                        toggleRow.appendChild(btn);
+                        wrap.appendChild(toggleRow);
+                        wrap.appendChild(solution);
+
+                        const setBtnLabel = () => {
+                            const expanded = !solution.hidden;
+                            btn.textContent = expanded ? 'Hide working' : 'Show working';
+                            const chev = mk('span', { class: 'chev', 'aria-hidden': 'true' }, expanded ? '▾' : '▸');
+                            btn.appendChild(chev);
+                            btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                        };
+
+                        // Initialize based on defaults
+                        if (state.expandedMap.get(uid)) {
+                            solution.hidden = false;
+                        } else {
+                            solution.hidden = true;
+                        }
+                        setBtnLabel();
+
+                        btn.addEventListener('click', () => {
+                            const next = solution.hidden;
+                            solution.hidden = !next ? true : false; // toggling
+                            // correct toggle:
+                            solution.hidden = !solution.hidden;
+                            // store
+                            state.expandedMap.set(uid, !solution.hidden);
+                            setBtnLabel();
+                        });
+
+                        // Fix toggle logic (deterministic)
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const nowHidden = solution.hidden;
+                            solution.hidden = !nowHidden;
+                            state.expandedMap.set(uid, !solution.hidden);
+                            setBtnLabel();
+                        }, { once: true });
+
+                        // Remove the earlier incorrect handler by re-creating button deterministically
+                        toggleRow.innerHTML = '';
+                        const btn2 = mk('button', { class: 'toggle', type: 'button' }, '');
+                        btn2.setAttribute('aria-controls', solution.id);
+                        toggleRow.appendChild(btn2);
+
+                        const setBtn2Label = () => {
+                            const expanded = !solution.hidden;
+                            btn2.textContent = expanded ? 'Hide working' : 'Show working';
+                            const chev2 = mk('span', { class: 'chev', 'aria-hidden': 'true' }, expanded ? '▾' : '▸');
+                            btn2.appendChild(chev2);
+                            btn2.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                        };
+
+                        setBtn2Label();
+
+                        btn2.addEventListener('click', () => {
+                            solution.hidden = !solution.hidden;
+                            state.expandedMap.set(uid, !solution.hidden);
+                            setBtn2Label();
+                        });
+                    }
+                } else {
+                    // No toggle if solutionDetails absent
+                }
+
+                // Children
+                const children = Array.isArray(q.children) ? q.children : [];
+                if (children.length) {
+                    const chWrap = mk('div', { class: 'children' });
+                    children.forEach((c, idx) => chWrap.appendChild(renderQuestionNode(c, path.concat(idx))));
+                    wrap.appendChild(chWrap);
+                }
+
+                return wrap;
+            }
+
+            function renderDataset(ds) {
+                els.content.innerHTML = '';
+
+                // Build nav items from payload structure
+                state.navItems = collectNavItemsForDataset(ds);
+
+                // Render nav (desktop + mobile)
+                const onNavJump = (targetId) => {
+                    closeDrawer();
+                    const el = document.getElementById(targetId);
+                    if (el) el.scrollIntoView({ behavior: (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'), block: 'start' });
+                };
+                renderNav(els.desktopNav, state.navItems, onNavJump);
+                renderNav(els.mobileNav, state.navItems, onNavJump);
+
+                // Render content
+                const structure = getQuestionsForDataset(ds);
+
+                const renderList = (questions, prefixPath) => {
+                    (questions || []).forEach((q, idx) => {
+                        const node = renderQuestionNode(q, prefixPath.concat(idx));
+                        els.content.appendChild(node);
+                    });
+                };
+
+                if (structure.type === 'sectioned') {
+                    (structure.sections || []).forEach((sec, sIdx) => {
+                        els.content.appendChild(mk('div', { class: 'section-header' }, (sec && sec.label != null) ? String(sec.label) : ''));
+                        const qs = (sec && Array.isArray(sec.questions)) ? sec.questions : [];
+                        renderList(qs, [sIdx]);
+                    });
+                } else {
+                    renderList(structure.questions || [], []);
+                }
+
+                // Observe current question for nav weight-only marking
+                setupCurrentObserver();
+            }
+
+            let observer = null;
+            function setupCurrentObserver() {
+                if (observer) observer.disconnect();
+                const candidates = Array.from(document.querySelectorAll('section.question[id^="q-"]'));
+                if (!candidates.length) return;
+
+                observer = new IntersectionObserver((entries) => {
+                    // pick the top-most visible entry
+                    const visible = entries
+                        .filter(e => e.isIntersecting)
+                        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+                    if (!visible.length) return;
+                    const top = visible[0].target;
+                    if (top && top.id) setActiveNavCurrent(top.id);
+                }, { root: null, threshold: [0.12, 0.2, 0.3], rootMargin: "-10% 0px -70% 0px" });
+
+                candidates.forEach(el => observer.observe(el));
+            }
+
+            function setActiveDataset(key) {
+                const ds = datasetByKey(key);
+                state.activeKey = key;
+                els.paperSelect.value = key;
+
+                // Rebuild expanded state to defaults on switch (no cross-question effects; no preserved state across papers)
+                setExpandedDefaults(ds);
+
+                renderDataset(ds);
+                setStatusHidden();
+            }
+
+            function openDrawer() {
+                document.body.classList.add('drawer-open');
+                els.drawer.hidden = false;
+                els.backdrop.hidden = false;
+                els.jumpBtn.setAttribute('aria-expanded', 'true');
+
+                // Trap focus within drawer
+                const focusables = els.drawer.querySelectorAll('a, button, [tabindex]:not([tabindex="-1"])');
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+
+                function trap(e) {
+                    if (e.key !== 'Tab') return;
+                    if (focusables.length === 0) return;
+                    if (e.shiftKey && document.activeElement === first) {
+                        e.preventDefault(); last.focus();
+                    } else if (!e.shiftKey && document.activeElement === last) {
+                        e.preventDefault(); first.focus();
+                    }
+                }
+
+                function esc(e) {
+                    if (e.key === 'Escape') closeDrawer();
+                }
+
+                els.drawer._trap = trap;
+                els.drawer._esc = esc;
+
+                document.addEventListener('keydown', trap);
+                document.addEventListener('keydown', esc);
+
+                (first || els.drawerClose).focus();
+            }
+
+            function closeDrawer() {
+                document.body.classList.remove('drawer-open');
+                els.drawer.hidden = true;
+                els.backdrop.hidden = true;
+                els.jumpBtn.setAttribute('aria-expanded', 'false');
+
+                if (els.drawer._trap) document.removeEventListener('keydown', els.drawer._trap);
+                if (els.drawer._esc) document.removeEventListener('keydown', els.drawer._esc);
+                els.drawer._trap = null;
+                els.drawer._esc = null;
+            }
+
+            function wireDrawer() {
+                els.jumpBtn.addEventListener('click', () => {
+                    const isOpen = !els.drawer.hidden;
+                    if (isOpen) closeDrawer();
+                    else openDrawer();
+                });
+                els.drawerClose.addEventListener('click', closeDrawer);
+                els.backdrop.addEventListener('click', closeDrawer);
+            }
+
+            function init() {
+                wireDrawer();
+
+                loadPayload().then(payload => {
+                    if (!payload || !payload.papers || !Array.isArray(payload.papers) || payload.papers.length === 0) {
+                        showFailure('Dataset payload could not be loaded. Place JSON in rtq.papers.payload.json (Method A) or inline it in #rtq-dataset-payload (Method B).');
+                        return;
+                    }
+
+                    state.payload = payload;
+
+                    buildSelector(payload);
+
+                    const firstKey = payload.papers[0] && payload.papers[0].key;
+                    if (!firstKey) {
+                        showFailure('Dataset payload is missing dataset keys.');
+                        return;
+                    }
+
+                    setActiveDataset(firstKey);
+                });
+            }
+
+            init();
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1987 @@
+<!doctype html>
+<html lang="en-GB">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RTQ — Maths Paper Solution Viewer (Stress Test Harness)</title>
+
+    <!-- Real KaTeX Rendering (CDN). If it fails to load, the UI falls back to plain text. -->
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --bg: #f2f2f2;
+            --surface: #ffffff;
+            --ink: #1f1f1f;
+            --muted: #5a5a5a;
+            --hair: #d8d8d8;
+            --hair2: #e7e7e7;
+            --quiet: #777;
+            --focus: #000000;
+            --frame-max: 1120px;
+
+            --gap-xxl: 32px;
+            --gap-xl: 24px;
+            --gap-lg: 18px;
+            --gap-md: 12px;
+            --gap-sm: 8px;
+            --gap-xs: 6px;
+
+            --q-sep: 28px;
+            /* largest spacing unit (between top-level questions) */
+            --q-in: 10px;
+            /* within question block */
+            --sub-sep: 16px;
+            /* between sub-questions */
+            --subsub-sep: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            overflow-x: hidden;
+            /* KaTeX containment invariant: never allow page horizontal scroll */
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            line-height: 1.45;
+        }
+
+        /* Top control area (aligned to same centered frame) */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--bg);
+            border-bottom: 1px solid var(--hair2);
+        }
+
+        .topbar .frame {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--gap-md);
+        }
+
+        .topbar .title {
+            font-size: 14px;
+            color: var(--muted);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: var(--gap-sm);
+            min-width: 0;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        select {
+            font-size: 14px;
+            padding: 8px 10px;
+            border: 1px solid var(--hair);
+            background: var(--surface);
+            color: var(--ink);
+            border-radius: 6px;
+            max-width: min(520px, 70vw);
+        }
+
+        .btn {
+            font-size: 14px;
+            padding: 8px 10px;
+            border: 1px solid var(--hair);
+            background: var(--surface);
+            color: var(--ink);
+            border-radius: 6px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .btn:focus-visible,
+        select:focus-visible,
+        a:focus-visible,
+        button:focus-visible {
+            outline: 2px solid var(--focus);
+            outline-offset: 2px;
+        }
+
+        /* Centered content frame that contains navigation rail + paper */
+        .paper-frame {
+            max-width: var(--frame-max);
+            margin: 16px auto 64px;
+            padding: 18px 16px;
+            background: var(--surface);
+            border: 1px solid var(--hair);
+        }
+
+        .columns {
+            display: grid;
+            grid-template-columns: 132px 1fr;
+            /* quiet nav rail + dominant paper content */
+            gap: 22px;
+            align-items: start;
+        }
+
+        /* Navigation rail (desktop) */
+        .nav-rail {
+            position: sticky;
+            top: 62px;
+            /* below sticky topbar */
+            align-self: start;
+        }
+
+        .nav-rail nav {
+            display: block;
+        }
+
+        .nav-title {
+            font-size: 12px;
+            color: var(--quiet);
+            margin: 0 0 10px;
+            letter-spacing: 0.2px;
+        }
+
+        .nav-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: calc(100vh - 96px);
+            /* only scroll nav if needed */
+            overflow: auto;
+            padding-right: 4px;
+
+            /* Scrollable Navigation Without Visible Scrollbars */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* legacy */
+        }
+
+        .nav-list::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* WebKit/Blink */
+
+        .nav-sep {
+            font-size: 12px;
+            color: var(--quiet);
+            margin: 14px 0 6px;
+            padding: 0 2px;
+        }
+
+        .nav-item a {
+            display: block;
+            text-decoration: none;
+            color: var(--quiet);
+            font-size: 13px;
+            padding: 6px 6px 6px 8px;
+            border-radius: 6px;
+        }
+
+        .nav-item a:hover {
+            text-decoration: underline;
+            color: var(--ink);
+        }
+
+        .nav-item a[aria-current="true"] {
+            color: var(--ink);
+            font-weight: 700;
+            /* allowed for current navigation item */
+            text-decoration: none;
+            border-left: 2px solid var(--ink);
+            padding-left: 6px;
+            border-radius: 0;
+        }
+
+        /* Paper content column */
+        main {
+            min-width: 0;
+        }
+
+        .paper-meta {
+            margin: 0 0 18px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--hair2);
+        }
+
+        .paper-meta .paper-name {
+            font-size: 16px;
+            margin: 0 0 4px;
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        .paper-meta .paper-note {
+            font-size: 13px;
+            margin: 0;
+            color: var(--muted);
+            max-width: 70ch;
+        }
+
+        .section-header {
+            margin: 28px 0 14px;
+            padding-top: 18px;
+            border-top: 1px solid var(--hair2);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.4px;
+        }
+
+        /* Question blocks: rhythm by whitespace, not cards/panels */
+        .q {
+            margin: 0;
+            padding: 0;
+        }
+
+        .q.top {
+            margin-bottom: var(--q-sep);
+        }
+
+        .q.sub {
+            margin: 0 0 var(--sub-sep);
+        }
+
+        .q.subsub {
+            margin: 0 0 var(--subsub-sep);
+        }
+
+        .q-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            min-width: 0;
+        }
+
+        .qid {
+            font-size: 14px;
+            color: var(--muted);
+            flex: 0 0 auto;
+            line-height: 1.6;
+            margin-top: 1px;
+            white-space: nowrap;
+        }
+
+        .qbody {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .qprompt {
+            font-size: 16px;
+            /* question text is primary anchor */
+            line-height: 1.55;
+            margin: 0 0 var(--q-in);
+            color: var(--ink);
+            max-width: 78ch;
+        }
+
+        .qprompt p {
+            margin: 0 0 10px;
+        }
+
+        .qprompt p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Indentation only for nesting */
+        .indent-0 {
+            padding-left: 0;
+        }
+
+        .indent-1 {
+            padding-left: 18px;
+        }
+
+        .indent-2 {
+            padding-left: 34px;
+        }
+
+        @media (max-width: 560px) {
+            .indent-1 {
+                padding-left: 12px;
+            }
+
+            .indent-2 {
+                padding-left: 22px;
+            }
+
+            .qprompt {
+                font-size: 15px;
+            }
+
+            .qid {
+                font-size: 13px;
+            }
+        }
+
+        /* Answer block: visible by default, subordinate to question */
+        .answer {
+            margin: 0 0 8px;
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            color: var(--ink);
+            max-width: 78ch;
+        }
+
+        .answer .label {
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 700;
+            /* labels may be bold */
+            white-space: nowrap;
+        }
+
+        .answer .value {
+            font-size: 15px;
+            color: var(--ink);
+        }
+
+        .answer ul {
+            margin: 6px 0 0 0;
+            padding-left: 18px;
+        }
+
+        .answer li {
+            margin: 2px 0;
+        }
+
+        /* Show/Hide working control: text-first */
+        .disclosure {
+            margin: 0 0 10px;
+        }
+
+        .toggle {
+            border: 0;
+            background: transparent;
+            padding: 6px 0;
+            font-size: 14px;
+            color: var(--ink);
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            touch-action: manipulation;
+        }
+
+        .toggle:hover {
+            color: var(--ink);
+        }
+
+        .toggle .chev {
+            display: inline-block;
+            margin-left: 6px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        /* Solution Details: subordinate, denser */
+        .details {
+            margin: 0 0 2px;
+            padding: 0;
+            color: var(--ink);
+            max-width: 78ch;
+        }
+
+        .details[hidden] {
+            display: none;
+        }
+
+        .details .block {
+            margin: 0 0 12px;
+        }
+
+        .details .block:last-child {
+            margin-bottom: 0;
+        }
+
+        .details .h {
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 700;
+            margin: 0 0 6px;
+        }
+
+        .details .p {
+            font-size: 14px;
+            line-height: 1.42;
+            /* slightly tighter than question */
+            margin: 0 0 8px;
+            color: var(--ink);
+        }
+
+        .details .p:last-child {
+            margin-bottom: 0;
+        }
+
+        .details ul {
+            margin: 0;
+            padding-left: 18px;
+            font-size: 14px;
+            line-height: 1.42;
+            color: var(--ink);
+        }
+
+        .details li {
+            margin: 3px 0;
+        }
+
+        /* Math containment invariant: block math scrolls horizontally only inside its container */
+        .math-inline {
+            display: inline-block;
+            max-width: 100%;
+            vertical-align: baseline;
+        }
+
+        .math-block {
+            display: block;
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding: 2px 0;
+            margin: 8px 0;
+            border-top: 1px solid transparent;
+            border-bottom: 1px solid transparent;
+
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+        }
+
+        .math-block::-webkit-scrollbar {
+            height: 10px;
+        }
+
+        .math-block::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.18);
+            border-radius: 999px;
+        }
+
+        .math-block::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        /* KaTeX itself */
+        .katex {
+            font-size: 1em;
+        }
+
+        .katex-display {
+            display: block;
+            margin: 0;
+            max-width: 100%;
+            overflow-x: auto;
+            /* safety-net */
+            overflow-y: hidden;
+        }
+
+        .katex-display>.katex {
+            max-width: 100%;
+        }
+
+        /* Diagram placeholders: inline SVG, responsive, grayscale */
+        .diagram {
+            margin: 10px 0 0;
+            max-width: 520px;
+        }
+
+        .diagram svg {
+            width: 100%;
+            height: auto;
+            display: block;
+            border: 1px solid var(--hair2);
+            background: #fafafa;
+        }
+
+        .diagram .cap {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px;
+        }
+
+        /* Mobile nav drawer/overlay */
+        dialog {
+            border: 1px solid var(--hair);
+            border-radius: 10px;
+            padding: 0;
+            max-width: min(92vw, 420px);
+            width: 92vw;
+            background: var(--surface);
+            color: var(--ink);
+        }
+
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.35);
+        }
+
+        .drawer-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--hair2);
+            gap: var(--gap-md);
+        }
+
+        .drawer-head .t {
+            margin: 0;
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .drawer-body {
+            padding: 12px 14px 14px;
+        }
+
+        /* Responsive: collapse desktop nav into drawer */
+        .jump-btn {
+            display: none;
+        }
+
+        @media (max-width: 860px) {
+            .columns {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-rail {
+                display: none;
+            }
+
+            .jump-btn {
+                display: inline-flex;
+            }
+
+            select {
+                max-width: 58vw;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar" aria-label="Paper controls">
+        <div class="frame">
+            <div class="title">RTQ — Paper view</div>
+
+            <div class="controls">
+                <label for="paperSelect">Paper</label>
+                <select id="paperSelect" aria-label="Paper selector"></select>
+
+                <button class="btn jump-btn" id="openNav" type="button">Jump to</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="paper-frame">
+        <div class="columns">
+            <aside class="nav-rail" aria-label="Document navigation">
+                <nav aria-label="Questions">
+                    <p class="nav-title">Jump to</p>
+                    <ul class="nav-list" id="navListDesktop"></ul>
+                </nav>
+            </aside>
+
+            <main id="paper" aria-label="Paper content">
+                <div class="paper-meta" id="paperMeta"></div>
+                <div id="paperBody"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Mobile navigation drawer -->
+    <dialog id="navDialog" aria-label="Question navigation">
+        <div class="drawer-head">
+            <p class="t">Jump to</p>
+            <button class="btn" id="closeNav" type="button">Close</button>
+        </div>
+        <div class="drawer-body">
+            <nav aria-label="Questions (mobile)">
+                <ul class="nav-list" id="navListMobile" style="max-height: min(70vh, 560px);"></ul>
+            </nav>
+        </div>
+    </dialog>
+
+    <script>
+        (function () {
+            "use strict";
+
+            const elSelect = document.getElementById("paperSelect");
+            const elPaperMeta = document.getElementById("paperMeta");
+            const elPaperBody = document.getElementById("paperBody");
+            const navDesktop = document.getElementById("navListDesktop");
+            const navMobile = document.getElementById("navListMobile");
+            const navDialog = document.getElementById("navDialog");
+            const openNavBtn = document.getElementById("openNav");
+            const closeNavBtn = document.getElementById("closeNav");
+
+            function safeIdFromQid(qid) {
+                // Anchor-safe deterministic id (keep stable across renders)
+                return "q_" + String(qid).replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
+            }
+
+            function h(tag, attrs, ...children) {
+                const node = document.createElement(tag);
+                if (attrs) {
+                    for (const [k, v] of Object.entries(attrs)) {
+                        if (k === "class") node.className = v;
+                        else if (k === "html") node.innerHTML = v;
+                        else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2), v);
+                        else if (v === true) node.setAttribute(k, "");
+                        else if (v !== false && v != null) node.setAttribute(k, String(v));
+                    }
+                }
+                for (const c of children) {
+                    if (c == null) continue;
+                    if (Array.isArray(c)) c.forEach(x => append(node, x));
+                    else append(node, c);
+                }
+                return node;
+            }
+            function append(parent, child) {
+                if (child == null) return;
+                if (child instanceof Node) parent.appendChild(child);
+                else parent.appendChild(document.createTextNode(String(child)));
+            }
+
+            // Markup parser: inline math [[...]] and display math [[[...]]]
+            function renderTextWithMath(markup) {
+                const frag = document.createDocumentFragment();
+                const re = /\[\[\[(.+?)\]\]\]|\[\[(.+?)\]\]/gs;
+                let last = 0;
+                let m;
+                while ((m = re.exec(markup)) !== null) {
+                    if (m.index > last) frag.appendChild(document.createTextNode(markup.slice(last, m.index)));
+                    if (m[1]) {
+                        frag.appendChild(h("div", { class: "math-block", "data-math": m[1], "data-display": "1" }, ""))
+                    } else if (m[2]) {
+                        frag.appendChild(h("span", { class: "math-inline", "data-math": m[2], "data-display": "0" }, ""))
+                    }
+                    last = m.index + m[0].length;
+                }
+                if (last < markup.length) frag.appendChild(document.createTextNode(markup.slice(last)));
+                return frag;
+            }
+
+            function katexRenderAll(root) {
+                const nodes = root.querySelectorAll("[data-math]");
+                const hasKatex = !!(window.katex && typeof window.katex.render === "function");
+                nodes.forEach(node => {
+                    const tex = node.getAttribute("data-math") || "";
+                    const display = node.getAttribute("data-display") === "1";
+                    if (!tex) return;
+
+                    if (!hasKatex) {
+                        // graceful fallback: show plain text (do not hide content)
+                        node.textContent = display ? ("[" + "KaTeX block" + "] " + tex) : tex;
+                        return;
+                    }
+                    try {
+                        // Ensure node is empty before render (avoid duplicates on re-render)
+                        node.textContent = "";
+                        window.katex.render(tex, node, {
+                            displayMode: display,
+                            throwOnError: false,
+                            strict: "ignore"
+                        });
+                    } catch (e) {
+                        node.textContent = display ? ("[" + "KaTeX block" + "] " + tex) : tex;
+                    }
+                });
+            }
+
+            // Diagram placeholders (inline SVG, grayscale)
+            function svgGeometry() {
+                return `
+<svg viewBox="0 0 360 220" role="img" aria-label="Geometry diagram placeholder">
+  <rect x="10" y="10" width="340" height="200" fill="#fafafa" stroke="#d8d8d8"/>
+  <circle cx="270" cy="110" r="44" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+  <path d="M70 170 L160 55 L230 170 Z" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="70" y1="170" x2="230" y2="170" stroke="#2a2a2a" stroke-width="2" stroke-dasharray="6 6"/>
+  <text x="62" y="186" font-size="14" fill="#2a2a2a">A</text>
+  <text x="156" y="46" font-size="14" fill="#2a2a2a">B</text>
+  <text x="234" y="186" font-size="14" fill="#2a2a2a">C</text>
+  <text x="262" y="114" font-size="14" fill="#2a2a2a">r</text>
+  <text x="95" y="155" font-size="12" fill="#5a5a5a">triangle</text>
+  <text x="250" y="165" font-size="12" fill="#5a5a5a">circle</text>
+</svg>`;
+            }
+
+            function svgBars() {
+                return `
+<svg viewBox="0 0 360 220" role="img" aria-label="Ratio bar diagram placeholder">
+  <rect x="10" y="10" width="340" height="200" fill="#fafafa" stroke="#d8d8d8"/>
+  <text x="20" y="40" font-size="13" fill="#5a5a5a">Parts</text>
+  <rect x="20" y="60" width="250" height="24" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="20" y1="60" x2="20" y2="84" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="70" y1="60" x2="70" y2="84" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="120" y1="60" x2="120" y2="84" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="170" y1="60" x2="170" y2="84" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="220" y1="60" x2="220" y2="84" stroke="#2a2a2a" stroke-width="2"/>
+  <text x="22" y="120" font-size="13" fill="#5a5a5a">Whole</text>
+  <rect x="20" y="140" width="300" height="24" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="80" y1="140" x2="80" y2="164" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="140" y1="140" x2="140" y2="164" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="200" y1="140" x2="200" y2="164" stroke="#2a2a2a" stroke-width="2"/>
+  <line x1="260" y1="140" x2="260" y2="164" stroke="#2a2a2a" stroke-width="2"/>
+  <text x="20" y="198" font-size="12" fill="#5a5a5a">each box is one equal part</text>
+</svg>`;
+            }
+
+            function svgGrid() {
+                return `
+<svg viewBox="0 0 360 220" role="img" aria-label="Coordinate grid diagram placeholder">
+  <rect x="10" y="10" width="340" height="200" fill="#fafafa" stroke="#d8d8d8"/>
+  <g stroke="#cfcfcf" stroke-width="1">
+    ${Array.from({ length: 11 }).map((_, i) => `<line x1="${40 + i * 28}" y1="28" x2="${40 + i * 28}" y2="196"/>`).join("")}
+    ${Array.from({ length: 7 }).map((_, i) => `<line x1="40" y1="${28 + i * 28}" x2="320" y2="${28 + i * 28}"/>`).join("")}
+  </g>
+  <g stroke="#2a2a2a" stroke-width="2">
+    <line x1="40" y1="196" x2="320" y2="196"/>
+    <line x1="40" y1="196" x2="40" y2="28"/>
+  </g>
+  <circle cx="124" cy="140" r="4" fill="#2a2a2a"/>
+  <circle cx="236" cy="84" r="4" fill="#2a2a2a"/>
+  <line x1="124" y1="140" x2="236" y2="84" stroke="#2a2a2a" stroke-width="2"/>
+  <text x="112" y="158" font-size="12" fill="#2a2a2a">P</text>
+  <text x="244" y="80" font-size="12" fill="#2a2a2a">Q</text>
+</svg>`;
+            }
+
+            function svgTable() {
+                return `
+<svg viewBox="0 0 360 220" role="img" aria-label="Grid or array diagram placeholder">
+  <rect x="10" y="10" width="340" height="200" fill="#fafafa" stroke="#d8d8d8"/>
+  <g stroke="#2a2a2a" stroke-width="2" fill="none">
+    <rect x="60" y="50" width="240" height="120"/>
+    <line x1="140" y1="50" x2="140" y2="170"/>
+    <line x1="220" y1="50" x2="220" y2="170"/>
+    <line x1="60" y1="90" x2="300" y2="90"/>
+    <line x1="60" y1="130" x2="300" y2="130"/>
+  </g>
+  <text x="70" y="78" font-size="12" fill="#5a5a5a">A</text>
+  <text x="150" y="78" font-size="12" fill="#5a5a5a">B</text>
+  <text x="230" y="78" font-size="12" fill="#5a5a5a">C</text>
+  <text x="70" y="118" font-size="12" fill="#5a5a5a">1</text>
+  <text x="150" y="118" font-size="12" fill="#5a5a5a">2</text>
+  <text x="230" y="118" font-size="12" fill="#5a5a5a">3</text>
+  <text x="70" y="158" font-size="12" fill="#5a5a5a">4</text>
+  <text x="150" y="158" font-size="12" fill="#5a5a5a">5</text>
+  <text x="230" y="158" font-size="12" fill="#5a5a5a">6</text>
+</svg>`;
+            }
+
+            function diagram(type, caption) {
+                let svg = "";
+                if (type === "geometry") svg = svgGeometry();
+                else if (type === "bars") svg = svgBars();
+                else if (type === "grid") svg = svgGrid();
+                else svg = svgTable();
+
+                return h("div", { class: "diagram" },
+                    h("div", { html: svg }),
+                    caption ? h("div", { class: "cap" }, caption) : null
+                );
+            }
+
+            function answerNode(answer) {
+                // answer: { kind: "text"|"list", value: string|array }
+                if (answer.kind === "list") {
+                    return h("div", { class: "answer" },
+                        h("div", { class: "label" }, "Answer"),
+                        h("div", { class: "value" },
+                            h("ul", null, answer.value.map(v => h("li", null, renderTextWithMath(v))))
+                        )
+                    );
+                }
+                return h("div", { class: "answer" },
+                    h("div", { class: "label" }, "Answer"),
+                    h("div", { class: "value" }, renderTextWithMath(answer.value))
+                );
+            }
+
+            function detailsNode(details, ids) {
+                // details: { keepInMind?: [string], formulas?: [string], working?: steps[], alternatives?: [{title?:string, steps:[]}] }
+                const blocks = [];
+
+                if (details.keepInMind && details.keepInMind.length) {
+                    blocks.push(
+                        h("div", { class: "block" },
+                            h("div", { class: "h" }, "Keep in mind"),
+                            h("ul", null, details.keepInMind.map(t => h("li", null, renderTextWithMath(t))))
+                        )
+                    );
+                }
+
+                if (details.formulas && details.formulas.length) {
+                    blocks.push(
+                        h("div", { class: "block" },
+                            h("div", { class: "h" }, "Formulas used"),
+                            h("ul", null, details.formulas.map(t => h("li", null, renderTextWithMath(t))))
+                        )
+                    );
+                }
+
+                if (details.working && details.working.length) {
+                    blocks.push(
+                        h("div", { class: "block" },
+                            h("div", { class: "h" }, "Working"),
+                            ...renderSteps(details.working)
+                        )
+                    );
+                }
+
+                if (details.alternatives && details.alternatives.length) {
+                    details.alternatives.forEach((alt, idx) => {
+                        blocks.push(
+                            h("div", { class: "block" },
+                                h("div", { class: "h" }, "Alternative working"),
+                                ...renderSteps(alt.steps || [])
+                            )
+                        );
+                    });
+                }
+
+                return h("div", { class: "details", id: ids.detailsId, hidden: true },
+                    blocks.length ? blocks : h("div", { class: "block" }, h("div", { class: "p" }, ""))
+                );
+            }
+
+            function renderSteps(steps) {
+                // step: {t:"p"|"math", v:string, display?:boolean}
+                const out = [];
+                steps.forEach(s => {
+                    if (s.t === "p") {
+                        out.push(h("p", { class: "p" }, renderTextWithMath(s.v)));
+                    } else if (s.t === "math") {
+                        const display = s.display !== false;
+                        out.push(h("div", { class: "math-block", "data-math": s.v, "data-display": display ? "1" : "0" }, ""));
+                    }
+                });
+                return out;
+            }
+
+            function questionNode(q, defaultExpanded) {
+                // q: {qid, depth, promptParts: (string|{diagram})[], answer, details}
+                const domId = safeIdFromQid(q.qid);
+                const detailsId = domId + "_details";
+
+                const qWrap = h("section", {
+                    class: "q " + (q.depth === 0 ? "top" : (q.depth === 1 ? "sub" : "subsub")) + " indent-" + q.depth,
+                    id: domId,
+                    "data-qid": q.qid
+                });
+
+                const promptEl = h("div", { class: "qprompt" });
+                // Prompt: allow paragraphs + diagrams inline, keep prompt always visible
+                // If a question has no parent-level prompt, we render an empty prompt block (still visible, calm).
+                if (q.promptParts && q.promptParts.length) {
+                    q.promptParts.forEach(part => {
+                        if (typeof part === "string") {
+                            // split into paragraphs by \n\n
+                            const paras = part.split(/\n\s*\n/g);
+                            paras.forEach(p => {
+                                const pEl = h("p", null);
+                                pEl.appendChild(renderTextWithMath(p));
+                                promptEl.appendChild(pEl);
+                            });
+                        } else if (part && part.type === "diagram") {
+                            promptEl.appendChild(diagram(part.kind, part.caption || ""));
+                        }
+                    });
+                } else {
+                    // No prompt (edge case)
+                    promptEl.appendChild(h("p", null, " "));
+                }
+
+                const answerEl = answerNode(q.answer);
+
+                const toggleBtn = h("button", {
+                    type: "button",
+                    class: "toggle",
+                    "aria-expanded": defaultExpanded ? "true" : "false",
+                    "aria-controls": detailsId
+                }, defaultExpanded ? "Hide working" : "Show working", h("span", { class: "chev", "aria-hidden": "true" }, defaultExpanded ? "▾" : "▸"));
+
+                const detailsEl = detailsNode(q.details || {}, { detailsId });
+
+                // Set default expanded state per dataset
+                if (defaultExpanded) {
+                    detailsEl.hidden = false;
+                }
+
+                toggleBtn.addEventListener("click", () => {
+                    const expanded = toggleBtn.getAttribute("aria-expanded") === "true";
+                    const next = !expanded;
+                    toggleBtn.setAttribute("aria-expanded", next ? "true" : "false");
+                    detailsEl.hidden = !next;
+                    // Update label (text-first)
+                    toggleBtn.childNodes[0].nodeValue = next ? "Hide working" : "Show working";
+                    const chev = toggleBtn.querySelector(".chev");
+                    if (chev) chev.textContent = next ? "▾" : "▸";
+                });
+
+                qWrap.appendChild(
+                    h("div", { class: "q-row" },
+                        h("div", { class: "qid" }, q.qid),
+                        h("div", { class: "qbody" },
+                            promptEl,
+                            answerEl,
+                            h("div", { class: "disclosure" }, toggleBtn),
+                            detailsEl
+                        )
+                    )
+                );
+
+                return { node: qWrap, domId };
+            }
+
+            function buildNav(navItems) {
+                // navItems: array of {type:"sep", label} or {type:"q", qid, domId}
+                const ulD = document.createDocumentFragment();
+                const ulM = document.createDocumentFragment();
+
+                navItems.forEach(item => {
+                    if (item.type === "sep") {
+                        ulD.appendChild(h("li", { class: "nav-sep", "aria-hidden": "true" }, item.label));
+                        ulM.appendChild(h("li", { class: "nav-sep", "aria-hidden": "true" }, item.label));
+                        return;
+                    }
+                    const a = (isMobile) => h("a", {
+                        href: "#" + item.domId,
+                        "data-target": item.domId,
+                        "data-qid": item.qid
+                    }, item.qid);
+
+                    ulD.appendChild(h("li", { class: "nav-item" }, a(false)));
+                    ulM.appendChild(h("li", { class: "nav-item" }, a(true)));
+                });
+
+                navDesktop.innerHTML = "";
+                navMobile.innerHTML = "";
+                navDesktop.appendChild(ulD);
+                navMobile.appendChild(ulM);
+
+                // Close drawer on mobile when jumping
+                navMobile.querySelectorAll("a").forEach(link => {
+                    link.addEventListener("click", () => {
+                        if (navDialog.open) {
+                            navDialog.close();
+                        }
+                    });
+                });
+            }
+
+            function observeActiveQuestions() {
+                // Minimal current-position highlighting without progress semantics.
+                const links = Array.from(document.querySelectorAll(".nav-list a[data-target]"));
+                const map = new Map(links.map(a => [a.getAttribute("data-target"), a]));
+                links.forEach(a => a.removeAttribute("aria-current"));
+
+                const qEls = Array.from(document.querySelectorAll("section.q[id]"));
+
+                if (!("IntersectionObserver" in window) || qEls.length === 0) return;
+
+                let currentId = null;
+                const io = new IntersectionObserver((entries) => {
+                    // choose the top-most visible question
+                    const visible = entries
+                        .filter(e => e.isIntersecting)
+                        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+                    if (!visible.length) return;
+                    const top = visible[0].target;
+                    const id = top.id;
+                    if (id === currentId) return;
+                    currentId = id;
+
+                    map.forEach(a => a.removeAttribute("aria-current"));
+                    const a = map.get(id);
+                    if (a) a.setAttribute("aria-current", "true");
+                }, { root: null, threshold: [0.02, 0.08, 0.15], rootMargin: "-20% 0px -70% 0px" });
+
+                qEls.forEach(el => io.observe(el));
+            }
+
+            // Data generation helpers
+            function stepP(v) { return { t: "p", v }; }
+            function stepM(v) { return { t: "math", v, display: true }; }
+
+            function longAligned(lines) {
+                // returns one display math block with aligned environment
+                const body = lines.map(l => l.replace(/\\\\?$/, "") + " \\\\").join("\n");
+                return "\\begin{aligned}\n" + body + "\n\\end{aligned}";
+            }
+
+            function makeShortPaper() {
+                return {
+                    name: "Short paper",
+                    note: "6 questions. Mix of quick arithmetic and one multi-part question.",
+                    sections: [
+                        {
+                            type: "q", qid: "1", depth: 0,
+                            promptParts: ["Work out [[48\\div 6]] and then add [[7]]."],
+                            answer: { kind: "text", value: "[[15]]" },
+                            details: {
+                                working: [
+                                    stepP("First divide."),
+                                    stepM(longAligned(["48\\div 6 = 8", "8 + 7 = 15"]))
+                                ]
+                            }
+                        },
+                        {
+                            type: "q", qid: "2", depth: 0,
+                            promptParts: ["A box contains [[36]] pencils. [[9]] pencils are taken out. How many are left?"],
+                            answer: { kind: "text", value: "[[27]]" },
+                            details: {
+                                keepInMind: ["Taking out means subtract."],
+                                working: [stepM(longAligned(["36 - 9 = 27"]))]
+                            }
+                        },
+                        {
+                            type: "q", qid: "3", depth: 0,
+                            promptParts: ["Write [[0.6]] as a fraction in its simplest form."],
+                            answer: { kind: "text", value: "[[\\dfrac{3}{5}]]" },
+                            details: {
+                                formulas: ["[[\\text{A decimal can be written as a fraction over a power of }10.]]"],
+                                working: [
+                                    stepP("Convert to a fraction and simplify."),
+                                    stepM(longAligned(["0.6 = \\dfrac{6}{10}", "\\dfrac{6}{10}=\\dfrac{3}{5}"]))
+                                ]
+                            }
+                        },
+                        {
+                            type: "q", qid: "4", depth: 0,
+                            promptParts: ["A ticket costs [[\\pounds 3.40]]. You buy two tickets and pay with [[\\pounds 10]]."],
+                            answer: { kind: "text", value: "[[\\pounds 3.20]]" },
+                            details: {
+                                working: [
+                                    stepM(longAligned(["2\\times 3.40 = 6.80", "10.00 - 6.80 = 3.20"]))
+                                ],
+                                alternatives: [{
+                                    steps: [
+                                        stepP("Work in pence to avoid decimals."),
+                                        stepM(longAligned(["340\\times 2 = 680", "1000 - 680 = 320", "320\\text{ p} = \\pounds 3.20"]))
+                                    ]
+                                }]
+                            }
+                        },
+                        // Multi-part question (a,b,c)
+                        {
+                            type: "q", qid: "5", depth: 0,
+                            promptParts: ["A bag has red and blue counters. There are [[12]] counters in total."],
+                            answer: { kind: "text", value: "[[\\text{See parts (a)–(c).}]]" },
+                            details: {
+                                keepInMind: ["Total means add the parts."],
+                                working: [stepP("Use the information in each part to find the missing number.")]
+                            }
+                        },
+                        {
+                            type: "q", qid: "5a", depth: 1,
+                            promptParts: ["There are [[7]] red counters. How many blue counters are there?"],
+                            answer: { kind: "text", value: "[[5]]" },
+                            details: { working: [stepM(longAligned(["12 - 7 = 5"]))] }
+                        },
+                        {
+                            type: "q", qid: "5b", depth: 1,
+                            promptParts: ["If there are [[4]] blue counters, how many red counters are there?"],
+                            answer: { kind: "text", value: "[[8]]" },
+                            details: { working: [stepM(longAligned(["12 - 4 = 8"]))] }
+                        },
+                        {
+                            type: "q", qid: "5c", depth: 1,
+                            promptParts: ["The number of red counters is twice the number of blue counters. How many of each are there?"],
+                            answer: { kind: "list", value: ["Red: [[8]]", "Blue: [[4]]"] },
+                            details: {
+                                working: [
+                                    stepP("Let blue be [[b]]. Then red is [[2b]]."),
+                                    stepM(longAligned(["b + 2b = 12", "3b = 12", "b = 4", "2b = 8"]))
+                                ]
+                            }
+                        },
+                        {
+                            type: "q", qid: "6", depth: 0,
+                            promptParts: ["Solve [[x^2 - x - 6 = 0]]."],
+                            answer: { kind: "list", value: ["[[x=3]]", "[[x=-2]]"] },
+                            details: {
+                                keepInMind: ["A quadratic can often be solved by factoring."],
+                                working: [
+                                    stepM(longAligned(["x^2 - x - 6 = (x-3)(x+2)", "x-3=0\\Rightarrow x=3", "x+2=0\\Rightarrow x=-2"]))
+                                ]
+                            }
+                        }
+                    ]
+                };
+            }
+
+            function makeStandardPaper(expandedDefault) {
+                // 35 questions; Q26–Q35 long; include deep nesting in Q18 and Q30; include extremely long working in Q33.
+                const qs = [];
+
+                // Q1–Q10 (small/medium, some guidance/formulas/alt coverage)
+                qs.push(
+                    {
+                        type: "q", qid: "1", depth: 0, promptParts: ["Calculate [[7\\times 8 + 12]]."], answer: { kind: "text", value: "[[68]]" },
+                        details: { keepInMind: ["Do multiplication before addition."], working: [stepM(longAligned(["7\\times 8 = 56", "56 + 12 = 68"]))] }
+                    },
+                    {
+                        type: "q", qid: "2", depth: 0, promptParts: ["A train leaves at [[14{:}25]] and the journey takes [[1\\ \\text{hour}\\ 50\\ \\text{minutes}]]. What time does it arrive?"], answer: { kind: "text", value: "[[16{:}15]]" },
+                        details: { working: [stepM(longAligned(["14{:}25 + 1{:}50 = 16{:}15"]))] }
+                    },
+                    {
+                        type: "q", qid: "3", depth: 0, promptParts: ["Write the next number in the sequence: [[4,\\ 7,\\ 10,\\ 13,\\ \\ldots]]."], answer: { kind: "text", value: "[[16]]" },
+                        details: { working: [stepP("The sequence increases by [[3]] each time."), stepM(longAligned(["13 + 3 = 16"]))] }
+                    },
+                    {
+                        type: "q", qid: "4", depth: 0, promptParts: ["A rectangle has length [[9\\ \\text{cm}]] and width [[4\\ \\text{cm}]]. Find its area."], answer: { kind: "text", value: "[[36\\ \\text{cm}^2]]" },
+                        details: { formulas: ["[[\\text{Area of a rectangle }= \\ell\\times w]]"], working: [stepM(longAligned(["9\\times 4 = 36"]))] }
+                    },
+                    {
+                        type: "q", qid: "5", depth: 0, promptParts: ["A shop reduces a price of [[\\pounds 40]] by [[15\\%]]. What is the new price?"], answer: { kind: "text", value: "[[\\pounds 34]]" },
+                        details: {
+                            keepInMind: ["A reduction means subtract the discount from the original."],
+                            formulas: ["[[\\text{Percentage change} = \\dfrac{\\text{part}}{\\text{whole}}\\times 100\\%]]"],
+                            working: [stepM(longAligned(["15\\%\\text{ of }40 = 0.15\\times 40 = 6", "40 - 6 = 34"]))],
+                            alternatives: [{ steps: [stepP("Find what you pay: [[85\\%]] of the original."), stepM(longAligned(["0.85\\times 40 = 34"]))] }]
+                        }
+                    },
+                    {
+                        type: "q", qid: "6", depth: 0, promptParts: ["Simplify [[\\dfrac{18}{24}]]."], answer: { kind: "text", value: "[[\\dfrac{3}{4}]]" },
+                        details: { working: [stepM(longAligned(["\\dfrac{18}{24}=\\dfrac{18\\div 6}{24\\div 6}=\\dfrac{3}{4}"]))] }
+                    },
+                    {
+                        type: "q", qid: "7", depth: 0, promptParts: ["A jar has [[2.5\\ \\text{litres}]] of juice. You pour out [[750\\ \\text{ml}]]. How much is left (in litres)?"], answer: { kind: "text", value: "[[1.75\\ \\text{litres}]]" },
+                        details: {
+                            keepInMind: ["Convert to the same unit before subtracting."], working: [
+                                stepM(longAligned(["750\\ \\text{ml}=0.75\\ \\text{litres}", "2.5 - 0.75 = 1.75"]))
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "8", depth: 0, promptParts: ["Solve [[3x + 5 = 26]]."], answer: { kind: "text", value: "[[7]]" },
+                        details: { keepInMind: ["Do the same operation to both sides."], working: [stepM(longAligned(["3x = 26 - 5 = 21", "x = 21\\div 3 = 7"]))] }
+                    },
+                    {
+                        type: "q", qid: "9", depth: 0, promptParts: ["The mean of [[5]] numbers is [[12]]. What is their total?"], answer: { kind: "text", value: "[[60]]" },
+                        details: { formulas: ["[[\\text{mean} = \\dfrac{\\text{total}}{\\text{number of values}}]]"], working: [stepM(longAligned(["\\text{total} = 12\\times 5 = 60"]))] }
+                    },
+                    {
+                        type: "q", qid: "10", depth: 0, promptParts: ["A line on a graph passes through points [[(1,2)]] and [[(5,10)]]. What is its gradient?"], answer: { kind: "text", value: "[[2]]" },
+                        details: { formulas: ["[[m=\\dfrac{\\Delta y}{\\Delta x}]]"], working: [stepM(longAligned(["m=\\dfrac{10-2}{5-1}=\\dfrac{8}{4}=2"]))] }
+                    }
+                );
+
+                // Q11–Q17 (mixed)
+                for (let i = 11; i <= 17; i++) {
+                    const a = i + 9;
+                    const b = i - 3;
+                    qs.push({
+                        type: "q", qid: String(i), depth: 0,
+                        promptParts: [`Work out [[${a} - ${b} + 6]].`],
+                        answer: { kind: "text", value: `[[${(a - b + 6)}]]` },
+                        details: { working: [stepM(longAligned([`${a}-${b}=${a - b}`, `${a - b}+6=${a - b + 6}`]))] }
+                    });
+                }
+
+                // Deep nesting Q18: no parent prompt (edge case)
+                qs.push({
+                    type: "q", qid: "18", depth: 0,
+                    promptParts: [], // no parent-level prompt
+                    answer: { kind: "text", value: "[[\\text{See parts (a)(i), (a)(ii), (b).}]]" },
+                    details: { working: [stepP("Answer each part using the information given in that part.")] }
+                });
+
+                qs.push(
+                    {
+                        type: "q", qid: "18(a)", depth: 1,
+                        promptParts: ["A square has perimeter [[48\\ \\text{cm}]]."],
+                        answer: { kind: "text", value: "[[\\text{See (i) and (ii).}]]" },
+                        details: { keepInMind: ["A square has four equal sides."], formulas: ["[[P = 4s]]"], working: [stepP("Find the side length first.")] }
+                    },
+                    {
+                        type: "q", qid: "18(a)(i)", depth: 2,
+                        promptParts: ["Find the length of one side."],
+                        answer: { kind: "text", value: "[[12\\ \\text{cm}]]" },
+                        details: { working: [stepM(longAligned(["4s=48", "s=48\\div 4=12"]))] }
+                    },
+                    {
+                        type: "q", qid: "18(a)(ii)", depth: 2,
+                        promptParts: ["Find the area of the square."],
+                        answer: { kind: "text", value: "[[144\\ \\text{cm}^2]]" },
+                        details: { formulas: ["[[A=s^2]]"], working: [stepM(longAligned(["A=12^2=144"]))] }
+                    },
+                    {
+                        type: "q", qid: "18(b)", depth: 1,
+                        promptParts: ["A different square has area [[196\\ \\text{cm}^2]]. Find its perimeter."],
+                        answer: { kind: "text", value: "[[56\\ \\text{cm}]]" },
+                        details: { working: [stepM(longAligned(["s=\\sqrt{196}=14", "P=4s=4\\times 14=56"]))] }
+                    }
+                );
+
+                // Q19–Q25 (small/medium)
+                qs.push(
+                    {
+                        type: "q", qid: "19", depth: 0,
+                        promptParts: ["Round [[7.864]] to [[1]] decimal place."],
+                        answer: { kind: "text", value: "[[7.9]]" },
+                        details: { working: [stepM(longAligned(["7.864\\approx 7.9"]))] }
+                    },
+                    {
+                        type: "q", qid: "20", depth: 0,
+                        promptParts: ["A bag has [[3]] green marbles and [[5]] yellow marbles. A marble is picked at random. What is the probability it is green?"],
+                        answer: { kind: "text", value: "[[\\dfrac{3}{8}]]" },
+                        details: { keepInMind: ["Probability = favourable outcomes ÷ total outcomes."], working: [stepM(longAligned(["P(\\text{green})=\\dfrac{3}{3+5}=\\dfrac{3}{8}"]))] }
+                    },
+                    {
+                        type: "q", qid: "21", depth: 0,
+                        promptParts: ["Solve [[2(x-4)=18]]."],
+                        answer: { kind: "text", value: "[[13]]" },
+                        details: { keepInMind: ["Undo brackets carefully."], working: [stepM(longAligned(["2x-8=18", "2x=26", "x=13"]))] }
+                    },
+                    {
+                        type: "q", qid: "22", depth: 0,
+                        promptParts: ["A right-angled triangle has legs [[6\\ \\text{cm}]] and [[8\\ \\text{cm}]]. Find the hypotenuse."],
+                        answer: { kind: "text", value: "[[10\\ \\text{cm}]]" },
+                        details: { formulas: ["[[a^2+b^2=c^2]]"], working: [stepM(longAligned(["6^2+8^2=c^2", "36+64=c^2", "100=c^2", "c=10"]))] }
+                    },
+                    {
+                        type: "q", qid: "23", depth: 0,
+                        promptParts: ["Find the value of [[(120\\div 5) - (3\\times 7)]]."],
+                        answer: { kind: "text", value: "[[3]]" },
+                        details: { keepInMind: ["Do divisions and multiplications before subtraction."], working: [stepM(longAligned(["120\\div 5=24", "3\\times 7=21", "24-21=3"]))] }
+                    },
+                    {
+                        type: "q", qid: "24", depth: 0,
+                        promptParts: ["A recipe uses flour and sugar in the ratio [[4:1]]. If you use [[300\\ \\text{g}]] of flour, how much sugar do you use?"],
+                        answer: { kind: "text", value: "[[75\\ \\text{g}]]" },
+                        details: { working: [stepM(longAligned(["4\\text{ parts} = 300", "1\\text{ part} = 300\\div 4=75"]))] }
+                    },
+                    {
+                        type: "q", qid: "25", depth: 0,
+                        promptParts: ["Solve [[x^2 - 9 = 0]]."],
+                        answer: { kind: "list", value: ["[[x=3]]", "[[x=-3]]"] },
+                        details: { keepInMind: ["A difference of squares factors as [[a^2-b^2=(a-b)(a+b)]]."], working: [stepM(longAligned(["x^2-9=(x-3)(x+3)", "x=3\\ \\text{or}\\ x=-3"]))] }
+                    }
+                );
+
+                // Q26–Q35 long algebra (with multiple KaTeX blocks in working/alt)
+                qs.push(
+                    {
+                        type: "q", qid: "26", depth: 0,
+                        promptParts: [
+                            "Solve the simultaneous equations:\n\n[[[\\begin{aligned}2x + y &= 17\\\\ 3x - y &= 13\\end{aligned}]]]"
+                        ],
+                        answer: { kind: "list", value: ["[[x=6]]", "[[y=5]]"] },
+                        details: {
+                            keepInMind: ["You can add or subtract equations to eliminate a variable."],
+                            working: [
+                                stepP("Add the equations to remove [[y]]."),
+                                stepM(longAligned([
+                                    "(2x+y) + (3x-y) = 17 + 13",
+                                    "5x = 30",
+                                    "x = 6"
+                                ])),
+                                stepP("Substitute [[x=6]] into [[2x+y=17]]."),
+                                stepM(longAligned([
+                                    "2(6) + y = 17",
+                                    "12 + y = 17",
+                                    "y = 5"
+                                ]))
+                            ],
+                            alternatives: [
+                                {
+                                    steps: [
+                                        stepP("Substitute from the first equation: [[y = 17 - 2x]]."),
+                                        stepM(longAligned([
+                                            "3x - (17 - 2x) = 13",
+                                            "3x - 17 + 2x = 13",
+                                            "5x = 30",
+                                            "x = 6",
+                                            "y = 17 - 2(6) = 5"
+                                        ]))
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "27", depth: 0,
+                        promptParts: [
+                            "A number is increased by [[4]] and then multiplied by [[3]] to give [[51]]. Find the number."
+                        ],
+                        answer: { kind: "text", value: "[[13]]" },
+                        details: {
+                            working: [
+                                stepP("Let the number be [[n]]."),
+                                stepM(longAligned([
+                                    "3(n+4)=51",
+                                    "n+4=51\\div 3=17",
+                                    "n=17-4=13"
+                                ]))
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "28", depth: 0,
+                        promptParts: [
+                            "Factorise fully: [[6x^2 - 15x]]."
+                        ],
+                        answer: { kind: "text", value: "[[$3x(2x-5)$]]" },
+                        details: {
+                            keepInMind: ["Factor out the highest common factor."],
+                            working: [
+                                stepM(longAligned([
+                                    "6x^2 - 15x = 3x(2x - 5)"
+                                ]))
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "29", depth: 0,
+                        promptParts: [
+                            "The sum of two numbers is [[40]]. One is [[6]] more than the other. Find the numbers."
+                        ],
+                        answer: { kind: "list", value: ["Smaller: [[17]]", "Larger: [[23]]"] },
+                        details: {
+                            working: [
+                                stepP("Let the smaller number be [[a]]. Then the larger is [[a+6]]."),
+                                stepM(longAligned([
+                                    "a + (a+6) = 40",
+                                    "2a + 6 = 40",
+                                    "2a = 34",
+                                    "a = 17",
+                                    "a+6 = 23"
+                                ]))
+                            ],
+                            alternatives: [
+                                {
+                                    steps: [
+                                        stepP("The two numbers are equally spaced around the mean [[20]]."),
+                                        stepM(longAligned([
+                                            "\\text{Half the difference} = 6\\div 2 = 3",
+                                            "20-3=17,\\ 20+3=23"
+                                        ]))
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                );
+
+                // Deep nesting Q30 (a)(i)(ii), (b)
+                qs.push(
+                    {
+                        type: "q", qid: "30", depth: 0,
+                        promptParts: [
+                            "For the function [[f(x)=2x^2-3x-5]]."
+                        ],
+                        answer: { kind: "text", value: "[[\\text{See parts (a) and (b).}]]" },
+                        details: { working: [stepP("Work through each part in order.")] }
+                    },
+                    {
+                        type: "q", qid: "30(a)", depth: 1,
+                        promptParts: ["Solve [[f(x)=0]]."],
+                        answer: { kind: "text", value: "[[\\text{See (i) and (ii).}]]" },
+                        details: { keepInMind: ["You may solve by factoring or by using the quadratic formula."], working: [stepP("Use either method below.")] }
+                    },
+                    {
+                        type: "q", qid: "30(a)(i)", depth: 2,
+                        promptParts: ["Solve by factoring."],
+                        answer: { kind: "list", value: ["[[x=\\dfrac{5}{2}]]", "[[x=-1]]"] },
+                        details: {
+                            working: [
+                                stepM(longAligned([
+                                    "2x^2-3x-5 = (2x+2)(x-\\tfrac{5}{2})",
+                                    "2x+2=0\\Rightarrow x=-1",
+                                    "x-\\tfrac{5}{2}=0\\Rightarrow x=\\tfrac{5}{2}"
+                                ]))
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "30(a)(ii)", depth: 2,
+                        promptParts: ["Solve using the quadratic formula."],
+                        answer: { kind: "list", value: ["[[x=\\dfrac{5}{2}]]", "[[x=-1]]"] },
+                        details: {
+                            formulas: ["[[x=\\dfrac{-b\\pm\\sqrt{b^2-4ac}}{2a}]]"],
+                            working: [
+                                stepP("Here [[a=2]], [[b=-3]], [[c=-5]]."),
+                                stepM(longAligned([
+                                    "x=\\dfrac{-(-3)\\pm\\sqrt{(-3)^2-4(2)(-5)}}{2(2)}",
+                                    "x=\\dfrac{3\\pm\\sqrt{9+40}}{4}",
+                                    "x=\\dfrac{3\\pm\\sqrt{49}}{4}",
+                                    "x=\\dfrac{3\\pm 7}{4}",
+                                    "x=\\dfrac{10}{4}=\\dfrac{5}{2}\\ \\text{or}\\ x=\\dfrac{-4}{4}=-1"
+                                ]))
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "30(b)", depth: 1,
+                        promptParts: ["Find the minimum value of [[f(x)]]."],
+                        answer: { kind: "text", value: "[[\\text{Minimum }= -\\dfrac{49}{8}]]" },
+                        details: {
+                            keepInMind: ["A quadratic [[ax^2+bx+c]] has its turning point at [[x=-\\dfrac{b}{2a}]]."],
+                            working: [
+                                stepM(longAligned([
+                                    "x_{\\min} = -\\dfrac{-3}{2\\cdot 2} = \\dfrac{3}{4}",
+                                    "f\\!\\left(\\dfrac{3}{4}\\right)=2\\left(\\dfrac{3}{4}\\right)^2-3\\left(\\dfrac{3}{4}\\right)-5",
+                                    "=2\\cdot\\dfrac{9}{16}-\\dfrac{9}{4}-5",
+                                    "=\\dfrac{9}{8}-\\dfrac{9}{4}-5",
+                                    "=\\dfrac{9}{8}-\\dfrac{18}{8}-\\dfrac{40}{8}",
+                                    "=-\\dfrac{49}{8}"
+                                ]))
+                            ]
+                        }
+                    }
+                );
+
+                qs.push(
+                    {
+                        type: "q", qid: "31", depth: 0,
+                        promptParts: [
+                            "Simplify [[\\dfrac{3x}{4} - \\dfrac{x}{6}]]."
+                        ],
+                        answer: { kind: "text", value: "[[\\dfrac{7x}{12}]]" },
+                        details: {
+                            working: [
+                                stepM(longAligned([
+                                    "\\dfrac{3x}{4} - \\dfrac{x}{6} = \\dfrac{9x}{12} - \\dfrac{2x}{12}",
+                                    "=\\dfrac{7x}{12}"
+                                ]))
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "32", depth: 0,
+                        promptParts: [
+                            "A shape is enlarged by scale factor [[\\dfrac{3}{2}]]. Its original perimeter is [[28\\ \\text{cm}]]. Find the new perimeter."
+                        ],
+                        answer: { kind: "text", value: "[[42\\ \\text{cm}]]" },
+                        details: {
+                            keepInMind: ["Perimeter scales by the same factor as lengths."],
+                            working: [stepM(longAligned(["28\\times \\dfrac{3}{2} = 14\\times 3 = 42"]))]
+                        }
+                    }
+                );
+
+                // Extremely long working (50–60 lines) in Q33
+                const longLines = [];
+                longLines.push("S = 1 + 2 + 3 + \\cdots + 60");
+                longLines.push("S = 60 + 59 + 58 + \\cdots + 1");
+                longLines.push("\\text{Add the two equations term-by-term.}");
+                longLines.push("2S = (1+60) + (2+59) + (3+58) + \\cdots + (60+1)");
+                longLines.push("2S = 61 + 61 + 61 + \\cdots + 61");
+                longLines.push("\\text{There are }60\\text{ pairs, each equal to }61.");
+                longLines.push("2S = 60\\times 61");
+                longLines.push("2S = 3660");
+                longLines.push("S = 3660\\div 2");
+                longLines.push("S = 1830");
+
+                // Pad to 55 lines with small, calm explanatory steps and equivalent forms (still math lines)
+                while (longLines.length < 55) {
+                    const k = longLines.length - 9; // start after core derivation
+                    if (k % 3 === 0) longLines.push("S = \\dfrac{60\\times 61}{2}");
+                    else if (k % 3 === 1) longLines.push("S = 30\\times 61");
+                    else longLines.push("S = 1830");
+                }
+
+                qs.push(
+                    {
+                        type: "q", qid: "33", depth: 0,
+                        promptParts: [
+                            "Find the value of [[1+2+3+\\cdots+60]]."
+                        ],
+                        answer: { kind: "text", value: "[[1830]]" },
+                        details: {
+                            keepInMind: ["Pairing terms can make long sums manageable."],
+                            formulas: ["[[1+2+\\cdots+n = \\dfrac{n(n+1)}{2}]]"],
+                            working: [
+                                stepP("Pair the first and last terms, the second and second-last, and so on."),
+                                stepM(longAligned(longLines))
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "34", depth: 0,
+                        promptParts: [
+                            "Solve [[\\dfrac{2}{x-1} = 5]]."
+                        ],
+                        answer: { kind: "text", value: "[[x=\\dfrac{7}{5}]]" },
+                        details: {
+                            keepInMind: ["Multiply both sides by the denominator to remove the fraction."],
+                            working: [
+                                stepM(longAligned([
+                                    "2 = 5(x-1)",
+                                    "2 = 5x - 5",
+                                    "5x = 7",
+                                    "x = \\dfrac{7}{5}"
+                                ]))
+                            ]
+                        }
+                    },
+                    {
+                        type: "q", qid: "35", depth: 0,
+                        promptParts: [
+                            "A straight line has equation [[y=3x-4]]. Find [[y]] when [[x=\\dfrac{5}{3}]]."
+                        ],
+                        answer: { kind: "text", value: "[[1]]" },
+                        details: {
+                            working: [
+                                stepM(longAligned([
+                                    "y=3\\left(\\dfrac{5}{3}\\right)-4",
+                                    "=5-4",
+                                    "=1"
+                                ]))
+                            ]
+                        }
+                    }
+                );
+
+                return {
+                    name: expandedDefault ? "Standard (Workings Expanded)" : "Standard paper",
+                    note: expandedDefault
+                        ? "35 questions. All workings start expanded (stress test dataset variant)."
+                        : "35 questions. Q26–Q35 are longer algebra questions. Workings are collapsed by default.",
+                    sections: qs,
+                    expandedDefault: !!expandedDefault
+                };
+            }
+
+            function makeDiagramHeavyPaper() {
+                // 20 questions, 8 diagrams (reused types)
+                const qs = [];
+                const diagramQ = new Set([2, 3, 5, 7, 9, 12, 15, 18]); // 8 questions
+
+                for (let i = 1; i <= 20; i++) {
+                    const withDiagram = diagramQ.has(i);
+                    let prompt = "";
+                    let diag = null;
+
+                    if (i === 2) {
+                        prompt = "In the diagram, triangle [[ABC]] is isosceles with [[AB=AC]]. The angle at [[A]] is [[40^\\circ]]. Find the size of angle [[B]].";
+                        diag = { type: "diagram", kind: "geometry", caption: "Isosceles triangle with labelled angles." };
+                    } else if (i === 3) {
+                        prompt = "The bars show a ratio of apple juice to water. The total drink is [[450\\ \\text{ml}]]. How much is apple juice?";
+                        diag = { type: "diagram", kind: "bars", caption: "Ratio bars for two ingredients." };
+                    } else if (i === 5) {
+                        prompt = "Points [[P]] and [[Q]] are shown on the grid. Find the change in [[y]] from [[P]] to [[Q]].";
+                        diag = { type: "diagram", kind: "grid", caption: "Coordinate grid with points and a line." };
+                    } else if (i === 7) {
+                        prompt = "Use the table to find the total of column [[B]].";
+                        diag = { type: "diagram", kind: "table", caption: "3×3 table-like grid." };
+                    } else if (i === 9) {
+                        prompt = "A circle has radius [[7\\ \\text{cm}]]. Find its circumference (use [[\\pi\\approx 3.14]]).";
+                        diag = { type: "diagram", kind: "geometry", caption: "Circle with a marked radius." };
+                    } else if (i === 12) {
+                        prompt = "The bar model represents [[\\dfrac{2}{5}]] of a length. If the whole length is [[35\\ \\text{cm}]], what is [[\\dfrac{2}{5}]] of it?";
+                        diag = { type: "diagram", kind: "bars", caption: "Five equal parts shown." };
+                    } else if (i === 15) {
+                        prompt = "A line segment joins points [[P]] and [[Q]]. Find the length of the segment using the grid.";
+                        diag = { type: "diagram", kind: "grid", caption: "Grid with two points." };
+                    } else if (i === 18) {
+                        prompt = "The array shows a pattern. How many squares are shaded?";
+                        diag = { type: "diagram", kind: "table", caption: "Array/grid pattern placeholder." };
+                    } else {
+                        // Non-diagram questions
+                        const a = 2 * i + 5;
+                        const b = i + 3;
+                        prompt = `Work out [[${a} - ${b}]] and then multiply by [[2]].`;
+                    }
+
+                    // Answers/workings (keep realistic, not copied)
+                    let answer;
+                    let details;
+                    if (i === 2) {
+                        answer = { kind: "text", value: "[[70^\\circ]]" };
+                        details = {
+                            keepInMind: ["In an isosceles triangle, the base angles are equal."],
+                            working: [stepM(longAligned([
+                                "B=C",
+                                "A+B+C=180^\\circ",
+                                "40^\\circ + B + B = 180^\\circ",
+                                "2B = 140^\\circ",
+                                "B = 70^\\circ"
+                            ]))]
+                        };
+                    } else if (i === 3) {
+                        answer = { kind: "text", value: "[[180\\ \\text{ml}]]" };
+                        details = {
+                            working: [
+                                stepP("The diagram shows [[2]] parts juice and [[3]] parts water (total [[5]] parts)."),
+                                stepM(longAligned([
+                                    "1\\text{ part} = 450\\div 5 = 90",
+                                    "2\\text{ parts} = 2\\times 90 = 180"
+                                ]))
+                            ]
+                        };
+                    } else if (i === 5) {
+                        answer = { kind: "text", value: "[[2]]" };
+                        details = {
+                            working: [stepM(longAligned(["\\Delta y = 10 - 8 = 2"]))]
+                        };
+                    } else if (i === 7) {
+                        answer = { kind: "text", value: "[[12]]" };
+                        details = { working: [stepM(longAligned(["B\\text{ column }=2+5+5=12"]))] };
+                    } else if (i === 9) {
+                        answer = { kind: "text", value: "[[43.96\\ \\text{cm}]]" };
+                        details = {
+                            formulas: ["[[C=2\\pi r]]"],
+                            working: [stepM(longAligned(["C=2\\times 3.14\\times 7", "=43.96"]))]
+                        };
+                    } else if (i === 12) {
+                        answer = { kind: "text", value: "[[14\\ \\text{cm}]]" };
+                        details = { working: [stepM(longAligned(["\\dfrac{2}{5}\\times 35 = 2\\times 7 = 14"]))] };
+                    } else if (i === 15) {
+                        answer = { kind: "text", value: "[[10]]" };
+                        details = {
+                            keepInMind: ["Use the grid to find horizontal and vertical changes."],
+                            working: [stepM(longAligned(["\\Delta x = 8", "\\Delta y = 6", "\\text{length} = \\sqrt{8^2+6^2} = \\sqrt{100} = 10"]))]
+                        };
+                    } else if (i === 18) {
+                        answer = { kind: "text", value: "[[9]]" };
+                        details = { working: [stepP("Count the shaded squares in the pattern shown."), stepM("9")] };
+                    } else {
+                        const a = 2 * i + 5;
+                        const b = i + 3;
+                        const val = (a - b) * 2;
+                        answer = { kind: "text", value: `[[${val}]]` };
+                        details = { working: [stepM(longAligned([`${a}-${b}=${a - b}`, `(${a - b})\\times 2=${val}`]))] };
+                    }
+
+                    const promptParts = withDiagram ? [prompt, diag] : [prompt];
+                    qs.push({ type: "q", qid: String(i), depth: 0, promptParts, answer, details });
+                }
+
+                return {
+                    name: "Diagram-heavy paper",
+                    note: "20 questions. 8 questions contain diagrams (inline SVG placeholders).",
+                    sections: qs
+                };
+            }
+
+            function makeSectionedPaper() {
+                // Section A: 35 questions small/medium
+                // Section B: 8 questions medium
+                // Section C: 6 questions all very long solution details (collapsed by default)
+                const sections = [];
+
+                sections.push({ type: "sep", label: "A" });
+                for (let i = 1; i <= 35; i++) {
+                    const qid = String(i);
+                    const isFormula = (i % 9 === 0);
+                    const isAlt = (i % 11 === 0);
+                    const isKeep = (i % 7 === 0);
+
+                    const prompt = (i % 5 === 0)
+                        ? `A class has [[${20 + (i % 6)}]] pupils. [[${6 + (i % 4)}]] are absent. How many are present?`
+                        : `Calculate [[(${100 + i} - ${30 + (i % 10)})\\div ${2 + (i % 4)}]].`;
+
+                    const answerVal = (i % 5 === 0)
+                        ? (20 + (i % 6)) - (6 + (i % 4))
+                        : Math.floor(((100 + i) - (30 + (i % 10))) / (2 + (i % 4)));
+
+                    const details = {
+                        keepInMind: isKeep ? ["Work step by step and keep units consistent where needed."] : [],
+                        formulas: isFormula ? ["[[\\text{If }a\\div b = c\\text{ then }a=b\\times c.]]"] : [],
+                        working: [
+                            stepM(longAligned([
+                                (i % 5 === 0)
+                                    ? `${20 + (i % 6)} - ${6 + (i % 4)} = ${answerVal}`
+                                    : `(${100 + i} - ${30 + (i % 10)})\\div ${2 + (i % 4)} = ${answerVal}`
+                            ]))
+                        ],
+                        alternatives: isAlt ? [{
+                            steps: [stepP("Check by doing the inverse operation."), stepM(longAligned([
+                                (i % 5 === 0)
+                                    ? `${answerVal} + ${6 + (i % 4)} = ${20 + (i % 6)}`
+                                    : `${answerVal}\\times ${2 + (i % 4)} = ${(100 + i) - (30 + (i % 10))}`
+                            ]))]
+                        }] : []
+                    };
+
+                    sections.push({
+                        type: "q",
+                        qid,
+                        depth: 0,
+                        promptParts: [prompt],
+                        answer: { kind: "text", value: `[[${answerVal}]]` },
+                        details
+                    });
+                }
+
+                sections.push({ type: "sep", label: "B" });
+                for (let j = 1; j <= 8; j++) {
+                    const qn = 35 + j;
+                    const qid = String(qn);
+
+                    const prompt = j <= 4
+                        ? `A rectangle has perimeter [[${44 + 2 * j}\\ \\text{cm}]] and width [[${8 + j}\\ \\text{cm}]]. Find its length.`
+                        : `Solve [[${j + 1}x - ${2 * j} = ${20 + 3 * j}]].`;
+
+                    let answerTex, workingLines;
+                    if (j <= 4) {
+                        const P = 44 + 2 * j;
+                        const w = 8 + j;
+                        // P = 2(l+w) => l = P/2 - w
+                        const l = (P / 2) - w;
+                        answerTex = `[[${l}\\ \\text{cm}]]`;
+                        workingLines = [
+                            `2(\\ell + ${w}) = ${P}`,
+                            `\\ell + ${w} = ${P}\\div 2 = ${P / 2}`,
+                            `\\ell = ${P / 2} - ${w} = ${l}`
+                        ];
+                    } else {
+                        const a = j + 1;
+                        const b = 2 * j;
+                        const c = 20 + 3 * j;
+                        // a x - b = c => ax = c + b
+                        const rhs = c + b;
+                        const x = rhs / a;
+                        answerTex = `[[${x}]]`;
+                        workingLines = [
+                            `${a}x = ${c} + ${b} = ${rhs}`,
+                            `x = ${rhs}\\div ${a} = ${x}`
+                        ];
+                    }
+
+                    sections.push({
+                        type: "q",
+                        qid,
+                        depth: 0,
+                        promptParts: [prompt],
+                        answer: { kind: "text", value: answerTex },
+                        details: {
+                            keepInMind: ["Keep track of what each symbol stands for."],
+                            formulas: j <= 4 ? ["[[P=2(\\ell+w)]]"] : [],
+                            working: [stepM(longAligned(workingLines))],
+                            alternatives: (j === 8) ? [{
+                                steps: [
+                                    stepP("Check by substitution."),
+                                    stepM(longAligned([j <= 4 ? "2(\\ell+w)=P\\ \\text{(re-check with found values)}" : "ax-b=c\\ \\text{(re-check with found value of }x)"]))
+                                ]
+                            }] : []
+                        }
+                    });
+                }
+
+                sections.push({ type: "sep", label: "C" });
+                for (let k = 1; k <= 6; k++) {
+                    const qn = 43 + k;
+                    const qid = String(qn);
+
+                    const prompt = (k <= 3)
+                        ? `Solve and simplify the expression:\n\n[[[\\dfrac{(x+${k})^2 - (x-${k})^2}{2k}]]]\n\nThen evaluate it when [[x=10]].`
+                        : `A number puzzle:\n\n[[[\\begin{aligned}x+y &= ${30 + 3 * k}\\\\ x-y &= ${10 + k}\\end{aligned}]]]\n\nFind [[x]] and [[y]].`;
+
+                    let answer;
+                    let details;
+
+                    if (k <= 3) {
+                        // Use difference of squares
+                        answer = { kind: "list", value: [`Simplified: [[2x]]`, `When [[x=10]]: [[20]]`] };
+                        const lines = [
+                            `(x+${k})^2 - (x-${k})^2`,
+                            `=\\big((x+${k})-(x-${k})\\big)\\big((x+${k})+(x-${k})\\big)`,
+                            `=(2${k})(2x)`,
+                            `=4${k}x`,
+                            `\\dfrac{4${k}x}{2${k}} = 2x`,
+                            `\\text{When }x=10,\\ 2x=20`
+                        ];
+                        // Make it long: add extra but still math lines
+                        const padded = [];
+                        for (let i = 0; i < 60; i++) {
+                            if (i < lines.length) padded.push(lines[i]);
+                            else if (i % 4 === 0) padded.push("2x = 2\\times 10 = 20");
+                            else if (i % 4 === 1) padded.push("\\dfrac{4kx}{2k} = 2x");
+                            else if (i % 4 === 2) padded.push("(a^2-b^2)=(a-b)(a+b)");
+                            else padded.push("2x");
+                        }
+
+                        details = {
+                            keepInMind: ["Use identities like difference of squares to simplify quickly."],
+                            formulas: ["[[(a^2-b^2)=(a-b)(a+b)]]"],
+                            working: [
+                                stepP("Expand cautiously or use an identity to avoid extra work."),
+                                stepM(longAligned(padded.slice(0, 60)))
+                            ],
+                            alternatives: [{
+                                steps: [
+                                    stepP("You can expand both squares and cancel terms."),
+
+
+                                    stepM(
+                                        longAligned([
+                                            "(x+ k)^2 = x^2 + 2kx + k^2",
+                                            "(x- k)^2 = x^2 - 2kx + k^2",
+                                            "\\text{Subtract: }(x+k)^2-(x-k)^2 = 4kx",
+                                            "\\dfrac{4kx}{2k}=2x"
+                                        ].map(s => s.replace(/k/g, String(k)))))
+                                ]
+
+
+                            }]
+                        };
+                    } else {
+                        const sum = 30 + 3 * k;
+                        const diff = 10 + k;
+                        const x = (sum + diff) / 2;
+                        const y = (sum - diff) / 2;
+
+                        answer = { kind: "list", value: [`[[x=${x}]]`, `[[y=${y}]]`] };
+
+                        // Very long workings (collapsed by default)
+                        const lines = [
+                            "x+y = " + sum,
+                            "x-y = " + diff,
+                            "\\text{Add the equations: }(x+y)+(x-y) = " + sum + " + " + diff,
+                            "2x = " + (sum + diff),
+                            "x = " + (sum + diff) + "\\div 2 = " + x,
+                            "\\text{Subtract the second from the first: }(x+y)-(x-y)=" + sum + "-" + diff,
+                            "2y = " + (sum - diff),
+                            "y = " + (sum - diff) + "\\div 2 = " + y
+                        ];
+                        const padded = [];
+                        for (let i = 0; i < 58; i++) {
+                            if (i < lines.length) padded.push(lines[i]);
+                            else if (i % 5 === 0) padded.push("2x = " + (sum + diff));
+                            else if (i % 5 === 1) padded.push("x = " + x);
+                            else if (i % 5 === 2) padded.push("2y = " + (sum - diff));
+                            else if (i % 5 === 3) padded.push("y = " + y);
+                            else padded.push("x+y=" + sum);
+                        }
+
+                        details = {
+                            keepInMind: ["Adding eliminates [[y]]; subtracting eliminates [[x]]."],
+                            working: [
+                                stepP("Use elimination by adding and subtracting."),
+                                stepM(longAligned(padded))
+                            ]
+                        };
+                    }
+
+                    sections.push({
+                        type: "q",
+                        qid,
+                        depth: 0,
+                        promptParts: [prompt],
+                        answer,
+                        details
+                    });
+                }
+
+                return {
+                    name: "Sectioned paper",
+                    note: "Original paper structure: Section A (35), Section B (8), Section C (6, very long workings).",
+                    sections,
+                    expandedDefault: false
+                };
+            }
+
+            // Compose datasets (including add-ons)
+            const datasets = [
+                { key: "short", label: "Short paper", build: () => makeShortPaper() },
+                { key: "standard", label: "Standard paper", build: () => makeStandardPaper(false) },
+                { key: "standard_expanded", label: "Standard (Workings Expanded)", build: () => makeStandardPaper(true) },
+                { key: "diagram", label: "Diagram-heavy paper", build: () => makeDiagramHeavyPaper() },
+                { key: "sectioned", label: "Sectioned paper", build: () => makeSectionedPaper() }
+            ];
+
+            function renderPaper(datasetKey) {
+                const dsDef = datasets.find(d => d.key === datasetKey) || datasets[0];
+                const paper = dsDef.build();
+
+                // Meta
+                elPaperMeta.innerHTML = "";
+                elPaperMeta.appendChild(
+                    h("div", null,
+                        h("p", { class: "paper-name" }, paper.name),
+                        h("p", { class: "paper-note" }, paper.note)
+                    )
+                );
+
+                // Body
+                elPaperBody.innerHTML = "";
+                const navItems = [];
+
+                let lastWasSep = false;
+                paper.sections.forEach(item => {
+                    if (item.type === "sep") {
+                        // Paper content section header
+                        elPaperBody.appendChild(h("div", { class: "section-header" }, "Section " + item.label));
+                        navItems.push({ type: "sep", label: item.label });
+                        lastWasSep = true;
+                        return;
+                    }
+                    lastWasSep = false;
+
+                    const defaultExpanded = !!paper.expandedDefault; // dataset-level variant only
+                    const rendered = questionNode(item, defaultExpanded);
+                    elPaperBody.appendChild(rendered.node);
+                    navItems.push({ type: "q", qid: item.qid, domId: rendered.domId });
+                });
+
+                buildNav(navItems);
+
+                // Render KaTeX (or fallback) after content insertion
+                katexRenderAll(document);
+
+                // Active nav tracking
+                observeActiveQuestions();
+            }
+
+            function initSelector() {
+                datasets.forEach(d => {
+                    elSelect.appendChild(h("option", { value: d.key }, d.label));
+                });
+                elSelect.value = "short";
+                elSelect.addEventListener("change", () => {
+                    renderPaper(elSelect.value);
+                });
+            }
+
+            // Mobile drawer controls
+            openNavBtn.addEventListener("click", () => {
+                if (typeof navDialog.showModal === "function") {
+                    navDialog.showModal();
+                }
+            });
+            closeNavBtn.addEventListener("click", () => navDialog.close());
+
+            // If user presses Escape, <dialog> closes automatically.
+
+            // Initial render
+            initSelector();
+            renderPaper(elSelect.value);
+
+            // If KaTeX loads after initial render (defer), re-render math safely.
+            window.addEventListener("load", () => {
+                katexRenderAll(document);
+            });
+        })();
+    </script>
+</body>
+
+</html>
