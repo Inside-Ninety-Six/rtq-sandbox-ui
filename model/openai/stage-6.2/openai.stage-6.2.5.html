@@ -1,0 +1,1409 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RTQ – Maths Paper Solution Viewer (Prototype)</title>
+
+    <!-- KaTeX (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        crossorigin="anonymous"></script>
+
+    <!-- Markdown-It (CDN) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"
+        crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            /* restrained warm-neutral base (paper-adjacent) */
+            --bg: #f4f2ee;
+            --surface: #fbfaf7;
+            --ink: #1f1f1f;
+            --ink-muted: #3a3a3a;
+            --quiet: #5a5a5a;
+            --hairline: rgba(0, 0, 0, 0.12);
+            --hairline-quiet: rgba(0, 0, 0, 0.08);
+            --soft: rgba(0, 0, 0, 0.04);
+
+            /* restrained accent (non-semantic) */
+            --accent: #2f5f6a;
+
+            --frame-max: 1120px;
+
+            --gap-xl: 42px;
+            /* between top-level questions (largest) */
+            --gap-l: 18px;
+            --gap-m: 12px;
+            --gap-s: 8px;
+            --gap-xs: 6px;
+
+            --nav-w: 172px;
+            --radius: 10px;
+            --focus: 2px solid rgba(47, 95, 106, 0.55);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        html,
+        body {
+            overflow-x: hidden;
+        }
+
+        body {
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            background: var(--bg);
+            color: var(--ink);
+            line-height: 1.55;
+            -webkit-text-size-adjust: 100%;
+            text-rendering: optimizeLegibility;
+        }
+
+        /* Top controls (aligned to centered frame) */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: linear-gradient(to bottom, rgba(244, 242, 238, 0.98), rgba(244, 242, 238, 0.92));
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid var(--hairline-quiet);
+        }
+
+        .topbar {
+            max-width: var(--frame-max);
+            margin: 0 auto;
+            padding: 10px 14px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--quiet);
+            white-space: nowrap;
+        }
+
+        select {
+            appearance: none;
+            border: 1px solid var(--hairline);
+            background: var(--surface);
+            color: var(--ink);
+            border-radius: 8px;
+            padding: 8px 34px 8px 10px;
+            font-size: 14px;
+            line-height: 1.2;
+            max-width: 62vw;
+        }
+
+        .select-wrap {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .select-wrap::after {
+            content: "▾";
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--quiet);
+            pointer-events: none;
+            font-size: 12px;
+        }
+
+        .jump-btn {
+            display: none;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--quiet);
+            font-size: 14px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .jump-btn:hover {
+            color: var(--ink-muted);
+        }
+
+        .jump-btn:focus-visible {
+            outline: var(--focus);
+            outline-offset: 2px;
+        }
+
+        /* Centered frame containing nav + paper */
+        .frame {
+            max-width: var(--frame-max);
+            margin: 14px auto 64px auto;
+            padding: 0 14px;
+        }
+
+        .surface {
+            background: var(--surface);
+            border: 1px solid var(--hairline-quiet);
+            border-radius: 14px;
+            padding: 16px 12px 20px 12px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: var(--nav-w) 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        nav {
+            position: sticky;
+            top: 66px;
+            /* below topbar */
+            align-self: start;
+            max-height: calc(100vh - 86px);
+            overflow: auto;
+            padding: 6px 6px 6px 2px;
+
+            /* hide scrollbars but keep scrolling */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* legacy */
+        }
+
+        nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* WebKit/Blink */
+
+        .nav-title {
+            font-size: 12px;
+            letter-spacing: 0.02em;
+            color: var(--quiet);
+            margin: 0 0 8px 8px;
+            font-weight: 600;
+        }
+
+        .nav-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-sep {
+            margin: 10px 0 6px 8px;
+            font-size: 12px;
+            color: var(--quiet);
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px 6px 10px;
+            border-radius: 8px;
+        }
+
+        .nav-btn {
+            all: unset;
+            cursor: pointer;
+            display: inline-block;
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.52);
+            line-height: 1.2;
+            padding: 2px 0;
+            border-bottom: 1px solid transparent;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .nav-btn:hover {
+            color: rgba(0, 0, 0, 0.68);
+            border-bottom-color: rgba(0, 0, 0, 0.18);
+        }
+
+        .nav-btn:focus-visible {
+            outline: var(--focus);
+            outline-offset: 3px;
+            border-bottom-color: transparent;
+            border-radius: 6px;
+            padding: 2px 4px;
+            margin-left: -4px;
+        }
+
+        .nav-marker {
+            width: 2px;
+            height: 18px;
+            background: transparent;
+            flex: 0 0 auto;
+            border-radius: 1px;
+        }
+
+        .nav-item[data-active="true"] .nav-marker {
+            background: rgba(47, 95, 106, 0.55);
+        }
+
+        .nav-item[data-active="true"] .nav-btn {
+            color: rgba(0, 0, 0, 0.72);
+            font-weight: 600;
+            border-bottom-color: transparent;
+        }
+
+        main {
+            min-width: 0;
+            padding: 0 6px 0 0;
+        }
+
+        /* Paper content */
+        .paper-meta {
+            margin: 2px 0 18px 0;
+            color: var(--quiet);
+            font-size: 13px;
+        }
+
+        .section-label {
+            margin: 22px 0 12px 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: rgba(0, 0, 0, 0.65);
+            letter-spacing: 0.02em;
+        }
+
+        .question {
+            margin: 0 0 var(--gap-xl) 0;
+            padding: 0;
+        }
+
+        /* Depth rhythm via indentation + slightly tighter spacing */
+        .q-inner {
+            display: block;
+            min-width: 0;
+        }
+
+        .q-inner[data-depth="0"] {
+            padding-left: 0px;
+        }
+
+        .q-inner[data-depth="1"] {
+            padding-left: 16px;
+            margin-top: 10px;
+        }
+
+        .q-inner[data-depth="2"] {
+            padding-left: 28px;
+            margin-top: 10px;
+        }
+
+        .q-inner[data-depth="3"] {
+            padding-left: 38px;
+            margin-top: 10px;
+        }
+
+        .q-inner[data-depth="4"] {
+            padding-left: 46px;
+            margin-top: 10px;
+        }
+
+        .q-head {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            min-width: 0;
+        }
+
+        .qid {
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.65);
+            flex: 0 0 auto;
+            line-height: 1.4;
+            margin-top: 1px;
+            font-weight: 600;
+        }
+
+        .q-text {
+            min-width: 0;
+        }
+
+        .q-text .md {
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--ink);
+        }
+
+        .answer {
+            margin: var(--gap-m) 0 0 0;
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            min-width: 0;
+        }
+
+        .answer-label {
+            flex: 0 0 auto;
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.60);
+            font-weight: 700;
+        }
+
+        .answer .md {
+            font-size: 15px;
+            line-height: 1.55;
+            color: rgba(0, 0, 0, 0.72);
+            min-width: 0;
+        }
+
+        .toggle-row {
+            margin-top: var(--gap-s);
+        }
+
+        .toggle {
+            all: unset;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(0, 0, 0, 0.58);
+            font-size: 14px;
+            padding: 4px 0;
+            border-bottom: 1px solid transparent;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            text-decoration-thickness: 1px;
+        }
+
+        .toggle:hover {
+            color: rgba(0, 0, 0, 0.72);
+        }
+
+        .toggle:focus-visible {
+            outline: var(--focus);
+            outline-offset: 3px;
+            border-radius: 8px;
+            padding: 4px 6px;
+            margin-left: -6px;
+            text-decoration: none;
+        }
+
+        .chev {
+            width: 10px;
+            height: 10px;
+            display: inline-block;
+            transform: rotate(0deg);
+            transition: transform 140ms ease;
+            color: rgba(0, 0, 0, 0.55);
+            flex: 0 0 auto;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .chev {
+                transition: none;
+            }
+        }
+
+        .solution {
+            margin-top: var(--gap-m);
+            padding-top: 10px;
+            border-top: 1px solid var(--hairline-quiet);
+            background: rgba(0, 0, 0, 0.015);
+            /* subtle surface separation */
+        }
+
+        /* Inline expand/collapse without focus movement */
+        .solution[hidden] {
+            display: none;
+        }
+
+        .solution-inner {
+            padding: 10px 10px 2px 10px;
+        }
+
+        .sol-block {
+            margin: 0 0 14px 0;
+        }
+
+        .sol-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: rgba(0, 0, 0, 0.60);
+            margin: 0 0 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .keep-icon {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+            color: rgba(0, 0, 0, 0.55);
+            flex: 0 0 auto;
+        }
+
+        .sol-body .md {
+            font-size: 14px;
+            line-height: 1.55;
+            color: rgba(0, 0, 0, 0.62);
+        }
+
+        /* Keep in mind slightly more prominent than working body */
+        .sol-block.keep .sol-body .md {
+            color: rgba(0, 0, 0, 0.68);
+        }
+
+        .sol-block.keep .sol-label {
+            color: rgba(0, 0, 0, 0.64);
+        }
+
+        /* Optional minimal left marker for Keep in mind (hairline, not a panel) */
+        .sol-block.keep {
+            padding-left: 10px;
+            border-left: 1px solid var(--hairline);
+        }
+
+        /* Working / alternative working slightly denser + quieter */
+        .sol-block.work .sol-body .md,
+        .sol-block.alt .sol-body .md {
+            color: rgba(0, 0, 0, 0.58);
+            line-height: 1.5;
+        }
+
+        /* Minimal divider between formulas and working if both present */
+        .sol-divider {
+            height: 1px;
+            background: var(--hairline-quiet);
+            margin: 10px 0 12px 0;
+            border: 0;
+        }
+
+        /* Markdown rendering basics */
+        .md> :first-child {
+            margin-top: 0;
+        }
+
+        .md> :last-child {
+            margin-bottom: 0;
+        }
+
+        .md p {
+            margin: 0 0 10px 0;
+        }
+
+        .md ul,
+        .md ol {
+            margin: 0 0 10px 22px;
+            padding: 0;
+        }
+
+        .md li {
+            margin: 4px 0;
+        }
+
+        .md table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 12px 0;
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.60);
+        }
+
+        .md th,
+        .md td {
+            border: 1px solid var(--hairline-quiet);
+            padding: 6px 8px;
+            vertical-align: top;
+        }
+
+        .md th {
+            font-weight: 700;
+            color: rgba(0, 0, 0, 0.62);
+            background: transparent;
+        }
+
+        .md code,
+        .md pre {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        .md pre {
+            overflow: auto;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid var(--hairline-quiet);
+            border-radius: 8px;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .md pre::-webkit-scrollbar {
+            display: none;
+        }
+
+        .md img,
+        .md svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Table overflow wrapper (created in JS) */
+        .table-wrap {
+            overflow: auto;
+            max-width: 100%;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .table-wrap::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* KaTeX containment invariant */
+        .katex-display {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 4px 0;
+            margin: 10px 0;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .katex-display>.katex {
+            max-width: 100%;
+            display: inline-block;
+        }
+
+        /* Display-math underlay ONLY inside Working + Alternative working */
+        .sol-block.work .katex-display,
+        .sol-block.alt .katex-display {
+            background: rgba(0, 0, 0, 0.035);
+            padding: 6px 8px;
+            margin: 10px 0;
+        }
+
+        /* Ensure inline math never receives background */
+        .katex {
+            background: transparent !important;
+        }
+
+        /* Avoid any horizontal scroll at page level */
+        .surface,
+        .layout,
+        main,
+        .q-text,
+        .sol-body,
+        .md {
+            max-width: 100%;
+        }
+
+        /* Mobile / tablet */
+        @media (max-width: 900px) {
+            .layout {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            nav {
+                display: none;
+            }
+
+            .jump-btn {
+                display: inline-flex;
+            }
+
+            .surface {
+                padding: 14px 12px 18px 12px;
+            }
+
+            .q-inner[data-depth="1"] {
+                padding-left: 12px;
+            }
+
+            .q-inner[data-depth="2"] {
+                padding-left: 20px;
+            }
+
+            .q-inner[data-depth="3"] {
+                padding-left: 28px;
+            }
+
+            .q-inner[data-depth="4"] {
+                padding-left: 34px;
+            }
+        }
+
+        /* Drawer (mobile nav) */
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 80;
+            display: none;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: min(320px, 86vw);
+            background: var(--surface);
+            border-left: 1px solid var(--hairline);
+            z-index: 90;
+            display: none;
+            padding: 14px 12px;
+            overflow: hidden;
+            /* internal scroll only for list */
+        }
+
+        .drawer header {
+            position: static;
+            background: transparent;
+            border-bottom: none;
+            backdrop-filter: none;
+            padding: 0;
+            margin: 0 0 10px 0;
+        }
+
+        .drawer-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .drawer-title {
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.62);
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .drawer-close {
+            all: unset;
+            cursor: pointer;
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.58);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            padding: 6px 8px;
+            border-radius: 8px;
+        }
+
+        .drawer-close:hover {
+            color: rgba(0, 0, 0, 0.72);
+        }
+
+        .drawer-close:focus-visible {
+            outline: var(--focus);
+            outline-offset: 2px;
+        }
+
+        .drawer-nav {
+            height: calc(100% - 44px);
+            overflow: auto;
+            padding: 6px 4px;
+
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .drawer-nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        .visually-hidden {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+
+        /* Failure mode */
+        .missing {
+            padding: 24px 0;
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.62);
+            letter-spacing: 0.02em;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="topbar" role="region" aria-label="Paper controls">
+            <div class="control-group">
+                <label for="paperSelect">Paper</label>
+                <div class="select-wrap">
+                    <select id="paperSelect" aria-label="Paper selector" disabled>
+                        <option>Loading…</option>
+                    </select>
+                </div>
+            </div>
+            <button id="jumpBtn" class="jump-btn" type="button" aria-haspopup="dialog" aria-controls="drawer"
+                aria-expanded="false">
+                Jump to
+            </button>
+        </div>
+    </header>
+
+    <div class="frame">
+        <div class="surface">
+            <div class="layout">
+                <nav aria-label="Question navigation">
+                    <div class="nav-title">Questions</div>
+                    <div id="navHost"></div>
+                </nav>
+
+                <main id="main" tabindex="-1">
+                    <div class="paper-meta" id="paperMeta"></div>
+                    <div id="paperHost"></div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile drawer -->
+    <div id="backdrop" class="drawer-backdrop" hidden></div>
+    <div id="drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+        <header>
+            <div class="drawer-top">
+                <p id="drawerTitle" class="drawer-title">Questions</p>
+                <button id="drawerClose" class="drawer-close" type="button">Close</button>
+            </div>
+        </header>
+        <div class="drawer-nav" id="drawerNavHost" aria-label="Question navigation (drawer)"></div>
+    </div>
+
+    <script>
+        // === Canonical constant (single literal occurrence) ===
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.json";
+
+        (function () {
+            const state = {
+                payload: null,
+                paperIndex: 0,
+                expandedByQKey: new Map(), // key: paperKey + "::" + questionPathId -> boolean
+                activeAnchorId: null,
+                prefersReducedMotion: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            };
+
+            const els = {
+                paperSelect: document.getElementById('paperSelect'),
+                paperHost: document.getElementById('paperHost'),
+                navHost: document.getElementById('navHost'),
+                paperMeta: document.getElementById('paperMeta'),
+                jumpBtn: document.getElementById('jumpBtn'),
+                backdrop: document.getElementById('backdrop'),
+                drawer: document.getElementById('drawer'),
+                drawerNavHost: document.getElementById('drawerNavHost'),
+                drawerClose: document.getElementById('drawerClose'),
+                main: document.getElementById('main'),
+            };
+
+            // Markdown renderer with required behavior:
+            // - html passthrough enabled
+            // - disable inline escape rule to preserve TeX backslashes
+            function createMarkdownRenderer() {
+                const md = window.markdownit({
+                    html: true,
+                    linkify: true,
+                    breaks: false,
+                    typographer: false
+                });
+                if (md && md.inline && md.inline.ruler && md.inline.ruler.disable) {
+                    md.inline.ruler.disable(['escape']);
+                }
+                return md;
+            }
+
+            function safeRenderMarkdown(md, source) {
+                if (!source) return '';
+                try { return md.render(source); }
+                catch (e) { return ''; }
+            }
+
+            function runKatex(container) {
+                try {
+                    if (!window.renderMathInElement) return;
+                    window.renderMathInElement(container, {
+                        delimiters: [
+                            { left: "$$", right: "$$", display: true },
+                            { left: "$", right: "$", display: false }
+                        ],
+                        throwOnError: false
+                    });
+                } catch (e) {
+                    // fall back to plain text (content remains visible)
+                }
+            }
+
+            function wrapTables(container) {
+                const tables = container.querySelectorAll('table');
+                tables.forEach(t => {
+                    if (t.parentElement && t.parentElement.classList && t.parentElement.classList.contains('table-wrap')) return;
+                    const wrap = document.createElement('div');
+                    wrap.className = 'table-wrap';
+                    t.parentNode.insertBefore(wrap, t);
+                    wrap.appendChild(t);
+                });
+            }
+
+            function qKey(paperKey, pathId) {
+                return paperKey + "::" + pathId;
+            }
+
+            function setExpanded(paperKey, pathId, value) {
+                state.expandedByQKey.set(qKey(paperKey, pathId), !!value);
+            }
+
+            function getExpanded(paperKey, pathId, defaultExpanded) {
+                const k = qKey(paperKey, pathId);
+                if (state.expandedByQKey.has(k)) return state.expandedByQKey.get(k);
+                return !!defaultExpanded;
+            }
+
+            function clearExpandedForPaper(paperKey) {
+                // preserve map entries for other papers; nothing required beyond not forcing state changes
+                // (paper switching rebuilds view; per rules, should not auto-expand/collapse beyond paper defaults)
+            }
+
+            function normalizeIdForDom(id) {
+                return String(id || '').replace(/\s+/g, '').replace(/[^\w\-\(\)]+/g, '_');
+            }
+
+            function buildNavList({ paper, entries, container, onClick }) {
+                container.innerHTML = '';
+                const ul = document.createElement('ul');
+                ul.className = 'nav-list';
+
+                for (const entry of entries) {
+                    if (entry.type === 'section') {
+                        const sep = document.createElement('div');
+                        sep.className = 'nav-sep';
+                        sep.textContent = entry.label;
+                        container.appendChild(sep);
+                        continue;
+                    }
+
+                    const li = document.createElement('li');
+                    li.className = 'nav-item';
+                    li.dataset.anchor = entry.anchorId;
+                    li.dataset.active = "false";
+                    li.style.paddingLeft = (10 + Math.min(entry.depth, 6) * 10) + 'px';
+
+                    const marker = document.createElement('span');
+                    marker.className = 'nav-marker';
+                    marker.setAttribute('aria-hidden', 'true');
+
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'nav-btn';
+                    btn.textContent = entry.label;
+                    btn.addEventListener('click', () => onClick(entry.anchorId));
+
+                    li.appendChild(marker);
+                    li.appendChild(btn);
+                    ul.appendChild(li);
+                }
+
+                container.appendChild(ul);
+            }
+
+            function setActiveNav(anchorId) {
+                state.activeAnchorId = anchorId;
+                const allNavItems = document.querySelectorAll('.nav-item[data-anchor]');
+                allNavItems.forEach(item => {
+                    item.dataset.active = (item.dataset.anchor === anchorId) ? "true" : "false";
+                });
+            }
+
+            function smoothScrollToAnchor(anchorId) {
+                const el = document.getElementById(anchorId);
+                if (!el) return;
+                const behavior = state.prefersReducedMotion ? 'auto' : 'smooth';
+                el.scrollIntoView({ behavior, block: 'start' });
+            }
+
+            function iconSvg() {
+                // single neutral icon for Keep in mind
+                return `
+          <svg class="keep-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 2a7 7 0 0 0-4 12.74V18a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-3.26A7 7 0 0 0 12 2zm2.5 11.3-.5.35V18h-4v-4.35l-.5-.35A5 5 0 1 1 14.5 13.3zM10 22h4v-1h-4v1z"/>
+          </svg>
+        `;
+            }
+
+            function buildQuestionNode(md, paperKey, node, depth, pathId, defaultExpandedAll, navEntries) {
+                const domId = "q_" + normalizeIdForDom(pathId);
+                navEntries.push({ type: 'q', label: node.id || '', anchorId: domId, depth });
+
+                const outer = document.createElement('section');
+                outer.className = 'question';
+                outer.id = domId;
+
+                const inner = document.createElement('div');
+                inner.className = 'q-inner';
+                inner.dataset.depth = String(depth);
+
+                // Question
+                const head = document.createElement('div');
+                head.className = 'q-head';
+
+                const qid = document.createElement('div');
+                qid.className = 'qid';
+                qid.textContent = node.id || '';
+
+                const qtext = document.createElement('div');
+                qtext.className = 'q-text';
+
+                const qmd = document.createElement('div');
+                qmd.className = 'md';
+                qmd.innerHTML = safeRenderMarkdown(md, node.question || '');
+                qtext.appendChild(qmd);
+
+                head.appendChild(qid);
+                head.appendChild(qtext);
+                inner.appendChild(head);
+
+                // Answer (always visible)
+                const ans = document.createElement('div');
+                ans.className = 'answer';
+
+                const al = document.createElement('div');
+                al.className = 'answer-label';
+                al.textContent = 'Answer';
+
+                const av = document.createElement('div');
+                av.className = 'md';
+                av.innerHTML = safeRenderMarkdown(md, node.answer || '');
+
+                ans.appendChild(al);
+                ans.appendChild(av);
+                inner.appendChild(ans);
+
+                // Solution Details (optional)
+                const hasSol = !!node.solutionDetails;
+                let solutionEl = null;
+                let toggleBtn = null;
+
+                if (hasSol) {
+                    const toggleRow = document.createElement('div');
+                    toggleRow.className = 'toggle-row';
+
+                    toggleBtn = document.createElement('button');
+                    toggleBtn.type = 'button';
+                    toggleBtn.className = 'toggle';
+                    toggleBtn.setAttribute('aria-controls', domId + "_sol");
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+
+                    const chev = document.createElement('span');
+                    chev.className = 'chev';
+                    chev.setAttribute('aria-hidden', 'true');
+                    chev.textContent = '›';
+
+                    const label = document.createElement('span');
+                    label.textContent = 'Show working';
+
+                    toggleBtn.appendChild(chev);
+                    toggleBtn.appendChild(label);
+
+                    toggleRow.appendChild(toggleBtn);
+                    inner.appendChild(toggleRow);
+
+                    solutionEl = document.createElement('div');
+                    solutionEl.className = 'solution';
+                    solutionEl.id = domId + "_sol";
+                    const solInner = document.createElement('div');
+                    solInner.className = 'solution-inner';
+
+                    const sd = node.solutionDetails || {};
+
+                    const blocks = [];
+
+                    if (sd.keepInMind) {
+                        blocks.push({ kind: 'keep', label: 'Keep in mind', body: sd.keepInMind });
+                    }
+                    if (sd.formulasUsed) {
+                        blocks.push({ kind: 'formulas', label: 'Formulas used', body: sd.formulasUsed });
+                    }
+                    if (sd.working) {
+                        blocks.push({ kind: 'work', label: 'Working', body: sd.working });
+                    }
+                    if (sd.alternativeWorking) {
+                        blocks.push({ kind: 'alt', label: 'Alternative working', body: sd.alternativeWorking });
+                    }
+
+                    // Render blocks in required order (already sequenced above)
+                    let seenFormulas = false;
+                    let insertedDivider = false;
+
+                    for (const b of blocks) {
+                        const block = document.createElement('section');
+                        block.className = 'sol-block ' + b.kind;
+
+                        const lab = document.createElement('div');
+                        lab.className = 'sol-label';
+
+                        if (b.kind === 'keep') {
+                            const iconWrap = document.createElement('span');
+                            iconWrap.innerHTML = iconSvg();
+                            lab.appendChild(iconWrap.firstElementChild);
+                        }
+
+                        const labText = document.createElement('span');
+                        labText.textContent = b.label;
+                        lab.appendChild(labText);
+
+                        const body = document.createElement('div');
+                        body.className = 'sol-body';
+                        const bodyMd = document.createElement('div');
+                        bodyMd.className = 'md';
+                        bodyMd.innerHTML = safeRenderMarkdown(md, b.body || '');
+                        body.appendChild(bodyMd);
+
+                        block.appendChild(lab);
+                        block.appendChild(body);
+
+                        // Insert optional hairline divider between formulas and working, if both exist
+                        if (!insertedDivider && seenFormulas && (b.kind === 'work' || b.kind === 'alt')) {
+                            const hr = document.createElement('hr');
+                            hr.className = 'sol-divider';
+                            solInner.appendChild(hr);
+                            insertedDivider = true;
+                        }
+
+                        solInner.appendChild(block);
+
+                        if (b.kind === 'formulas') seenFormulas = true;
+                    }
+
+                    solutionEl.appendChild(solInner);
+                    inner.appendChild(solutionEl);
+
+                    // Default expanded state: only if paper.defaults.expandedAll === true
+                    const defaultExpanded = !!defaultExpandedAll;
+                    const expanded = getExpanded(paperKey, pathId, defaultExpanded);
+
+                    if (!expanded) solutionEl.hidden = true;
+                    toggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                    toggleBtn.querySelector('span:last-child').textContent = expanded ? 'Hide working' : 'Show working';
+                    toggleBtn.querySelector('.chev').style.transform = expanded ? 'rotate(90deg)' : 'rotate(0deg)';
+
+                    toggleBtn.addEventListener('click', () => {
+                        const now = !solutionEl.hidden;
+                        const next = !now;
+
+                        setExpanded(paperKey, pathId, next);
+
+                        // Update UI inline only; no focus movement, no auto scroll
+                        solutionEl.hidden = !next;
+                        toggleBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
+                        toggleBtn.querySelector('span:last-child').textContent = next ? 'Hide working' : 'Show working';
+                        toggleBtn.querySelector('.chev').style.transform = next ? 'rotate(90deg)' : 'rotate(0deg)';
+
+                        // After reveal/hide, re-run KaTeX on this question area only (safe, deterministic)
+                        // This avoids missing KaTeX in newly revealed content.
+                        requestAnimationFrame(() => {
+                            const scope = inner;
+                            wrapTables(scope);
+                            runKatex(scope);
+                        });
+                    });
+                }
+
+                outer.appendChild(inner);
+
+                // Children (render immediately below, tighter spacing)
+                if (Array.isArray(node.children) && node.children.length) {
+                    // reduce spacing between parent and first child by keeping children inside same outer section
+                    const childWrap = document.createElement('div');
+                    childWrap.style.marginTop = '14px';
+                    for (let i = 0; i < node.children.length; i++) {
+                        const child = node.children[i];
+                        const childPath = pathId + "." + i;
+                        const childNodeEl = buildQuestionNode(md, paperKey, child, depth + 1, childPath, defaultExpandedAll, navEntries);
+                        childWrap.appendChild(childNodeEl);
+                    }
+                    outer.appendChild(childWrap);
+                }
+
+                // Post-render hooks within this question
+                wrapTables(outer);
+
+                return outer;
+            }
+
+            function flattenNavEntries(paper) {
+                const entries = [];
+                const pushQuestions = (questions, basePath) => {
+                    for (let i = 0; i < questions.length; i++) {
+                        const node = questions[i];
+                        // note: actual nav entry is pushed during DOM creation, because we need DOM ids
+                        // here we only carry the section separators elsewhere
+                    }
+                };
+                return entries;
+            }
+
+            function observeActiveQuestions() {
+                // IntersectionObserver to set active nav item based on current viewport
+                const candidates = Array.from(document.querySelectorAll('.question[id]'));
+                if (!candidates.length) return;
+
+                const rootMargin = '-20% 0px -70% 0px';
+                const obs = new IntersectionObserver((entries) => {
+                    // Choose the topmost intersecting in reading direction
+                    const visible = entries
+                        .filter(e => e.isIntersecting)
+                        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+                    if (visible.length) {
+                        const id = visible[0].target.id;
+                        setActiveNav(id);
+                    }
+                }, { root: null, threshold: [0, 0.2, 0.6, 1], rootMargin });
+
+                candidates.forEach(el => obs.observe(el));
+            }
+
+            function closeDrawer({ restoreFocus = true } = {}) {
+                els.drawer.hidden = true;
+                els.backdrop.hidden = true;
+                els.drawer.style.display = 'none';
+                els.backdrop.style.display = 'none';
+                document.body.style.overflow = '';
+                els.jumpBtn.setAttribute('aria-expanded', 'false');
+                if (restoreFocus) els.jumpBtn.focus();
+            }
+
+            function openDrawer() {
+                els.backdrop.hidden = false;
+                els.drawer.hidden = false;
+                els.backdrop.style.display = 'block';
+                els.drawer.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                els.jumpBtn.setAttribute('aria-expanded', 'true');
+
+                // focus management: move focus to close button (no auto-scroll in content area)
+                els.drawerClose.focus();
+            }
+
+            function trapFocusInDrawer(e) {
+                if (els.drawer.hidden) return;
+                if (e.key !== 'Tab') return;
+
+                const focusables = els.drawer.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+                const list = Array.from(focusables).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+                if (!list.length) return;
+
+                const first = list[0];
+                const last = list[list.length - 1];
+
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+
+            function preventBackgroundFocus(e) {
+                if (els.drawer.hidden) return;
+                // prevent focus leaving the drawer when open
+                if (!els.drawer.contains(e.target)) {
+                    e.stopPropagation();
+                    els.drawerClose.focus();
+                }
+            }
+
+            function buildAndRenderPaper() {
+                const payload = state.payload;
+                const paper = payload.papers[state.paperIndex];
+                const paperKey = paper.key || ("paper_" + state.paperIndex);
+
+                els.paperHost.innerHTML = '';
+                els.navHost.innerHTML = '';
+                els.drawerNavHost.innerHTML = '';
+                els.paperMeta.textContent = paper.label ? paper.label : '';
+
+                const md = createMarkdownRenderer();
+
+                const defaultExpandedAll = !!(paper.defaults && paper.defaults.expandedAll);
+
+                // Gather nav entries as we render (question id only, derived from payload order + structure)
+                const navEntries = [];
+
+                const renderQuestionsArray = (questions, depthBase, pathBase) => {
+                    for (let i = 0; i < questions.length; i++) {
+                        const node = questions[i];
+                        const pathId = pathBase + i;
+                        const qEl = buildQuestionNode(md, paperKey, node, depthBase, pathId, defaultExpandedAll, navEntries);
+                        els.paperHost.appendChild(qEl);
+
+                        // Render KaTeX for this question scope (includes question/answer and potentially hidden solution)
+                        runKatex(qEl);
+                    }
+                };
+
+                if (Array.isArray(paper.sections)) {
+                    for (let s = 0; s < paper.sections.length; s++) {
+                        const sec = paper.sections[s];
+                        // section label (non-clickable separator)
+                        const h = document.createElement('div');
+                        h.className = 'section-label';
+                        h.textContent = sec.label || '';
+                        els.paperHost.appendChild(h);
+                        navEntries.push({ type: 'section', label: sec.label || '' });
+
+                        if (Array.isArray(sec.questions)) {
+                            renderQuestionsArray(sec.questions, 0, "s" + s + ".");
+                        }
+                    }
+                } else if (Array.isArray(paper.questions)) {
+                    renderQuestionsArray(paper.questions, 0, "q.");
+                }
+
+                // Build nav (desktop + drawer) from navEntries
+                const onNavClick = (anchorId) => {
+                    smoothScrollToAnchor(anchorId);
+                    setActiveNav(anchorId);
+                    closeDrawer({ restoreFocus: false });
+                };
+
+                buildNavList({ paper, entries: navEntries, container: els.navHost, onClick: onNavClick });
+                buildNavList({ paper, entries: navEntries, container: els.drawerNavHost, onClick: onNavClick });
+
+                // Wrap tables globally (for any tables added by KaTeX render timing or nested blocks)
+                wrapTables(els.paperHost);
+
+                // Run KaTeX across whole paper host (ensures any not yet rendered get rendered)
+                runKatex(els.paperHost);
+
+                // Observe active question for nav highlighting
+                observeActiveQuestions();
+
+                // Set initial active item
+                const firstQ = document.querySelector('.question[id]');
+                if (firstQ) setActiveNav(firstQ.id);
+            }
+
+            function setSelectorOptions() {
+                const payload = state.payload;
+                els.paperSelect.innerHTML = '';
+                payload.papers.forEach((p, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = String(idx);
+                    opt.textContent = p.label || p.key || ("Paper " + (idx + 1));
+                    els.paperSelect.appendChild(opt);
+                });
+                els.paperSelect.disabled = false;
+                els.paperSelect.value = String(state.paperIndex);
+            }
+
+            function renderMissing() {
+                els.paperSelect.disabled = true;
+                els.paperSelect.innerHTML = '<option>Papers payload missing</option>';
+                els.paperMeta.textContent = '';
+                els.navHost.innerHTML = '';
+                els.drawerNavHost.innerHTML = '';
+                els.paperHost.innerHTML = '<div class="missing">PAPERS PAYLOAD MISSING</div>';
+            }
+
+            async function loadPayload() {
+                try {
+                    const res = await fetch(RTQ_PAPERS_PAYLOAD_PATH, { cache: 'no-store' });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const json = await res.json();
+                    if (!json || !Array.isArray(json.papers)) throw new Error('Invalid schema');
+                    return json;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function initInteractions() {
+                els.paperSelect.addEventListener('change', () => {
+                    const idx = Number(els.paperSelect.value);
+                    if (!Number.isFinite(idx)) return;
+                    state.paperIndex = idx;
+
+                    // switching papers must rebuild navigation and content; do not auto expand/collapse beyond paper defaults
+                    buildAndRenderPaper();
+                });
+
+                els.jumpBtn.addEventListener('click', () => {
+                    if (!els.drawer.hidden) {
+                        closeDrawer();
+                    } else {
+                        openDrawer();
+                    }
+                });
+
+                els.drawerClose.addEventListener('click', () => closeDrawer());
+                els.backdrop.addEventListener('click', () => closeDrawer());
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && !els.drawer.hidden) {
+                        e.preventDefault();
+                        closeDrawer();
+                    }
+                    trapFocusInDrawer(e);
+                });
+
+                document.addEventListener('focusin', preventBackgroundFocus);
+            }
+
+            // Boot
+            (async function () {
+                initInteractions();
+
+                // Wait until markdown-it script is ready (defer scripts should load before this runs, but guard anyway)
+                const payload = await loadPayload();
+                if (!payload) {
+                    renderMissing();
+                    return;
+                }
+
+                state.payload = payload;
+                state.paperIndex = 0;
+
+                setSelectorOptions();
+                buildAndRenderPaper();
+            })();
+        })();
+    </script>
+</body>
+
+</html>
