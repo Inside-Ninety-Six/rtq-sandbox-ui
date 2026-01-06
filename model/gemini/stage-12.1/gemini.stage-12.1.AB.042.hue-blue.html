@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AB","indexWithinVariant":"42","totalWithinVariant":"200","hueFamily":"blue","intensityMode":"","timestamp":"2026-01-06T21:30:11.521Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AB&quot;,&quot;indexWithinVariant&quot;:&quot;42&quot;,&quot;totalWithinVariant&quot;:&quot;200&quot;,&quot;hueFamily&quot;:&quot;blue&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-06T21:30:11.521Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+
+    <!-- Tailwind CSS (via CDN for prototyping) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- KaTeX CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    
+    <!-- KaTeX JS -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <script>
+        // Tailwind Configuration for ColorLab B (Blue Hue Family, Light Mode Only)
+        tailwind.config = {
+            darkMode: 'class', // Manual toggle, but we enforce light mode logic
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        // Semantic mapping to Blue scale (Slate/Blue)
+                        base: {
+                            bg: '#F8FAFC', // Slate-50
+                            paper: '#FFFFFF',
+                            nav: '#F8FAFC', // Matches base for "shared surface" feel
+                        },
+                        content: {
+                            primary: '#0F172A', // Slate-900
+                            secondary: '#475569', // Slate-600
+                            tertiary: '#64748B', // Slate-500
+                            quiet: '#94A3B8', // Slate-400
+                        },
+                        divider: '#E2E8F0', // Slate-200
+                        accent: {
+                            DEFAULT: '#2563EB', // Blue-600 (Focus/Links/Active)
+                            subtle: '#EFF6FF', // Blue-50 (Hover)
+                            focus: '#3B82F6', // Blue-500
+                        },
+                        surface: {
+                            wash: '#F1F5F9', // Slate-100 (Solution Details wash if needed)
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base Reset & Typography */
+        body {
+            @apply bg-base-bg text-content-primary font-sans antialiased;
+            /* Prevent horizontal scroll on body */
+            overflow-x: hidden; 
+        }
+
+        /* Focus Styles (Stage 5.5.2) */
+        :focus-visible {
+            @apply outline-none ring-2 ring-accent-focus ring-offset-2;
+        }
+
+        /* Scrollbar Hiding for Nav (Stage 3 Add-on) */
+        .hide-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* KaTeX Containment (Stage 6.0.8) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5rem 0;
+            /* Scrollbar styling for math blocks */
+            scrollbar-width: thin;
+            scrollbar-color: #CBD5E1 transparent;
+        }
+        .katex-display::-webkit-scrollbar {
+            height: 4px;
+        }
+        .katex-display::-webkit-scrollbar-thumb {
+            @apply bg-slate-300 rounded;
+        }
+        
+        /* Markdown Tables */
+        table {
+            @apply w-full text-left text-sm border-collapse my-4;
+        }
+        th, td {
+            @apply border border-divider p-2 align-top;
+        }
+        th {
+            @apply font-semibold bg-slate-50;
+        }
+        
+        /* Markdown Lists */
+        ul { @apply list-disc list-outside ml-5 my-2 space-y-1; }
+        ol { @apply list-decimal list-outside ml-5 my-2 space-y-1; }
+        
+        /* Layout Utilities */
+        .sticky-nav {
+            position: sticky;
+            top: 0;
+            max-height: 100vh;
+            overflow-y: auto;
+        }
+
+        /* Motion (Stage 5.5.3) */
+        .disclosure-content {
+            @apply transition-all duration-300 ease-in-out;
+            overflow: hidden;
+        }
+        
+        /* Navigation Active State */
+        .nav-item-active {
+            @apply font-bold text-accent;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Structure will be injected here -->
+    </div>
+
+    <script>
+        /**
+         * STAGE 0: CONSTANTS
+         */
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        /**
+         * MARKDOWN CONFIGURATION (Stage 6 Add-on)
+         */
+        const md = window.markdownit ? window.markdownit({
+            html: true, // Allow inline SVG
+            linkify: true,
+            breaks: false // Critical: prevents <br> in math
+        }) : null;
+
+        if (md) {
+            md.inline.ruler.disable(['escape']);
+        }
+
+        /**
+         * STATE MANAGEMENT
+         */
+        const state = {
+            papers: [],
+            currentPaperKey: null,
+            payloadStatus: 'loading', // loading, loaded, error
+            // Map of question ID -> boolean (true = expanded)
+            expandedQuestions: new Map(), 
+            mobileNavOpen: false
+        };
+
+        /**
+         * DOM ELEMENTS
+         */
+        const app = document.getElementById('app');
+
+        /**
+         * INITIALIZATION
+         */
+        async function init() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const payload = await response.json();
+                
+                if (payload && Array.isArray(payload.papers)) {
+                    state.papers = payload.papers;
+                    state.payloadStatus = 'loaded';
+                    
+                    // Select first paper by default
+                    if (state.papers.length > 0) {
+                        selectPaper(state.papers[0].key);
+                    } else {
+                        render();
+                    }
+                } else {
+                    throw new Error('Invalid payload structure');
+                }
+            } catch (error) {
+                console.error("Payload loading failed:", error);
+                state.payloadStatus = 'error';
+                render();
+            }
+        }
+
+        /**
+         * LOGIC
+         */
+        function selectPaper(key) {
+            const paper = state.papers.find(p => p.key === key);
+            if (!paper) return;
+
+            state.currentPaperKey = key;
+            state.expandedQuestions.clear();
+            state.mobileNavOpen = false;
+
+            // Handle defaults (expandedAll)
+            const expandedAll = paper.defaults?.expandedAll !== false; // Default to true unless explicitly false
+
+            // Recursively set default expanded state for questions with solutionDetails
+            const traverseQuestions = (nodes) => {
+                if (!nodes) return;
+                nodes.forEach(node => {
+                    if (node.solutionBlock?.solutionDetails) {
+                        state.expandedQuestions.set(node.id, expandedAll);
+                    }
+                    if (node.children) traverseQuestions(node.children);
+                });
+            };
+
+            if (paper.sections) {
+                paper.sections.forEach(sec => traverseQuestions(sec.questions));
+            } else {
+                traverseQuestions(paper.questions);
+            }
+
+            render();
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        function toggleQuestion(id) {
+            const current = state.expandedQuestions.get(id);
+            state.expandedQuestions.set(id, !current);
+            renderPaperContent(); // Re-render only content to preserve shell
+        }
+
+        function toggleMobileNav() {
+            state.mobileNavOpen = !state.mobileNavOpen;
+            render();
+        }
+
+        function scrollToQuestion(id) {
+            const el = document.getElementById(`q-${id}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Close mobile nav if open
+                if (state.mobileNavOpen) {
+                    state.mobileNavOpen = false;
+                    render();
+                }
+            }
+        }
+
+        /**
+         * RENDERING
+         */
+        function render() {
+            if (state.payloadStatus === 'error') {
+                app.innerHTML = `
+                    <div class="flex items-center justify-center min-h-screen">
+                        <div class="text-xl font-medium text-content-secondary">PAPERS PAYLOAD MISSING</div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (state.payloadStatus === 'loading') {
+                app.innerHTML = `
+                    <div class="flex items-center justify-center min-h-screen">
+                        <div class="text-sm text-content-tertiary">Loading papers...</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const currentPaper = state.papers.find(p => p.key === state.currentPaperKey);
+            if (!currentPaper) return;
+
+            // Shell Structure
+            app.innerHTML = `
+                ${renderTopControls(currentPaper)}
+                
+                <div class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-8 grid grid-cols-1 md:grid-cols-[200px_1fr] lg:grid-cols-[240px_1fr] gap-8">
+                    <!-- Desktop Nav Rail -->
+                    <aside class="hidden md:block sticky-nav h-screen py-6 hide-scrollbar">
+                        ${renderNavigationList(currentPaper)}
+                    </aside>
+
+                    <!-- Paper Content -->
+                    <main class="py-6 min-w-0 pb-20">
+                        <div id="paper-surface" class="space-y-12">
+                            <!-- Paper Content Injected via JS to avoid full DOM trashing on toggles if possible, 
+                                 but for simplicity in this prototype we re-render string -->
+                        </div>
+                    </main>
+                </div>
+
+                ${renderMobileDrawer(currentPaper)}
+            `;
+
+            // Render inner paper content
+            renderPaperContent();
+        }
+
+        function renderPaperContent() {
+            const container = document.getElementById('paper-surface');
+            if (!container) return;
+
+            const currentPaper = state.papers.find(p => p.key === state.currentPaperKey);
+            if (!currentPaper) return;
+
+            let html = '';
+
+            if (currentPaper.sections) {
+                currentPaper.sections.forEach((section, index) => {
+                    // Section Header
+                    if (section.label && section.label.trim() !== '') {
+                        html += `
+                            <div class="mb-8 pt-4 pb-2 border-b border-divider">
+                                <h2 class="text-lg font-bold text-content-primary">${escapeHtml(section.label)}</h2>
+                            </div>
+                        `;
+                    }
+                    // Questions
+                    html += `<div class="space-y-16">`;
+                    section.questions.forEach(q => {
+                        html += renderQuestionNode(q, 0, true);
+                    });
+                    html += `</div>`;
+                    
+                    // Spacer between sections
+                    if (index < currentPaper.sections.length - 1) {
+                        html += `<div class="h-8"></div>`;
+                    }
+                });
+            } else {
+                html += `<div class="space-y-16">`;
+                currentPaper.questions.forEach(q => {
+                    html += renderQuestionNode(q, 0, true);
+                });
+                html += `</div>`;
+            }
+
+            container.innerHTML = html;
+            
+            // Trigger KaTeX rendering
+            renderMathInElement(container, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+
+        function renderTopControls(currentPaper) {
+            return `
+                <div class="sticky top-0 z-40 bg-base-nav/95 backdrop-blur border-b border-divider">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-14 flex items-center justify-between">
+                        <!-- Paper Selector -->
+                        <div class="flex items-center gap-3">
+                            <label for="paper-select" class="sr-only">Select Paper</label>
+                            <select id="paper-select" 
+                                class="bg-transparent text-sm font-medium text-content-primary border border-divider rounded px-2 py-1 focus:border-accent focus:ring-1 focus:ring-accent cursor-pointer"
+                                onchange="selectPaper(this.value)">
+                                ${state.papers.map(p => `
+                                    <option value="${p.key}" ${p.key === state.currentPaperKey ? 'selected' : ''}>
+                                        ${escapeHtml(p.label)}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+
+                        <!-- Mobile Jump To Trigger -->
+                        <button class="md:hidden text-sm font-medium text-accent hover:text-accent-focus px-2 py-1"
+                                onclick="toggleMobileNav()">
+                            Jump to
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMobileDrawer(currentPaper) {
+            if (!state.mobileNavOpen) return '';
+
+            return `
+                <div class="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
+                    <!-- Scrim -->
+                    <div class="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onclick="toggleMobileNav()"></div>
+                    
+                    <!-- Drawer -->
+                    <div class="relative w-64 bg-base-paper h-full shadow-xl flex flex-col">
+                        <div class="flex items-center justify-between p-4 border-b border-divider">
+                            <h2 class="text-sm font-bold text-content-primary">Jump to</h2>
+                            <button class="text-content-secondary hover:text-content-primary p-1" onclick="toggleMobileNav()">
+                                <span class="sr-only">Close</span>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-4 hide-scrollbar">
+                            ${renderNavigationList(currentPaper)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderNavigationList(currentPaper) {
+            let html = `<nav class="flex flex-col gap-1 text-sm">`;
+
+            const renderItem = (node, depth) => {
+                // Typography scale for hierarchy (Stage 5.4.5)
+                const textSize = depth === 0 ? 'text-sm' : (depth === 1 ? 'text-[13px]' : 'text-xs');
+                const textColor = depth === 0 ? 'text-content-secondary' : 'text-content-tertiary';
+                const weight = depth === 0 ? 'font-medium' : 'font-normal';
+                
+                // Flat list, no indentation
+                return `
+                    <button onclick="scrollToQuestion('${node.id}')" 
+                        class="text-left py-1 ${textSize} ${textColor} hover:text-content-primary transition-colors ${weight} truncate w-full hover:underline decoration-slate-300 underline-offset-2">
+                        ${escapeHtml(node.id)}
+                    </button>
+                `;
+            };
+
+            const traverse = (nodes, depth) => {
+                if (!nodes) return '';
+                let out = '';
+                nodes.forEach(node => {
+                    out += renderItem(node, depth);
+                    if (node.children) out += traverse(node.children, depth + 1);
+                });
+                return out;
+            };
+
+            if (currentPaper.sections) {
+                currentPaper.sections.forEach((sec, idx) => {
+                    if (sec.label && sec.label.trim() !== '') {
+                        // Section Label (Non-clickable)
+                        html += `
+                            <div class="mt-4 first:mt-0 mb-1">
+                                <span class="text-xs font-bold text-content-quiet uppercase tracking-wider">${escapeHtml(sec.label)}</span>
+                            </div>
+                        `;
+                    } else if (idx > 0) {
+                        // Spacing only if section label omitted but it's a new group
+                        html += `<div class="mt-4"></div>`;
+                    }
+                    html += traverse(sec.questions, 0);
+                });
+            } else {
+                html += traverse(currentPaper.questions, 0);
+            }
+
+            html += `</nav>`;
+            return html;
+        }
+
+        function renderQuestionNode(node, depth, isTopLevel) {
+            const hasSolutionBlock = !!node.solutionBlock;
+            const hasSolutionDetails = hasSolutionBlock && !!node.solutionBlock.solutionDetails;
+            const hasAnswer = hasSolutionBlock && !!node.solutionBlock.answer;
+            const isExpanded = state.expandedQuestions.get(node.id);
+
+            // Styling variables based on depth
+            const containerClass = isTopLevel ? 'scroll-mt-24' : 'mt-6 scroll-mt-24';
+            // Indentation for children (Stage 3) - Adaptive
+            const childContainerClass = depth >= 0 ? 'pl-0 md:pl-4 lg:pl-6 border-l-0 md:border-l-2 border-transparent' : ''; 
+            // NOTE: Canonical tree says visual indentation via spacing only, adapted for screens. 
+            // Design brief says "Indentation may adapt... must not create boxed layouts".
+            // Implementation: Simple left padding for children on larger screens to show structure without boxes.
+
+            let html = `<div id="q-${node.id}" class="${containerClass}">`;
+
+            // 1. Question Body
+            html += `
+                <div class="flex gap-3 md:gap-4">
+                    <div class="flex-none pt-0.5">
+                        <span class="text-sm font-bold text-content-secondary select-none">${escapeHtml(node.id)}</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="prose prose-slate max-w-none text-content-primary text-base/relaxed font-medium">
+                            ${renderMarkdown(node.question)}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 2. Solution Block (Optional)
+            if (hasSolutionBlock) {
+                html += `<div class="ml-8 md:ml-10 mt-3 space-y-4">`; // Indent to align with question text (approx)
+
+                // Answer
+                if (hasAnswer) {
+                    html += `
+                        <div>
+                            <span class="text-xs font-bold text-content-tertiary uppercase tracking-wide block mb-1">Answer</span>
+                            <div class="text-content-primary prose prose-slate max-w-none font-medium">
+                                ${renderMarkdown(node.solutionBlock.answer)}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Solution Details Toggle & Content
+                if (hasSolutionDetails) {
+                    html += `
+                        <div class="pt-1">
+                            <button onclick="toggleQuestion('${node.id}')" 
+                                class="group flex items-center gap-2 text-sm font-medium text-accent hover:text-accent-focus transition-colors focus:outline-none">
+                                <span>${isExpanded ? 'Hide working' : 'Show working'}</span>
+                                <svg class="w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}" 
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+
+                            ${isExpanded ? `
+                                <div class="mt-4 pl-0 border-t border-divider/50 pt-4">
+                                    ${renderSolutionDetails(node.solutionBlock.solutionDetails)}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                html += `</div>`;
+            }
+
+            // 3. Children
+            if (node.children && node.children.length > 0) {
+                html += `<div class="${childContainerClass} mt-4 space-y-8">`;
+                node.children.forEach(child => {
+                    html += renderQuestionNode(child, depth + 1, false);
+                });
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+            return html;
+        }
+
+        function renderSolutionDetails(details) {
+            let html = `<div class="space-y-6 text-base text-content-secondary">`;
+
+            // Order: Keep in mind -> Formulas -> Working -> Alternative
+
+            // Keep in mind
+            if (details.keepInMind) {
+                html += `
+                    <div>
+                        <div class="text-xs font-bold text-content-tertiary uppercase tracking-wide mb-2">Keep in mind</div>
+                        <div class="prose prose-slate prose-sm max-w-none text-content-secondary">
+                            ${renderMarkdown(details.keepInMind)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Formulas used
+            if (details.formulasUsed) {
+                html += `
+                    <div>
+                        <div class="text-xs font-bold text-content-tertiary uppercase tracking-wide mb-2">Formulas used</div>
+                        <div class="prose prose-slate prose-sm max-w-none text-content-secondary">
+                            ${renderMarkdown(details.formulasUsed)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Working
+            if (details.working) {
+                html += `
+                    <div>
+                        <div class="text-xs font-bold text-content-tertiary uppercase tracking-wide mb-2">Working</div>
+                        <div class="prose prose-slate max-w-none text-content-secondary">
+                            ${renderMarkdown(details.working)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Alternative Working
+            if (details.alternativeWorking && Array.isArray(details.alternativeWorking)) {
+                details.alternativeWorking.forEach((alt, idx) => {
+                    html += `
+                        <div class="pt-4 border-t border-divider border-dashed">
+                            <div class="text-xs font-bold text-content-tertiary uppercase tracking-wide mb-2">Alternative working</div>
+                            <div class="prose prose-slate max-w-none text-content-secondary">
+                                ${renderMarkdown(alt)}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `</div>`;
+            return html;
+        }
+
+        function renderMarkdown(text) {
+            if (!text || !md) return text || '';
+            // Markdown-it renders to HTML. KaTeX auto-render will pick it up later.
+            return md.render(text);
+        }
+
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Start App
+        init();
+
+    </script>
+</body>
+</html>
