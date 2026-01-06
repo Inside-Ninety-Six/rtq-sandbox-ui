@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Stress Test Harness (Shadcn Lab)</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        /* =========================================
+           RESET & BASE
+           ========================================= */
+        :root {
+            /* RTQ BRIDGE TOKENS (Initial Defaults - to be overwritten by Lab)
+               Values here are placeholders to prevent crash before JS runs 
+            */
+            --rtq-page-bg: #ffffff;
+            --rtq-frame-bg: #ffffff;
+            --rtq-paper-bg: #ffffff;
+
+            --rtq-question-surface-bg: #ffffff;
+            --rtq-answer-surface-bg: #f4f4f5;
+            --rtq-keepinmind-surface-bg: #fafafa;
+            --rtq-formulas-surface-bg: #f4f4f5;
+            --rtq-sd-wash-bg: #f4f4f5;
+
+            --rtq-text-primary: #09090b;
+            --rtq-text-secondary: #71717a;
+            --rtq-text-quiet: #a1a1aa;
+            --rtq-link: #18181b;
+
+            --rtq-hairline-strong: #e4e4e7;
+            --rtq-hairline: #e4e4e7;
+            --rtq-hairline-quiet: #f4f4f5;
+
+            --rtq-focus-ring: #09090b;
+            --rtq-font-sans: 'Inter', sans-serif;
+
+            /* ROLE-BASED SURFACE TOKENS (ALIASES)
+            */
+            --rtq-surface-viewport: var(--rtq-page-bg);
+            --rtq-surface-frame: var(--rtq-frame-bg);
+            --rtq-surface-top-controls: var(--rtq-frame-bg);
+            --rtq-surface-nav: var(--rtq-frame-bg);
+            --rtq-surface-paper: var(--rtq-paper-bg);
+
+            /* Optional/Exploratory aliases (default mapped to generic) */
+            --rtq-surface-question: var(--rtq-question-surface-bg);
+            --rtq-surface-answer: var(--rtq-answer-surface-bg);
+            --rtq-surface-keepinmind: var(--rtq-keepinmind-surface-bg);
+            --rtq-surface-formulas: var(--rtq-formulas-surface-bg);
+            --rtq-surface-sd-wash: var(--rtq-sd-wash-bg);
+
+            /*
+               ROLE-BASED TEXT TOKENS (ALIASES)
+            */
+            --rtq-text-question: var(--rtq-text-primary);
+            --rtq-text-question-id: var(--rtq-text-secondary);
+
+            --rtq-text-answer-label: var(--rtq-text-secondary);
+            --rtq-text-answer-value: var(--rtq-text-secondary);
+
+            --rtq-text-disclosure: var(--rtq-link);
+
+            --rtq-text-sd-label: var(--rtq-text-secondary);
+            --rtq-text-sd-body: var(--rtq-text-secondary);
+            --rtq-text-keepinmind-body: var(--rtq-text-secondary);
+            --rtq-text-formulas-body: var(--rtq-text-secondary);
+
+            --rtq-text-nav-item: var(--rtq-text-quiet);
+            --rtq-text-nav-section-label: var(--rtq-text-quiet);
+
+            --rtq-text-link: var(--rtq-link);
+
+            /* Spacing Constants (Stage 3/5 Rhythm) */
+            --sp-xs: 0.25rem;
+            --sp-sm: 0.5rem;
+            --sp-md: 1rem;
+            --sp-lg: 1.5rem;
+            --sp-xl: 2.5rem;
+            /* Top level question separation */
+
+            --nav-width: 240px;
+            --content-max-width: 800px;
+            /* Readable line length constraint */
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--rtq-font-sans);
+            background-color: var(--rtq-surface-viewport);
+            color: var(--rtq-text-primary);
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.5;
+        }
+
+        /* Focus States */
+        :focus-visible {
+            outline: 2px solid var(--rtq-focus-ring);
+            outline-offset: 2px;
+        }
+
+        /* =========================================
+           LAYOUT SHELL
+           ========================================= */
+        .document-frame-shell {
+            background-color: var(--rtq-surface-frame);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .shell-inner {
+            width: 100%;
+            max-width: 1200px;
+            /* Frame constraint */
+            padding: 0 var(--sp-md);
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        /* Top Controls Region */
+        .top-controls-region {
+            background-color: var(--rtq-surface-top-controls);
+            padding: var(--sp-md) 0;
+            border-bottom: 1px solid var(--rtq-hairline);
+            margin-bottom: var(--sp-lg);
+            width: 100%;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .controls-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: var(--sp-md);
+            flex-wrap: wrap;
+        }
+
+        /* Lab Strip */
+        .lab-strip {
+            display: flex;
+            gap: var(--sp-sm);
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--rtq-text-secondary);
+            flex-wrap: wrap;
+        }
+
+        .lab-control {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-xs);
+        }
+
+        select,
+        button {
+            font-family: inherit;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.5rem;
+            border: 1px solid var(--rtq-hairline);
+            background: var(--rtq-surface-paper);
+            color: var(--rtq-text-primary);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button.active {
+            background-color: var(--rtq-hairline-strong);
+        }
+
+        /* Columns */
+        .columns-container {
+            display: flex;
+            flex: 1;
+            gap: var(--sp-lg);
+        }
+
+        /* Navigation Rail (Desktop) */
+        .nav-rail {
+            width: var(--nav-width);
+            flex-shrink: 0;
+            background-color: var(--rtq-surface-nav);
+            position: sticky;
+            top: 80px;
+            /* clear top controls */
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            padding-bottom: var(--sp-xl);
+            display: none;
+            /* hidden on mobile by default */
+        }
+
+        /* Hide scrollbars */
+        .nav-rail {
+            scrollbar-width: none;
+        }
+
+        .nav-rail::-webkit-scrollbar {
+            display: none;
+        }
+
+        @media (min-width: 768px) {
+            .nav-rail {
+                display: block;
+            }
+
+            .mobile-jump-trigger {
+                display: none;
+            }
+        }
+
+        /* Mobile Drawer */
+        .mobile-jump-trigger {
+            display: block;
+        }
+
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            display: none;
+        }
+
+        .drawer-backdrop.open {
+            display: block;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 80%;
+            max-width: 300px;
+            background: var(--rtq-surface-frame);
+            z-index: 60;
+            transform: translateX(-100%);
+            transition: transform 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--rtq-hairline);
+        }
+
+        .drawer.open {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            padding: var(--sp-md);
+            border-bottom: 1px solid var(--rtq-hairline);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--sp-md);
+        }
+
+        /* Navigation List */
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-xs);
+        }
+
+        .nav-section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--rtq-text-nav-section-label);
+            font-weight: 600;
+            margin-top: var(--sp-md);
+            margin-bottom: var(--sp-sm);
+            padding-left: 0;
+            /* Flat */
+        }
+
+        .nav-item {
+            font-size: 0.875rem;
+            color: var(--rtq-text-nav-item);
+            cursor: pointer;
+            padding: 2px 0;
+            text-decoration: none;
+            display: block;
+            transition: color 0.1s;
+        }
+
+        /* Hierarchy via scale/quietness, strict left align */
+        .nav-item[data-depth="0"] {
+            font-size: 0.875rem;
+        }
+
+        .nav-item[data-depth="1"] {
+            font-size: 0.8125rem;
+        }
+
+        .nav-item[data-depth="2"] {
+            font-size: 0.75rem;
+        }
+
+        .nav-item:hover {
+            color: var(--rtq-text-primary);
+            text-decoration: underline;
+            text-decoration-color: var(--rtq-hairline-strong);
+        }
+
+        .nav-item.active {
+            font-weight: 600;
+            color: var(--rtq-text-primary);
+            /* Base weight cue */
+            /* Accent logic applied via JS if permitted, but base is weight */
+        }
+
+        /* Paper Region */
+        .paper-column {
+            flex: 1;
+            min-width: 0;
+            /* Prevent flex blowout */
+            padding-bottom: 100px;
+        }
+
+        .paper-surface {
+            background-color: var(--rtq-surface-paper);
+            /* No card chrome */
+        }
+
+        /* Question Node */
+        .question-node {
+            margin-bottom: var(--sp-xl);
+            position: relative;
+        }
+
+        /* Sub-questions have tighter rhythm */
+        .children-container .question-node {
+            margin-bottom: var(--sp-lg);
+        }
+
+        /* Section Header in Paper */
+        .paper-section-header {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--rtq-text-primary);
+            margin-top: var(--sp-xl);
+            margin-bottom: var(--sp-lg);
+            padding-bottom: var(--sp-sm);
+            border-bottom: 1px solid var(--rtq-hairline);
+        }
+
+        /* Question Body */
+        .question-body {
+            margin-bottom: var(--sp-md);
+            background-color: var(--rtq-surface-question);
+        }
+
+        .question-identifier {
+            font-weight: 600;
+            color: var(--rtq-text-question-id);
+            margin-right: var(--sp-sm);
+            display: inline-block;
+        }
+
+        .question-content {
+            display: inline;
+            color: var(--rtq-text-question);
+        }
+
+        /* Paragraphs within markdown content */
+        .question-content p {
+            display: inline;
+        }
+
+        .question-content p:not(:last-child) {
+            display: block;
+            margin-bottom: var(--sp-sm);
+        }
+
+        /* Solution Block */
+        .solution-block {
+            margin-top: var(--sp-md);
+            padding-left: 0;
+            /* Flat layout structure */
+        }
+
+        /* Answer */
+        .answer-region {
+            background-color: var(--rtq-surface-answer);
+            /* Optional surface usage permitted */
+            padding: var(--sp-sm) var(--sp-md);
+            /* If surface used, needs padding */
+            border-radius: 4px;
+            margin-bottom: var(--sp-sm);
+            display: flex;
+            gap: var(--sp-sm);
+            align-items: baseline;
+        }
+
+        /* If generic surface alias maps to paper-bg (transparent), remove padding */
+        .answer-region.transparent {
+            padding: 0;
+            background: none;
+        }
+
+        .answer-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--rtq-text-answer-label);
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .answer-content {
+            color: var(--rtq-text-answer-value);
+        }
+
+        /* Disclosure */
+        .disclosure-control {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 0.875rem;
+            color: var(--rtq-text-disclosure);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--sp-xs);
+            margin-bottom: var(--sp-sm);
+        }
+
+        .disclosure-control:hover {
+            text-decoration: underline;
+        }
+
+        /* Solution Details */
+        .solution-details-region {
+            display: none;
+            background-color: var(--rtq-surface-sd-wash);
+            padding: var(--sp-md);
+            border-radius: 4px;
+            /* Soft rounding if wash is used */
+        }
+
+        .solution-details-region.expanded {
+            display: block;
+            animation: reveal 0.2s ease-out;
+        }
+
+        @keyframes reveal {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* SD Subsections */
+        .sd-subsection {
+            margin-bottom: var(--sp-lg);
+        }
+
+        .sd-subsection:last-child {
+            margin-bottom: 0;
+        }
+
+        .sd-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--rtq-text-sd-label);
+            margin-bottom: var(--sp-xs);
+            display: block;
+        }
+
+        .sd-body {
+            color: var(--rtq-text-sd-body);
+            font-size: 0.9375rem;
+            /* Slight scale down */
+            line-height: 1.4;
+        }
+
+        /* Keep In Mind */
+        .kim-block .sd-body {
+            color: var(--rtq-text-keepinmind-body);
+        }
+
+        /* Formulas Used */
+        .formulas-block .sd-body {
+            color: var(--rtq-text-formulas-body);
+        }
+
+        /* Markdown Content Styling */
+        .md-content p {
+            margin-top: 0;
+            margin-bottom: var(--sp-sm);
+        }
+
+        .md-content ul,
+        .md-content ol {
+            margin-top: 0;
+            margin-bottom: var(--sp-sm);
+            padding-left: 1.2em;
+        }
+
+        /* Tables */
+        .md-content table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+            margin-bottom: var(--sp-sm);
+        }
+
+        .md-content th,
+        .md-content td {
+            border: 1px solid var(--rtq-hairline);
+            padding: var(--sp-xs) var(--sp-sm);
+            text-align: left;
+        }
+
+        .md-content th {
+            font-weight: 600;
+            background-color: rgba(0, 0, 0, 0.02);
+            /* Very subtle header tint */
+        }
+
+        /* KaTeX Containment Invariant */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            /* Allow scrolling within math block only */
+        }
+
+        /* No inline background */
+        .katex {
+            background-color: transparent !important;
+        }
+
+        /* Alternative Working Separation */
+        .alt-working {
+            border-top: 1px solid var(--rtq-hairline-quiet);
+            padding-top: var(--sp-md);
+            margin-top: var(--sp-md);
+        }
+
+        /* Failure Message */
+        .failure-message {
+            padding: var(--sp-xl);
+            text-align: center;
+            color: var(--rtq-text-secondary);
+            font-family: monospace;
+            background: var(--rtq-surface-frame);
+            border: 1px solid var(--rtq-hairline);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="document-frame-shell">
+        <div class="shell-inner">
+
+            <div class="top-controls-region">
+                <div class="controls-wrapper">
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <button class="mobile-jump-trigger" id="jumpTrigger">Jump to</button>
+                        <select id="paperSelector" aria-label="Select paper"></select>
+                    </div>
+
+                    <div class="lab-strip" id="labStrip">
+                        <div class="lab-control">
+                            <label for="labBase">Base:</label>
+                            <select id="labBase"></select>
+                        </div>
+                        <div class="lab-control">
+                            <label for="labTheme">Theme:</label>
+                            <select id="labTheme"></select>
+                        </div>
+                        <div class="lab-control">
+                            <label for="labFont">Font:</label>
+                            <select id="labFont">
+                                <option value="inter">Inter</option>
+                            </select>
+                        </div>
+                        <div class="lab-control">
+                            <label for="labMode">Mode:</label>
+                            <select id="labMode">
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                                <option value="system">System</option>
+                            </select>
+                        </div>
+                        <button id="resetLab">Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="columns-container">
+                <nav class="nav-rail" id="desktopNav" aria-label="Document navigation"></nav>
+
+                <main class="paper-column" id="paperRegion">
+                </main>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+    <div class="drawer" id="drawer">
+        <div class="drawer-header">
+            <strong>Jump to</strong>
+            <button id="closeDrawer" aria-label="Close navigation">✕</button>
+        </div>
+        <div class="drawer-content" id="drawerNav"></div>
+    </div>
+
+    <script>
+        // =========================================
+        // STAGE 0 & 6 CONSTANTS
+        // =========================================
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // =========================================
+        // GLOBAL STATE
+        // =========================================
+        const state = {
+            papersPayload: null,
+            profilesPayload: null,
+            currentPaperId: null,
+            lab: {
+                base: 'neutral',
+                theme: 'neutral',
+                font: 'inter',
+                mode: 'light'
+            }
+        };
+
+        // =========================================
+        // TOKEN BRIDGE (SHADCN -> RTQ)
+        // =========================================
+
+        function normalizeColor(v) {
+            if (!v) return "";
+            const raw = String(v).trim();
+            if (!raw) return "";
+            if (raw.includes("(") || raw.startsWith("#") || raw.startsWith("var("))
+                return raw;
+
+            if (!window.CSS || !window.CSS.supports) return raw; // Fallback
+
+            const candidates = [`oklch(${raw})`, `hsl(${raw})`, raw];
+            for (const c of candidates) {
+                try {
+                    if (CSS.supports("color", c)) return c;
+                } catch (e) { }
+            }
+            return raw;
+        }
+
+        function applyTokens() {
+            const { base, theme, font, mode } = state.lab;
+
+            // Resolve Mode
+            let effectiveMode = mode;
+            if (mode === 'system') {
+                effectiveMode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+
+            // Construct Key
+            const profileKey = `${base}-${theme}-${font}`;
+            const profile = state.profilesPayload.profiles[profileKey] || state.profilesPayload.profiles[`${state.profilesPayload.defaults.baseColor}-${state.profilesPayload.defaults.theme}-${state.profilesPayload.defaults.font}`];
+
+            if (!profile) {
+                console.warn("Profile not found:", profileKey);
+                return;
+            }
+
+            const vars = effectiveMode === 'dark' ? profile.vars.dark : profile.vars.light;
+            const root = document.documentElement;
+
+            // Apply Generic RTQ Bridge Tokens
+            // Helper to get and normalize
+            const get = (key) => normalizeColor(vars[key]);
+
+            // B1) Base surfaces
+            root.style.setProperty('--rtq-page-bg', get('--background'));
+            root.style.setProperty('--rtq-frame-bg', get('--background'));
+            root.style.setProperty('--rtq-paper-bg', get('--background'));
+
+            // B2) Optional surfaces (mapped to harmonizing tokens)
+            root.style.setProperty('--rtq-question-surface-bg', get('--card'));
+            root.style.setProperty('--rtq-answer-surface-bg', get('--secondary'));
+            root.style.setProperty('--rtq-keepinmind-surface-bg', get('--accent'));
+            root.style.setProperty('--rtq-formulas-surface-bg', get('--muted'));
+            root.style.setProperty('--rtq-sd-wash-bg', get('--muted'));
+
+            // B3) Text buckets
+            root.style.setProperty('--rtq-text-primary', get('--foreground'));
+
+            // Legibility Guardrail: if muted-foreground is too light, upgrade to foreground?
+            // For now, mapping direct, but real exec might define a contrast check.
+            root.style.setProperty('--rtq-text-secondary', get('--muted-foreground'));
+            root.style.setProperty('--rtq-text-quiet', get('--muted-foreground'));
+            root.style.setProperty('--rtq-link', get('--primary'));
+
+            // B4) Hairlines
+            const borderVal = get('--border');
+            const inputVal = get('--input');
+
+            root.style.setProperty('--rtq-hairline', borderVal);
+            // Strong priority mapping
+            root.style.setProperty('--rtq-hairline-strong', inputVal || borderVal); // Fallback to border if input missing
+            // Quiet mapping (in a real browser with HSL support we could alpha-modulate, here mapping to border)
+            root.style.setProperty('--rtq-hairline-quiet', borderVal);
+
+            // B5) Focus
+            root.style.setProperty('--rtq-focus-ring', get('--ring'));
+
+            // B6) Font
+            if (profile.font && profile.font.cssFontFamily) {
+                root.style.setProperty('--rtq-font-sans', profile.font.cssFontFamily);
+            }
+
+            // Force Document class for Tailwind/dark mode compat if needed (though we use vars)
+            if (effectiveMode === 'dark') {
+                root.classList.add('dark');
+            } else {
+                root.classList.remove('dark');
+            }
+        }
+
+        // =========================================
+        // MARKDOWN & KATEX CONFIG
+        // =========================================
+        let md = null;
+        if (window.markdownit) {
+            md = window.markdownit({
+                html: true,
+                linkify: true,
+                breaks: false
+            });
+            // Disable escape to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        function renderMarkdown(text) {
+            if (!text) return "";
+            return md ? md.render(text) : text;
+        }
+
+        function applyMath(container) {
+            if (window.renderMathInElement) {
+                renderMathInElement(container, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        // =========================================
+        // RENDERING LOGIC
+        // =========================================
+
+        function generateQuestionHTML(node, depth = 0, paperDefaults) {
+            const hasSolutionBlock = !!node.solutionBlock;
+            const hasAnswer = hasSolutionBlock && !!node.solutionBlock.answer;
+            const hasSolutionDetails = hasSolutionBlock && !!node.solutionBlock.solutionDetails;
+
+            // Default expanded state check
+            const isExpandedDefault = paperDefaults && paperDefaults.expandedAll;
+
+            let html = `
+                <div class="question-node" id="q-${node.id}">
+                    <div class="question-body">
+                        <div class="question-identifier">${node.id}</div>
+                        <div class="question-content md-content">${renderMarkdown(node.question)}</div>
+                    </div>
+            `;
+
+            if (hasSolutionBlock) {
+                html += `<div class="solution-block">`;
+
+                if (hasAnswer) {
+                    html += `
+                        <div class="answer-region ${state.lab.base === 'neutral' ? '' : ''}">
+                            <div class="answer-label">Answer</div>
+                            <div class="answer-content md-content">${renderMarkdown(node.solutionBlock.answer)}</div>
+                        </div>
+                    `;
+                }
+
+                if (hasSolutionDetails) {
+                    const sd = node.solutionBlock.solutionDetails;
+                    const expandedClass = isExpandedDefault ? 'expanded' : '';
+                    const labelText = isExpandedDefault ? 'Hide working' : 'Show working';
+
+                    html += `
+                        <button class="disclosure-control" aria-expanded="${isExpandedDefault}" onclick="toggleWorking(this)">
+                            <span class="label-text">${labelText}</span>
+                            <span class="icon">▼</span>
+                        </button>
+                        <div class="solution-details-region ${expandedClass}">
+                    `;
+
+                    // Keep in mind
+                    if (sd.keepInMind) {
+                        html += `
+                            <div class="sd-subsection kim-block">
+                                <span class="sd-label">Keep in mind</span>
+                                <div class="sd-body md-content">${renderMarkdown(sd.keepInMind)}</div>
+                            </div>
+                        `;
+                    }
+
+                    // Formulas
+                    if (sd.formulasUsed) {
+                        html += `
+                            <div class="sd-subsection formulas-block">
+                                <span class="sd-label">Formulas used</span>
+                                <div class="sd-body md-content">${renderMarkdown(sd.formulasUsed)}</div>
+                            </div>
+                        `;
+                    }
+
+                    // Working
+                    if (sd.working) {
+                        html += `
+                            <div class="sd-subsection working-block">
+                                <span class="sd-label">Working</span>
+                                <div class="sd-body md-content">${renderMarkdown(sd.working)}</div>
+                            </div>
+                        `;
+                    }
+
+                    // Alternatives
+                    if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                        sd.alternativeWorking.forEach(alt => {
+                            html += `
+                                <div class="sd-subsection alt-working">
+                                    <span class="sd-label">Alternative working</span>
+                                    <div class="sd-body md-content">${renderMarkdown(alt)}</div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    html += `</div>`; // End details region
+                }
+                html += `</div>`; // End solution block
+            }
+
+            // Children
+            if (node.children && node.children.length > 0) {
+                html += `<div class="children-container" style="padding-left: var(--sp-md);">`;
+                node.children.forEach(child => {
+                    html += generateQuestionHTML(child, depth + 1, paperDefaults);
+                });
+                html += `</div>`;
+            }
+
+            html += `</div>`; // End node
+            return html;
+        }
+
+        function renderPaper(paperKey) {
+            const paper = state.papersPayload.papers.find(p => p.key === paperKey);
+            const region = document.getElementById('paperRegion');
+
+            if (!paper) {
+                region.innerHTML = `<div class="failure-message">PAPER NOT FOUND</div>`;
+                return;
+            }
+
+            let html = `<div class="paper-surface">`;
+
+            // Handle Sections vs Flat
+            const nodes = [];
+            if (paper.sections) {
+                paper.sections.forEach(sec => {
+                    if (sec.label && sec.label.trim() !== "") {
+                        html += `<div class="paper-section-header">${sec.label}</div>`;
+                    }
+                    sec.questions.forEach(q => {
+                        html += generateQuestionHTML(q, 0, paper.defaults);
+                    });
+                });
+            } else if (paper.questions) {
+                paper.questions.forEach(q => {
+                    html += generateQuestionHTML(q, 0, paper.defaults);
+                });
+            }
+
+            html += `</div>`;
+            region.innerHTML = html;
+
+            // Apply KaTeX
+            applyMath(region);
+
+            // Rebuild Navigation
+            renderNav(paper);
+        }
+
+        function renderNav(paper) {
+            // Flatten navigation items
+            const items = [];
+
+            const processNode = (node, depth) => {
+                items.push({ id: node.id, depth });
+                if (node.children) {
+                    node.children.forEach(c => processNode(c, depth + 1));
+                }
+            };
+
+            if (paper.sections) {
+                paper.sections.forEach(sec => {
+                    if (sec.label && sec.label.trim() !== "") {
+                        items.push({ type: 'section', label: sec.label });
+                    }
+                    sec.questions.forEach(q => processNode(q, 0));
+                });
+            } else {
+                paper.questions.forEach(q => processNode(q, 0));
+            }
+
+            const generateList = () => {
+                let html = `<ul class="nav-list">`;
+                items.forEach(item => {
+                    if (item.type === 'section') {
+                        html += `<li class="nav-section-label">${item.label}</li>`;
+                    } else {
+                        html += `<li><a class="nav-item" data-id="q-${item.id}" data-depth="${item.depth}" onclick="scrollToId('q-${item.id}')">${item.id}</a></li>`;
+                    }
+                });
+                html += `</ul>`;
+                return html;
+            };
+
+            const html = generateList();
+            document.getElementById('desktopNav').innerHTML = html;
+            document.getElementById('drawerNav').innerHTML = html;
+        }
+
+        // =========================================
+        // INTERACTIONS
+        // =========================================
+
+        window.toggleWorking = function (btn) {
+            const region = btn.nextElementSibling;
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+
+            if (isExpanded) {
+                region.classList.remove('expanded');
+                btn.setAttribute('aria-expanded', 'false');
+                btn.querySelector('.label-text').textContent = 'Show working';
+            } else {
+                region.classList.add('expanded');
+                btn.setAttribute('aria-expanded', 'true');
+                btn.querySelector('.label-text').textContent = 'Hide working';
+            }
+        };
+
+        window.scrollToId = function (id) {
+            const el = document.getElementById(id);
+            if (el) {
+                // Offset for sticky header
+                const top = el.getBoundingClientRect().top + window.scrollY - 140;
+                window.scrollTo({ top, behavior: 'smooth' });
+
+                // Active state logic (simple)
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                document.querySelectorAll(`.nav-item[data-id="${id}"]`).forEach(n => n.classList.add('active'));
+
+                // Close drawer if open
+                closeDrawer();
+            }
+        }
+
+        // Mobile Drawer
+        const drawer = document.getElementById('drawer');
+        const backdrop = document.getElementById('drawerBackdrop');
+        const jumpTrigger = document.getElementById('jumpTrigger');
+        const closeBtn = document.getElementById('closeDrawer');
+
+        function openDrawer() {
+            drawer.classList.add('open');
+            backdrop.classList.add('open');
+        }
+        function closeDrawer() {
+            drawer.classList.remove('open');
+            backdrop.classList.remove('open');
+        }
+
+        jumpTrigger.addEventListener('click', openDrawer);
+        closeBtn.addEventListener('click', closeDrawer);
+        backdrop.addEventListener('click', closeDrawer);
+
+        // =========================================
+        // INIT & DATA LOADING
+        // =========================================
+
+        function initLabControls() {
+            const profiles = state.profilesPayload.profiles;
+
+            // Populate Dropdowns
+            // Bases: Extract from profiles meta (unique)
+            const bases = new Set();
+            const themes = new Set();
+
+            Object.values(profiles).forEach(p => {
+                bases.add(p.meta.baseColor);
+                themes.add(p.meta.theme);
+            });
+
+            const populate = (id, set) => {
+                const el = document.getElementById(id);
+                el.innerHTML = '';
+                set.forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.textContent = val.charAt(0).toUpperCase() + val.slice(1);
+                    el.appendChild(opt);
+                });
+            };
+
+            populate('labBase', bases);
+            populate('labTheme', themes);
+
+            // Set Values from State
+            document.getElementById('labBase').value = state.lab.base;
+            document.getElementById('labTheme').value = state.lab.theme;
+            document.getElementById('labFont').value = state.lab.font;
+            document.getElementById('labMode').value = state.lab.mode;
+
+            // Listeners
+            ['labBase', 'labTheme', 'labFont', 'labMode'].forEach(key => {
+                document.getElementById(key).addEventListener('change', (e) => {
+                    const prop = key.replace('lab', '').toLowerCase();
+                    state.lab[prop] = e.target.value;
+                    updateUrlParams();
+                    applyTokens();
+                });
+            });
+
+            document.getElementById('resetLab').addEventListener('click', () => {
+                const defs = state.profilesPayload.defaults;
+                state.lab.base = defs.baseColor;
+                state.lab.theme = defs.theme;
+                state.lab.font = defs.font;
+                state.lab.mode = defs.mode;
+
+                // Update UI
+                document.getElementById('labBase').value = state.lab.base;
+                document.getElementById('labTheme').value = state.lab.theme;
+                document.getElementById('labFont').value = state.lab.font;
+                document.getElementById('labMode').value = state.lab.mode;
+
+                updateUrlParams();
+                applyTokens();
+            });
+        }
+
+        function readUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('labBase')) state.lab.base = params.get('labBase');
+            if (params.has('labTheme')) state.lab.theme = params.get('labTheme');
+            if (params.has('labFont')) state.lab.font = params.get('labFont');
+            if (params.has('labMode')) state.lab.mode = params.get('labMode');
+            if (params.has('paper')) state.currentPaperId = params.get('paper');
+        }
+
+        function updateUrlParams() {
+            const url = new URL(window.location);
+            url.searchParams.set('labBase', state.lab.base);
+            url.searchParams.set('labTheme', state.lab.theme);
+            url.searchParams.set('labFont', state.lab.font);
+            url.searchParams.set('labMode', state.lab.mode);
+            if (state.currentPaperId) url.searchParams.set('paper', state.currentPaperId);
+            window.history.replaceState({}, '', url);
+        }
+
+        async function init() {
+            // 1. Load Profiles (Critical)
+            try {
+                const res = await fetch(RTQ_SHADCN_TOKEN_PROFILES_PATH);
+                if (!res.ok) throw new Error("Status " + res.status);
+                state.profilesPayload = await res.json();
+                window.SHADCN_TOKEN_PROFILES = state.profilesPayload; // Global avail per spec
+            } catch (e) {
+                document.getElementById('paperRegion').innerHTML = '<div class="failure-message">SHADCN TOKEN PROFILES MISSING</div>';
+                return; // STOP
+            }
+
+            // 2. Load Params & Init Lab
+            readUrlParams();
+            // Defaults fallback
+            if (!state.lab.base) state.lab.base = state.profilesPayload.defaults.baseColor;
+
+            initLabControls();
+            applyTokens(); // Apply initial tokens
+
+            // 3. System Theme Listener
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                if (state.lab.mode === 'system') applyTokens();
+            });
+
+            // 4. Load Papers
+            try {
+                const res = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!res.ok) throw new Error();
+                state.papersPayload = await res.json();
+            } catch (e) {
+                document.getElementById('paperRegion').innerHTML = '<div class="failure-message">PAPERS PAYLOAD MISSING</div>';
+                return; // STOP
+            }
+
+            // 5. Populate Paper Selector
+            const selector = document.getElementById('paperSelector');
+            state.papersPayload.papers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.key;
+                opt.textContent = p.label;
+                selector.appendChild(opt);
+            });
+
+            if (!state.currentPaperId) {
+                state.currentPaperId = state.papersPayload.papers[0].key;
+            }
+            selector.value = state.currentPaperId;
+
+            selector.addEventListener('change', (e) => {
+                state.currentPaperId = e.target.value;
+                updateUrlParams();
+                renderPaper(state.currentPaperId);
+            });
+
+            // 6. Initial Render
+            renderPaper(state.currentPaperId);
+        }
+
+        // Run
+        init();
+
+    </script>
+</body>
+
+</html>
