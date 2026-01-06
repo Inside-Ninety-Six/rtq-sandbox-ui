@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Stage 6 Baseline)</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <style>
+        /* =========================================
+           STAGE 0-5: CSS VARIABLES & TONE
+           (Soft-warm neutral base, grayscale-driven)
+           ========================================= */
+        :root {
+            /* NEUTRAL RAMP (Step 0 - Step 5) per Stage 6.0.0b1 */
+            --step-0-base: #f9f9f7;
+            /* Page background */
+            --step-1-frame: #f9f9f7;
+            /* Frame shell (matches base for seamlessness) */
+            --step-2-paper: #ffffff;
+            /* Main paper surface */
+            --step-3-wash-1: #f2f2f0;
+            /* Solution Details wash */
+            --step-4-wash-2: #ebebeb;
+            /* Nested subsection wash */
+            --step-5-wash-3: #e5e5e5;
+            /* Deep nested wash */
+
+            /* TEXT COLORS */
+            --text-question: #111111;
+            /* Primary Anchor */
+            --text-secondary: #444444;
+            /* Identifiers, Answers */
+            --text-tertiary: #666666;
+            /* Metadata, Navigation */
+            --text-subordinate: #333333;
+            /* Solution Body (readable!) */
+
+            /* ACCENT (Stage 5 Override - Restrained) */
+            --color-accent: #2563eb;
+            /* Links, Focus, Toggle Text */
+
+            /* BORDERS / DIVIDERS */
+            --border-hairline: #e0e0e0;
+
+            /* SPACING SYSTEM (Rhythm) */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+            --space-xxl: 48px;
+            /* Top-level question separation */
+
+            /* TYPOGRAPHY */
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-size-base: 16px;
+            --font-size-sm: 14px;
+            --font-size-xs: 12px;
+        }
+
+        /* RESET & BASE */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+            background-color: var(--step-0-base);
+            color: var(--text-question);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button {
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        /* =========================================
+           STAGE 6: CANONICAL LAYOUT STRUCTURE
+           ========================================= */
+
+        /* Top Controls Region */
+        .rtq-top-controls {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-color: var(--step-0-base);
+            border-bottom: 1px solid var(--border-hairline);
+            padding: var(--space-md) var(--space-lg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .rtq-paper-selector {
+            font-size: var(--font-size-sm);
+            padding: var(--space-xs) var(--space-sm);
+            border: 1px solid var(--border-hairline);
+            background: var(--step-2-paper);
+            color: var(--text-question);
+            border-radius: 4px;
+            /* Minimal rounding for controls */
+        }
+
+        .rtq-jump-trigger {
+            display: none;
+            /* Desktop default */
+            font-size: var(--font-size-sm);
+            color: var(--color-accent);
+            background: none;
+            border: none;
+            padding: var(--space-xs);
+        }
+
+        /* DocumentFrameShell */
+        .rtq-document-frame {
+            max-width: 1024px;
+            margin: 0 auto;
+            display: flex;
+            /* Sibling columns */
+            min-height: calc(100vh - 60px);
+            background-color: var(--step-1-frame);
+        }
+
+        /* Navigation Rail (Desktop) */
+        .rtq-nav-rail {
+            width: 240px;
+            flex-shrink: 0;
+            padding: var(--space-xl) var(--space-md) var(--space-xl) 0;
+            position: sticky;
+            top: 60px;
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+            border-right: 1px solid transparent;
+            /* Optical separation handled by space */
+            /* Hide scrollbar visually */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .rtq-nav-rail::-webkit-scrollbar {
+            display: none;
+        }
+
+        .rtq-nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .rtq-nav-section-label {
+            font-size: var(--font-size-xs);
+            color: var(--text-tertiary);
+            font-weight: 600;
+            padding: var(--space-sm) 0 var(--space-xs) 0;
+            margin-top: var(--space-md);
+            border-bottom: 1px solid var(--border-hairline);
+            /* Quiet separator */
+        }
+
+        .rtq-nav-section-label:first-child {
+            margin-top: 0;
+        }
+
+        .rtq-nav-item {
+            font-size: var(--font-size-sm);
+            color: var(--text-tertiary);
+            padding: 4px 0;
+            text-decoration: none;
+            border-left: 2px solid transparent;
+            /* Marker slot */
+            padding-left: var(--space-sm);
+            display: block;
+            transition: color 0.2s, font-weight 0.2s;
+        }
+
+        .rtq-nav-item:hover {
+            color: var(--text-secondary);
+        }
+
+        .rtq-nav-item.active {
+            font-weight: 600;
+            color: var(--text-question);
+            border-left-color: var(--color-accent);
+            /* Stage 5 Override */
+        }
+
+        /* Hierarchy via Type Scale Only (Stage 5.4.5) */
+        .rtq-nav-item[data-depth="0"] {
+            font-size: 14px;
+        }
+
+        .rtq-nav-item[data-depth="1"] {
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+
+        .rtq-nav-item[data-depth="2"] {
+            font-size: 12px;
+        }
+
+        /* Paper Region */
+        .rtq-paper-column {
+            flex-grow: 1;
+            padding: var(--space-xl) 0 var(--space-xxl) var(--space-xl);
+            background-color: var(--step-2-paper);
+            /* Explicit Surface */
+            /* Ensure containment */
+            min-width: 0;
+        }
+
+        /* SECTION HEADERS in Paper */
+        .rtq-section-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-question);
+            padding-bottom: var(--space-md);
+            margin-bottom: var(--space-lg);
+            border-bottom: 1px solid var(--border-hairline);
+        }
+
+        /* QUESTION NODE */
+        .rtq-question-node {
+            margin-bottom: var(--space-xxl);
+            /* Top level spacing */
+        }
+
+        .rtq-question-node[data-child="true"] {
+            margin-bottom: var(--space-md);
+            /* Child spacing */
+            margin-left: var(--space-md);
+            /* Child indentation */
+            padding-left: var(--space-md);
+            border-left: 1px solid var(--border-hairline);
+            /* Vertical separation line */
+        }
+
+        .rtq-question-body {
+            /* Markdown content */
+            margin-bottom: var(--space-md);
+        }
+
+        /* Question Identifier */
+        .rtq-qid {
+            font-weight: 700;
+            margin-right: var(--space-sm);
+        }
+
+        /* SOLUTION BLOCK */
+        .rtq-solution-block {
+            /* Wrapper */
+        }
+
+        /* ANSWER */
+        .rtq-answer-region {
+            margin-bottom: var(--space-md);
+        }
+
+        .rtq-answer-label {
+            font-size: var(--font-size-sm);
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-right: var(--space-sm);
+        }
+
+        .rtq-answer-content {
+            display: inline-block;
+        }
+
+        /* SOLUTION DETAILS CONTROL */
+        .rtq-disclosure-control {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: var(--font-size-sm);
+            color: var(--color-accent);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            margin-bottom: var(--space-sm);
+        }
+
+        .rtq-disclosure-control:hover {
+            text-decoration: underline;
+        }
+
+        .rtq-chevron {
+            transition: transform 0.2s;
+        }
+
+        .rtq-disclosure-control[aria-expanded="true"] .rtq-chevron {
+            transform: rotate(180deg);
+        }
+
+        /* SOLUTION DETAILS REGION */
+        .rtq-solution-details {
+            display: none;
+            /* Hidden by default */
+            background-color: var(--step-3-wash-1);
+            /* Wash 1 */
+            padding: var(--space-md);
+            /* border-left: 1px solid var(--border-hairline); Fallback boundary */
+        }
+
+        .rtq-solution-details.expanded {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* SUBSECTIONS inside Solution Details */
+        .rtq-sd-section {
+            margin-bottom: var(--space-md);
+        }
+
+        .rtq-sd-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .rtq-sd-label {
+            font-size: var(--font-size-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            margin-bottom: var(--space-xs);
+            display: block;
+        }
+
+        /* Specific Surfaces for Subsections (6.0.0b1) */
+        .rtq-surf-keep-in-mind {
+            background-color: var(--step-4-wash-2);
+            padding: var(--space-md);
+        }
+
+        .rtq-surf-formulas {
+            background-color: var(--step-5-wash-3);
+            /* Distinct step */
+            padding: var(--space-md);
+        }
+
+        /* Alternative Working Separation */
+        .rtq-alt-working {
+            margin-top: var(--space-lg);
+            padding-top: var(--space-md);
+            border-top: 1px dashed var(--border-hairline);
+            /* Quiet internal demarcation */
+        }
+
+        /* MATH & MARKDOWN STYLING */
+        .rtq-markdown p {
+            margin-top: 0;
+            margin-bottom: var(--space-sm);
+        }
+
+        .rtq-markdown ul {
+            padding-left: 1.5em;
+            margin-bottom: var(--space-sm);
+        }
+
+        /* KaTeX Containment Invariant (Locked) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Inline KaTeX: No background */
+        .katex {
+            font-size: 1.1em;
+        }
+
+        /* Tables */
+        .rtq-markdown table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: var(--space-md);
+            font-size: var(--font-size-sm);
+        }
+
+        .rtq-markdown th,
+        .rtq-markdown td {
+            border: 1px solid var(--border-hairline);
+            padding: var(--space-xs) var(--space-sm);
+            text-align: left;
+        }
+
+        .rtq-markdown th {
+            font-weight: 600;
+            background-color: var(--step-1-frame);
+        }
+
+        /* MOBILE DRAWER */
+        .rtq-drawer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            /* CUE__DRAWER_SCRIM */
+            z-index: 200;
+            display: none;
+        }
+
+        .rtq-drawer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 80%;
+            max-width: 300px;
+            background: var(--step-2-paper);
+            padding: var(--space-md);
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .rtq-drawer.open {
+            transform: translateX(0);
+        }
+
+        .rtq-drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-md);
+            padding-bottom: var(--space-md);
+            border-bottom: 1px solid var(--border-hairline);
+        }
+
+        .rtq-drawer-nav-container {
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* Failure Message */
+        .rtq-error {
+            padding: var(--space-xxl);
+            text-align: center;
+            color: var(--text-tertiary);
+            font-weight: 600;
+            background: var(--step-1-frame);
+            margin: var(--space-md);
+            border: 1px dashed var(--border-hairline);
+        }
+
+        /* MEDIA QUERIES */
+        @media (max-width: 768px) {
+            .rtq-document-frame {
+                display: block;
+            }
+
+            /* Stack columns */
+            .rtq-nav-rail {
+                display: none;
+            }
+
+            /* Hide desktop nav */
+            .rtq-jump-trigger {
+                display: block;
+            }
+
+            /* Show mobile trigger */
+            .rtq-paper-column {
+                padding: var(--space-md);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="root">
+        <header class="rtq-top-controls">
+            <select id="paperSelector" class="rtq-paper-selector" aria-label="Select Paper">
+                <option disabled selected>Loading papers...</option>
+            </select>
+            <button id="jumpToTrigger" class="rtq-jump-trigger" aria-label="Open Navigation">
+                Jump to
+            </button>
+        </header>
+
+        <main class="rtq-document-frame">
+            <nav class="rtq-nav-rail" id="desktopNav" aria-label="Paper Navigation">
+            </nav>
+
+            <article class="rtq-paper-column" id="paperContent">
+                <div class="rtq-error">Loading payload...</div>
+            </article>
+        </main>
+
+        <div id="drawerOverlay" class="rtq-drawer-overlay">
+            <div class="rtq-drawer" role="dialog" aria-modal="true" aria-label="Navigation">
+                <div class="rtq-drawer-header">
+                    <strong>Jump to</strong>
+                    <button id="drawerClose" class="rtq-jump-trigger" style="display:block;">Close</button>
+                </div>
+                <div class="rtq-drawer-nav-container" id="mobileNav">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================
+        // STAGE 0: CONSTANTS (Canonical)
+        // =========================================================
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+
+        // =========================================================
+        // STAGE 6: MARKDOWN CONFIGURATION (Authoritative)
+        // =========================================================
+        const md = window.markdownit
+            ? window.markdownit({
+                html: true,     // allow inline SVG/HTML from payload
+                linkify: true,
+                breaks: false,  // MUST be false for KaTeX compatibility
+            })
+            : null;
+
+        if (md) {
+            // Disable escape rule to preserve TeX backslashes
+            md.inline.ruler.disable(["escape"]);
+        }
+
+        // =========================================================
+        // STATE MANAGEMENT
+        // =========================================================
+        let state = {
+            payload: null,
+            currentPaperKey: null,
+            expandedNodes: new Set() // Track explicitly toggled nodes
+        };
+
+        // =========================================================
+        // INITIALIZATION
+        // =========================================================
+        async function init() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error("Payload not found");
+                const payload = await response.json();
+
+                state.payload = payload;
+                renderPaperSelector();
+
+                // Select first paper by default
+                if (payload.papers && payload.papers.length > 0) {
+                    loadPaper(payload.papers[0].key);
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('paperContent').innerHTML =
+                    `<div class="rtq-error">PAPERS PAYLOAD MISSING</div>`;
+                document.getElementById('paperSelector').innerHTML =
+                    `<option disabled>Error loading papers</option>`;
+            }
+        }
+
+        // =========================================================
+        // RENDERERS
+        // =========================================================
+
+        function renderPaperSelector() {
+            const selector = document.getElementById('paperSelector');
+            selector.innerHTML = state.payload.papers.map(p =>
+                `<option value="${p.key}">${p.label}</option>`
+            ).join('');
+
+            selector.addEventListener('change', (e) => {
+                loadPaper(e.target.value);
+            });
+        }
+
+        function loadPaper(paperKey) {
+            state.currentPaperKey = paperKey;
+            const paper = state.payload.papers.find(p => p.key === paperKey);
+            if (!paper) return;
+
+            // Reset state
+            state.expandedNodes.clear();
+            if (paper.defaults && paper.defaults.expandedAll) {
+                // Logic handled during render, but we need to know default state
+            }
+
+            // Render Content
+            const contentContainer = document.getElementById('paperContent');
+            contentContainer.innerHTML = ''; // Clear
+
+            // Render Sections/Questions
+            let html = '';
+
+            // Check if sectioned
+            if (paper.sections) {
+                paper.sections.forEach(section => {
+                    // Render Section Header (if label exists)
+                    if (section.label && section.label.trim().length > 0) {
+                        html += `<div class="rtq-section-header">${section.label}</div>`;
+                    }
+                    html += `<div class="rtq-question-list">`;
+                    html += section.questions.map(q => renderQuestionNode(q, 0, paper)).join('');
+                    html += `</div>`;
+                });
+            } else if (paper.questions) {
+                html += `<div class="rtq-question-list">`;
+                html += paper.questions.map(q => renderQuestionNode(q, 0, paper)).join('');
+                html += `</div>`;
+            }
+
+            contentContainer.innerHTML = html;
+
+            // Post-Render: Math & Interactions
+            renderMathInElement(contentContainer, {
+                delimiters: [
+                    { left: "$$", right: "$$", display: true },
+                    { left: "$", right: "$", display: false }
+                ],
+                throwOnError: false
+            });
+
+            // Rebuild Navigation
+            rebuildNavigation(paper);
+
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        // Recursive Question Renderer
+        function renderQuestionNode(node, depth, paper) {
+            const isDefaultExpanded = paper.defaults?.expandedAll || false;
+            // Generate unique DOM ID for navigation
+            const domId = `q-${node.id.replace(/[^a-zA-Z0-9]/g, '-')}`;
+
+            // Markdown rendering of question body
+            const qBodyHtml = md ? md.render(node.question) : node.question;
+
+            // SOLUTION BLOCK LOGIC
+            let solutionBlockHtml = '';
+            const sb = node.solutionBlock;
+
+            if (sb) {
+                // ANSWER (Optional)
+                let answerHtml = '';
+                if (sb.answer) {
+                    const ansContent = md ? md.renderInline(sb.answer) : sb.answer;
+                    answerHtml = `
+                        <div class="rtq-answer-region">
+                            <span class="rtq-answer-label">Answer</span>
+                            <div class="rtq-answer-content">${ansContent}</div>
+                        </div>
+                    `;
+                }
+
+                // SOLUTION DETAILS (Optional)
+                let detailsHtml = '';
+                let toggleHtml = '';
+
+                if (sb.solutionDetails) {
+                    const sd = sb.solutionDetails;
+                    const isExpanded = isDefaultExpanded; // Initial state
+
+                    // Toggle Control
+                    toggleHtml = `
+                        <button class="rtq-disclosure-control" 
+                                aria-expanded="${isExpanded}" 
+                                aria-controls="details-${domId}"
+                                onclick="toggleDetails(this, 'details-${domId}')">
+                            <span class="label">${isExpanded ? 'Hide working' : 'Show working'}</span>
+                            <span class="rtq-chevron">▼</span>
+                        </button>
+                    `;
+
+                    // Subsections
+                    let sectionsHtml = '';
+
+                    // 1. Keep in mind
+                    if (sd.keepInMind) {
+                        sectionsHtml += `
+                            <div class="rtq-sd-section rtq-surf-keep-in-mind">
+                                <span class="rtq-sd-label">Keep in mind</span>
+                                <div class="rtq-markdown">${md.render(sd.keepInMind)}</div>
+                            </div>
+                        `;
+                    }
+                    // 2. Formulas Used
+                    if (sd.formulasUsed) {
+                        sectionsHtml += `
+                            <div class="rtq-sd-section rtq-surf-formulas">
+                                <span class="rtq-sd-label">Formulas used</span>
+                                <div class="rtq-markdown">${md.render(sd.formulasUsed)}</div>
+                            </div>
+                        `;
+                    }
+                    // 3. Working
+                    if (sd.working) {
+                        sectionsHtml += `
+                            <div class="rtq-sd-section">
+                                <span class="rtq-sd-label">Working</span>
+                                <div class="rtq-markdown">${md.render(sd.working)}</div>
+                            </div>
+                        `;
+                    }
+                    // 4. Alternative Working
+                    if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                        sd.alternativeWorking.forEach((alt, idx) => {
+                            sectionsHtml += `
+                                <div class="rtq-sd-section rtq-alt-working">
+                                    <span class="rtq-sd-label">Alternative working</span>
+                                    <div class="rtq-markdown">${md.render(alt)}</div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    detailsHtml = `
+                        <div id="details-${domId}" class="rtq-solution-details ${isExpanded ? 'expanded' : ''}">
+                            ${sectionsHtml}
+                        </div>
+                    `;
+                }
+
+                solutionBlockHtml = `
+                    <div class="rtq-solution-block">
+                        ${answerHtml}
+                        ${toggleHtml}
+                        ${detailsHtml}
+                    </div>
+                `;
+            }
+
+            // CHILDREN RECURSION
+            let childrenHtml = '';
+            if (node.children && node.children.length > 0) {
+                childrenHtml = node.children.map(child => renderQuestionNode(child, depth + 1, paper)).join('');
+            }
+
+            // COMPOSE NODE
+            // Note: data-child attribute handles indentation via CSS
+            return `
+                <div class="rtq-question-node" id="${domId}" data-child="${depth > 0}">
+                    <div class="rtq-question-body rtq-markdown">
+                        <span class="rtq-qid">${node.id}</span>
+                        ${qBodyHtml}
+                    </div>
+                    ${solutionBlockHtml}
+                    ${childrenHtml}
+                </div>
+            `;
+        }
+
+        // =========================================================
+        // NAVIGATION LOGIC
+        // =========================================================
+        function rebuildNavigation(paper) {
+            const navContainer = document.getElementById('desktopNav');
+            let html = '<ul class="rtq-nav-list">';
+
+            // Flatten structure for nav generation
+            const generateItems = (questions, depth) => {
+                let items = '';
+                questions.forEach(q => {
+                    const domId = `q-${q.id.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                    items += `
+                        <li>
+                            <a href="#${domId}" class="rtq-nav-item" data-depth="${Math.min(depth, 2)}">
+                                ${q.id}
+                            </a>
+                        </li>
+                    `;
+                    if (q.children) {
+                        items += generateItems(q.children, depth + 1);
+                    }
+                });
+                return items;
+            };
+
+            if (paper.sections) {
+                paper.sections.forEach(sec => {
+                    if (sec.label) {
+                        html += `<li class="rtq-nav-section-label">${sec.label}</li>`;
+                    }
+                    html += generateItems(sec.questions, 0);
+                });
+            } else if (paper.questions) {
+                html += generateItems(paper.questions, 0);
+            }
+
+            html += '</ul>';
+            navContainer.innerHTML = html;
+
+            // Sync Mobile Nav
+            document.getElementById('mobileNav').innerHTML = html;
+
+            // Add Interaction Observers for Active State
+            setupScrollSpy();
+        }
+
+        function setupScrollSpy() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        // Remove active class from all
+                        document.querySelectorAll('.rtq-nav-item').forEach(el => el.classList.remove('active'));
+                        // Add to current
+                        const id = entry.target.id;
+                        document.querySelectorAll(`a[href="#${id}"]`).forEach(el => el.classList.add('active'));
+                    }
+                });
+            }, { rootMargin: '-10% 0px -80% 0px' }); // Trigger near top
+
+            document.querySelectorAll('.rtq-question-node').forEach(node => {
+                observer.observe(node);
+            });
+        }
+
+        // =========================================================
+        // INTERACTIONS
+        // =========================================================
+
+        // Expose toggle globally for onclick attributes
+        window.toggleDetails = function (btn, targetId) {
+            const target = document.getElementById(targetId);
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+
+            // Toggle State
+            btn.setAttribute('aria-expanded', !isExpanded);
+            btn.querySelector('.label').textContent = !isExpanded ? 'Hide working' : 'Show working';
+
+            if (!isExpanded) {
+                target.classList.add('expanded');
+            } else {
+                target.classList.remove('expanded');
+            }
+        };
+
+        // Mobile Drawer Logic
+        const drawerOverlay = document.getElementById('drawerOverlay');
+        const drawer = drawerOverlay.querySelector('.rtq-drawer');
+
+        document.getElementById('jumpToTrigger').addEventListener('click', () => {
+            drawerOverlay.style.display = 'block';
+            setTimeout(() => drawer.classList.add('open'), 10);
+            // Trap Focus logic would go here (simplified for prototype)
+        });
+
+        const closeDrawer = () => {
+            drawer.classList.remove('open');
+            setTimeout(() => drawerOverlay.style.display = 'none', 300);
+        };
+
+        document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+        drawerOverlay.addEventListener('click', (e) => {
+            if (e.target === drawerOverlay) closeDrawer();
+        });
+
+        // Close drawer on nav click
+        document.getElementById('mobileNav').addEventListener('click', (e) => {
+            if (e.target.tagName === 'A') closeDrawer();
+        });
+
+        // Start
+        init();
+
+    </script>
+</body>
+
+</html>
