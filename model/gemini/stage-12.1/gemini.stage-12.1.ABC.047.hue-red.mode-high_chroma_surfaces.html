@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"47","totalWithinVariant":"320","hueFamily":"red","intensityMode":"high_chroma_surfaces","timestamp":"2026-01-07T11:32:49.065Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;47&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;red&quot;,&quot;intensityMode&quot;:&quot;high_chroma_surfaces&quot;,&quot;timestamp&quot;:&quot;2026-01-07T11:32:49.065Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+    
+    <!-- KaTeX CSS (SRI disabled per Stage 6 baseline) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* =========================================
+           STAGE 0 & COLORLAB CONFIGURATION
+           Add-on: ColorLab B (Forced Hue: Red)
+           Add-on: ColorLab C (High Chroma Surfaces)
+           Mode: Light Only
+           ========================================= */
+        :root {
+            /* 
+               Hue Family: Red (approx 30deg in OKLCH) 
+               Mode 3: High Chroma Surfaces constraints applied.
+               - Two major surfaces C in [0.06 .. 0.12] (Page, Frame)
+               - Remaining major surface C in [0.03 .. 0.07] (Paper)
+               - Wash C in [0.05 .. 0.10]
+               - Text C <= 0.015
+               - Accent C in [0.12 .. 0.20]
+            */
+            --hue: 30;
+
+            /* Major Surfaces */
+            --surf-page: oklch(0.95 0.08 var(--hue));  /* High Chroma */
+            --surf-frame: oklch(0.92 0.10 var(--hue)); /* High Chroma */
+            --surf-paper: oklch(0.98 0.03 var(--hue)); /* Tinted */
+
+            /* Supporting Surfaces */
+            --surf-wash: oklch(0.95 0.07 var(--hue));  /* Solution Details Wash */
+            --surf-nav-hover: oklch(0.90 0.05 var(--hue)); /* Interaction state */
+
+            /* Typography */
+            --text-primary: oklch(0.20 0.015 var(--hue));
+            --text-secondary: oklch(0.45 0.02 var(--hue));
+            --text-quiet: oklch(0.60 0.02 var(--hue));
+
+            /* Interactive / Accent */
+            --color-accent: oklch(0.55 0.18 var(--hue)); 
+            --color-focus: oklch(0.55 0.18 var(--hue));
+            --color-hairline: oklch(0.85 0.04 var(--hue));
+
+            /* Spacing Constants */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2.5rem; /* Top level question separation */
+            
+            --nav-width: 240px;
+            --header-height: 60px;
+            --max-paper-width: 800px;
+        }
+
+        /* =========================================
+           RESET & BASE
+           ========================================= */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--surf-page);
+            color: var(--text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            overflow-y: scroll; /* Always show scrollbar to prevent shifts */
+        }
+
+        button {
+            font-family: inherit;
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+            color: inherit;
+        }
+
+        /* Focus States (Stage 5.5.2) */
+        :focus-visible {
+            outline: 2px solid var(--color-focus);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* =========================================
+           LAYOUT ARCHITECTURE (STAGE 3)
+           ========================================= */
+        #app-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Top Controls Region */
+        .top-controls-region {
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            padding: 0 var(--space-md);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background-color: var(--surf-page); /* Matches page bg per brief alignment */
+            border-bottom: 1px solid var(--color-hairline);
+        }
+
+        .top-controls-inner {
+            width: 100%;
+            max-width: 1200px; /* Aligned to max shell width */
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .paper-selector {
+            padding: var(--space-sm);
+            border: 1px solid var(--color-hairline);
+            border-radius: 4px;
+            background-color: var(--surf-paper);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .mobile-jump-trigger {
+            display: none; /* Desktop default */
+            font-weight: 600;
+            color: var(--color-accent);
+            font-size: 0.9rem;
+        }
+
+        /* DocumentFrameShell */
+        .document-frame-shell {
+            flex: 1;
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: var(--surf-frame);
+            /* Desktop: Nav and Paper share this frame surface */
+            position: relative;
+        }
+
+        /* Navigation Rail (Desktop) */
+        .nav-rail {
+            width: var(--nav-width);
+            flex-shrink: 0;
+            position: sticky;
+            top: var(--header-height);
+            height: calc(100vh - var(--header-height));
+            overflow-y: auto;
+            padding: var(--space-lg) var(--space-md);
+            border-right: 1px solid var(--color-hairline);
+            
+            /* Scrollbar hiding logic */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+        .nav-rail::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Paper Column */
+        .paper-column {
+            flex: 1;
+            padding: var(--space-lg) var(--space-xl);
+            /* Ensure containment */
+            min-width: 0; 
+        }
+
+        /* Paper Region */
+        .paper-region {
+            background-color: var(--surf-paper);
+            min-height: 80vh; /* Visual structure */
+            padding: var(--space-xl);
+            max-width: var(--max-paper-width);
+            margin: 0 auto;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Subtle lift */
+        }
+
+        /* Mobile Drawer */
+        .mobile-drawer-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+        .mobile-drawer {
+            position: absolute;
+            top: 0;
+            right: 0; /* Right side drawer per typical mobile patterns or bottom? Brief implies "Jump to" - right or bottom is fine. Using Right. */
+            bottom: 0;
+            width: 80%;
+            max-width: 300px;
+            background-color: var(--surf-paper);
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            padding: var(--space-md);
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.2s ease-out;
+        }
+        .mobile-drawer.open {
+            transform: translateX(0);
+        }
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-md);
+            border-bottom: 1px solid var(--color-hairline);
+            padding-bottom: var(--space-sm);
+        }
+        .drawer-title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .drawer-close {
+            font-size: 1.5rem;
+            line-height: 1;
+            padding: var(--space-sm);
+        }
+
+        /* =========================================
+           NAVIGATION CONTENT STYLING (Stage 5.4)
+           ========================================= */
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-quiet);
+            margin-top: var(--space-md);
+            margin-bottom: var(--space-xs);
+            padding-left: var(--space-sm);
+            font-weight: 600;
+            pointer-events: none;
+        }
+
+        .nav-item {
+            display: block;
+            padding: var(--space-xs) var(--space-sm);
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-size: 0.9rem; /* Base size */
+            border-radius: 4px;
+            transition: background-color 0.1s, color 0.1s;
+        }
+
+        .nav-item:hover {
+            background-color: var(--surf-nav-hover);
+            color: var(--text-primary);
+        }
+
+        /* Current item indication (Weight + Accent marker) */
+        .nav-item.active {
+            font-weight: 600;
+            color: var(--text-primary);
+            position: relative;
+        }
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 16px;
+            background-color: var(--color-accent);
+            border-radius: 0 2px 2px 0;
+        }
+
+        /* Hierarchy via type scale (Stage 5.4.5) - Flat list */
+        .nav-item[data-depth="0"] { font-size: 0.95rem; }
+        .nav-item[data-depth="1"] { font-size: 0.85rem; }
+        .nav-item[data-depth="2"] { font-size: 0.8rem; }
+
+        /* =========================================
+           PAPER CONTENT STYLING
+           ========================================= */
+        
+        /* Section Header in Paper */
+        .paper-section-header {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-lg);
+            padding-bottom: var(--space-sm);
+            border-bottom: 1px solid var(--color-hairline);
+            margin-top: var(--space-xl);
+        }
+        .paper-section-header:first-child {
+            margin-top: 0;
+        }
+
+        /* Question Node */
+        .question-node {
+            margin-bottom: var(--space-xl); /* Top level separation */
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Indentation & Spacing for children */
+        .children-container {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md); /* Sibling child separation */
+            margin-top: var(--space-md);
+            padding-left: 0; /* Indentation logic: handled by media query below */
+        }
+
+        /* Question Body */
+        .question-body {
+            margin-bottom: var(--space-sm);
+        }
+        .question-identifier {
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-right: var(--space-sm);
+            display: inline-block;
+        }
+        .question-prompt {
+            color: var(--text-primary);
+            display: inline;
+        }
+        .question-prompt p {
+            display: inline;
+        }
+        .question-prompt p:not(:last-child) {
+            display: block;
+            margin-bottom: var(--space-sm);
+        }
+
+        /* Solution Block */
+        .solution-block {
+            margin-top: var(--space-md);
+            padding-left: 0;
+        }
+
+        /* Answer */
+        .answer-region {
+            margin-bottom: var(--space-sm);
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-sm);
+        }
+        .answer-label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .answer-content {
+            color: var(--text-primary);
+        }
+
+        /* Disclosure Control */
+        .disclosure-control {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            font-size: 0.9rem;
+            color: var(--color-accent); /* Text-first */
+            font-weight: 500;
+            margin-bottom: var(--space-sm);
+            user-select: none;
+        }
+        .disclosure-control:hover {
+            text-decoration: underline;
+        }
+        .disclosure-icon {
+            transition: transform 0.2s;
+        }
+        .disclosure-control[aria-expanded="true"] .disclosure-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Solution Details Region */
+        .solution-details-region {
+            display: none; /* Collapsed by default via CSS, toggled by JS */
+            margin-top: var(--space-xs);
+            padding: var(--space-md);
+            background-color: var(--surf-wash); /* Surface Differentiation */
+            border-radius: 4px;
+        }
+        .solution-details-region.expanded {
+            display: block;
+        }
+
+        /* Subsections (Keep in mind, Formulas, Working, Alt) */
+        .sd-subsection {
+            margin-bottom: var(--space-lg);
+        }
+        .sd-subsection:last-child {
+            margin-bottom: 0;
+        }
+        .sd-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .sd-body {
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        /* Working Internal Grammar */
+        .sd-body p {
+            margin-bottom: var(--space-sm);
+        }
+        .sd-body ul, .sd-body ol {
+            margin-top: var(--space-xs);
+            margin-bottom: var(--space-sm);
+            padding-left: var(--space-lg);
+        }
+
+        /* Math Containment (Stage 6.0.8) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.25rem 0; /* Breathing room for scrollbar */
+            background-color: transparent; /* Explicit: No background for math blocks unless defined otherwise */
+        }
+        /* Tables */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: var(--space-md);
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid var(--color-hairline);
+            padding: var(--space-xs) var(--space-sm);
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* =========================================
+           RESPONSIVE
+           ========================================= */
+        @media (min-width: 768px) {
+            .mobile-jump-trigger {
+                display: none;
+            }
+            .nav-rail {
+                display: block;
+            }
+            .children-container {
+                padding-left: var(--space-lg); /* Indentation on larger screens */
+            }
+            .solution-block {
+                padding-left: var(--space-md);
+            }
+        }
+
+        @media (max-width: 767px) {
+            .document-frame-shell {
+                flex-direction: column;
+            }
+            .nav-rail {
+                display: none; /* Hide sticky rail on mobile */
+            }
+            .mobile-jump-trigger {
+                display: block;
+            }
+            .paper-column {
+                padding: var(--space-md) var(--space-sm);
+            }
+            .paper-region {
+                padding: var(--space-md);
+            }
+            .children-container {
+                padding-left: var(--space-sm); /* Reduced indentation on mobile */
+            }
+        }
+
+        /* Error View */
+        .error-message {
+            text-align: center;
+            margin-top: var(--space-xl);
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+
+<!-- STAGE 0: CONSTANTS DEFINED IN SCRIPT BELOW -->
+
+<div id="app-shell">
+    <div class="top-controls-region">
+        <div class="top-controls-inner">
+            <select id="paper-selector" class="paper-selector" aria-label="Select Paper">
+                <option value="" disabled selected>Loading papers...</option>
+            </select>
+            <button id="mobile-jump-trigger" class="mobile-jump-trigger">Jump to...</button>
+        </div>
+    </div>
+
+    <div class="document-frame-shell">
+        <!-- Desktop Nav Rail -->
+        <nav id="nav-rail" class="nav-rail" aria-label="Document Navigation"></nav>
+
+        <!-- Paper Column -->
+        <main class="paper-column">
+            <div id="paper-content" class="paper-region">
+                <!-- Content injected here -->
+                <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">Loading...</div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Mobile Drawer -->
+<div id="mobile-drawer-backdrop" class="mobile-drawer-backdrop">
+    <div id="mobile-drawer" class="mobile-drawer">
+        <div class="drawer-header">
+            <span class="drawer-title">Jump to</span>
+            <button id="drawer-close" class="drawer-close" aria-label="Close navigation">&times;</button>
+        </div>
+        <nav id="drawer-nav-content" aria-label="Mobile Document Navigation">
+            <!-- Mobile nav injected here -->
+        </nav>
+    </div>
+</div>
+
+<!-- SCRIPTS -->
+<!-- 1. Markdown-it -->
+<script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+<!-- 2. KaTeX JS -->
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+<script>
+    // --- STAGE 0: CONSTANTS (AUTHORITATIVE) ---
+    const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+    const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+    // --- ADD-ON: ColorLab B Parameter ---
+    // (CSS handles the rendering, this is for ref if needed)
+    // RTQ_COLORLAB_FORCE_HUE_FAMILY = "red" (Implemented in CSS :root)
+
+    // --- ADD-ON: ColorLab C Parameter ---
+    // RTQ_COLORLAB_INTENSITY_MODE = "high_chroma_surfaces" (Implemented in CSS :root)
+
+
+    // --- Markdown Configuration (Stage 6 Add-on) ---
+    const md = window.markdownit ? window.markdownit({
+        html: true,
+        linkify: true,
+        breaks: false // Critical constraint
+    }) : null;
+
+    if (md) {
+        // Disable escape rule to preserve TeX backslashes
+        md.inline.ruler.disable(['escape']);
+    }
+
+    // --- State ---
+    let papersData = [];
+    let currentPaper = null;
+
+    // --- DOM Elements ---
+    const els = {
+        selector: document.getElementById('paper-selector'),
+        content: document.getElementById('paper-content'),
+        navRail: document.getElementById('nav-rail'),
+        drawerNav: document.getElementById('drawer-nav-content'),
+        mobileTrigger: document.getElementById('mobile-jump-trigger'),
+        drawerBackdrop: document.getElementById('mobile-drawer-backdrop'),
+        drawer: document.getElementById('mobile-drawer'),
+        drawerClose: document.getElementById('drawer-close')
+    };
+
+    // --- Init ---
+    async function init() {
+        try {
+            const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+            
+            if (!data.papers || !Array.isArray(data.papers)) {
+                throw new Error('Invalid payload format');
+            }
+
+            papersData = data.papers;
+            populateSelector();
+            
+            // Load first paper by default
+            if (papersData.length > 0) {
+                loadPaper(papersData[0].key);
+            }
+        } catch (err) {
+            renderError();
+            console.error(err);
+        }
+    }
+
+    function renderError() {
+        els.content.innerHTML = '<div class="error-message">PAPERS PAYLOAD MISSING</div>';
+        els.selector.innerHTML = '<option disabled>Error loading papers</option>';
+    }
+
+    function populateSelector() {
+        els.selector.innerHTML = '';
+        papersData.forEach(paper => {
+            const opt = document.createElement('option');
+            opt.value = paper.key;
+            opt.textContent = paper.label || paper.key;
+            els.selector.appendChild(opt);
+        });
+
+        els.selector.addEventListener('change', (e) => {
+            loadPaper(e.target.value);
+        });
+    }
+
+    function loadPaper(paperKey) {
+        currentPaper = papersData.find(p => p.key === paperKey);
+        if (!currentPaper) return;
+
+        // Render Content
+        renderPaperContent();
+
+        // Render Nav
+        renderNavigation();
+
+        // Trigger Math Render
+        if (window.renderMathInElement) {
+            renderMathInElement(els.content, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+        
+        // Scroll top
+        window.scrollTo(0, 0);
+    }
+
+    // --- Content Rendering ---
+    function renderPaperContent() {
+        if (!currentPaper) return;
+        const container = document.createElement('div');
+
+        // Check for sections or flat questions
+        if (currentPaper.sections) {
+            currentPaper.sections.forEach(section => {
+                if (section.label && section.label.trim() !== '') {
+                    const header = document.createElement('div');
+                    header.className = 'paper-section-header';
+                    header.textContent = section.label;
+                    container.appendChild(header);
+                }
+                renderQuestionList(section.questions, container, 0);
+            });
+        } else if (currentPaper.questions) {
+            renderQuestionList(currentPaper.questions, container, 0);
+        }
+
+        els.content.innerHTML = '';
+        els.content.appendChild(container);
+    }
+
+    function renderQuestionList(questions, container, depth) {
+        if (!questions) return;
+        
+        const listWrapper = document.createElement('div');
+        listWrapper.className = depth > 0 ? 'children-container' : 'top-level-list';
+
+        questions.forEach(q => {
+            const node = document.createElement('div');
+            node.className = 'question-node';
+            node.id = `q-${cleanId(q.id)}`;
+            
+            // Question Body
+            const body = document.createElement('div');
+            body.className = 'question-body';
+            
+            const ident = document.createElement('span');
+            ident.className = 'question-identifier';
+            ident.textContent = q.id;
+            
+            const prompt = document.createElement('div');
+            prompt.className = 'question-prompt';
+            prompt.innerHTML = renderMarkdown(q.question);
+
+            body.appendChild(ident);
+            body.appendChild(prompt);
+            node.appendChild(body);
+
+            // Solution Block
+            if (q.solutionBlock) {
+                const sb = document.createElement('div');
+                sb.className = 'solution-block';
+
+                // Answer
+                if (q.solutionBlock.answer) {
+                    const ansRegion = document.createElement('div');
+                    ansRegion.className = 'answer-region';
+                    ansRegion.innerHTML = `
+                        <div class="answer-label">Answer</div>
+                        <div class="answer-content">${renderMarkdown(q.solutionBlock.answer)}</div>
+                    `;
+                    sb.appendChild(ansRegion);
+                }
+
+                // Solution Details (Show/Hide)
+                const sdData = q.solutionBlock.solutionDetails;
+                if (sdData) {
+                    // Toggle
+                    const expandedDefault = currentPaper.defaults?.expandedAll !== false;
+                    const toggleId = `toggle-${cleanId(q.id)}`;
+                    const regionId = `sd-${cleanId(q.id)}`;
+                    
+                    const btn = document.createElement('button');
+                    btn.className = 'disclosure-control';
+                    btn.setAttribute('aria-expanded', expandedDefault);
+                    btn.setAttribute('aria-controls', regionId);
+                    btn.innerHTML = `
+                        <span class="btn-text">${expandedDefault ? 'Hide working' : 'Show working'}</span>
+                        <svg class="disclosure-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    `;
+                    
+                    const region = document.createElement('div');
+                    region.id = regionId;
+                    region.className = `solution-details-region ${expandedDefault ? 'expanded' : ''}`;
+
+                    // Subsections Order: Keep in mind, Formulas, Working, Alt
+                    if (sdData.keepInMind) region.appendChild(createSDSubsection('Keep in mind', sdData.keepInMind));
+                    if (sdData.formulasUsed) region.appendChild(createSDSubsection('Formulas used', sdData.formulasUsed));
+                    if (sdData.working) region.appendChild(createSDSubsection('Working', sdData.working));
+                    if (sdData.alternativeWorking && Array.isArray(sdData.alternativeWorking)) {
+                        sdData.alternativeWorking.forEach(alt => {
+                            region.appendChild(createSDSubsection('Alternative working', alt));
+                        });
+                    }
+
+                    // Event
+                    btn.addEventListener('click', () => {
+                        const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+                        btn.setAttribute('aria-expanded', !isExpanded);
+                        btn.querySelector('.btn-text').textContent = !isExpanded ? 'Hide working' : 'Show working';
+                        region.classList.toggle('expanded');
+                    });
+
+                    sb.appendChild(btn);
+                    sb.appendChild(region);
+                }
+
+                node.appendChild(sb);
+            }
+
+            // Children recursion
+            if (q.children && q.children.length > 0) {
+                renderQuestionList(q.children, node, depth + 1);
+            }
+
+            listWrapper.appendChild(node);
+        });
+
+        container.appendChild(listWrapper);
+    }
+
+    function createSDSubsection(label, markdown) {
+        const div = document.createElement('div');
+        div.className = 'sd-subsection';
+        div.innerHTML = `
+            <div class="sd-label">${label}</div>
+            <div class="sd-body">${renderMarkdown(markdown)}</div>
+        `;
+        return div;
+    }
+
+    function renderMarkdown(text) {
+        if (!text) return '';
+        return md ? md.render(text) : text;
+    }
+
+    // --- Navigation Rendering ---
+    function renderNavigation() {
+        const createNavList = () => {
+            const list = document.createElement('ul');
+            list.className = 'nav-list';
+            return list;
+        };
+
+        const buildNavItems = (container, items, sectionLabel) => {
+            if (sectionLabel) {
+                const label = document.createElement('li');
+                label.className = 'nav-section-label';
+                label.textContent = sectionLabel;
+                container.appendChild(label);
+            }
+            
+            const traverse = (qs, depth) => {
+                qs.forEach(q => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = `#q-${cleanId(q.id)}`;
+                    a.className = 'nav-item';
+                    a.textContent = q.id; // Identifiers only
+                    a.dataset.depth = Math.min(depth, 2); // Cap depth for styling
+                    
+                    // Interaction
+                    a.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const target = document.getElementById(`q-${cleanId(q.id)}`);
+                        if (target) {
+                            // Smooth scroll
+                            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            // Close mobile drawer if open
+                            closeDrawer();
+                            // Update active state
+                            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                            a.classList.add('active');
+                        }
+                    });
+
+                    li.appendChild(a);
+                    container.appendChild(li);
+
+                    if (q.children) traverse(q.children, depth + 1);
+                });
+            };
+            
+            traverse(items, 0);
+        };
+
+        const listDesktop = createNavList();
+        const listMobile = createNavList();
+
+        if (currentPaper.sections) {
+            currentPaper.sections.forEach(sec => {
+                const label = sec.label && sec.label.trim() ? sec.label : null;
+                buildNavItems(listDesktop, sec.questions, label);
+                buildNavItems(listMobile, sec.questions, label);
+            });
+        } else if (currentPaper.questions) {
+            buildNavItems(listDesktop, currentPaper.questions, null);
+            buildNavItems(listMobile, currentPaper.questions, null);
+        }
+
+        els.navRail.innerHTML = '';
+        els.navRail.appendChild(listDesktop);
+
+        els.drawerNav.innerHTML = '';
+        els.drawerNav.appendChild(listMobile);
+
+        // Intersection Observer for Active State (Bonus)
+        setupScrollSpy();
+    }
+
+    function setupScrollSpy() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id.replace('q-', '');
+                    // Naive implementation: just highlights the visible ones. 
+                    // Better: track closest to top. For prototype, simplified.
+                    // Let's stick to click-to-activate or manual active handling for robustness without complex logic.
+                }
+            });
+        }, { threshold: 0.1 });
+        // Not implementing full scrollspy to keep JS minimal per brief constraints.
+    }
+
+    function cleanId(id) {
+        return id.replace(/[^a-zA-Z0-9]/g, '-');
+    }
+
+    // --- Mobile Drawer Logic ---
+    function openDrawer() {
+        els.drawerBackdrop.style.display = 'block';
+        // forced reflow
+        els.drawerBackdrop.offsetHeight; 
+        setTimeout(() => els.drawer.classList.add('open'), 10);
+    }
+
+    function closeDrawer() {
+        els.drawer.classList.remove('open');
+        setTimeout(() => {
+            els.drawerBackdrop.style.display = 'none';
+        }, 200);
+    }
+
+    els.mobileTrigger.addEventListener('click', openDrawer);
+    els.drawerClose.addEventListener('click', closeDrawer);
+    els.drawerBackdrop.addEventListener('click', (e) => {
+        if (e.target === els.drawerBackdrop) closeDrawer();
+    });
+
+    // --- Start ---
+    document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>

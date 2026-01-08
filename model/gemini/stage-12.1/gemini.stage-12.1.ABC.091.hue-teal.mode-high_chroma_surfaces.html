@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"91","totalWithinVariant":"320","hueFamily":"teal","intensityMode":"high_chroma_surfaces","timestamp":"2026-01-07T13:37:03.272Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;91&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;teal&quot;,&quot;intensityMode&quot;:&quot;high_chroma_surfaces&quot;,&quot;timestamp&quot;:&quot;2026-01-07T13:37:03.272Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+
+    <!-- Google Fonts: Inter for modern, neutral, readable type -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- KaTeX CSS (No Integrity/SRI per Stage 6 instructions) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+    <!-- Markdown-it (No Integrity/SRI) -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    
+    <!-- KaTeX JS (No Integrity/SRI) -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        /* =========================================
+           STAGE 6 ADD-ON: COLORLAB PARAMETERS
+           Force Hue: Teal
+           Intensity: High Chroma Surfaces
+           Mode: Light Only
+           ========================================= */
+        :root {
+            /* 
+               Base Hue: Teal (approx 195 in OKLCH)
+               High Chroma Surfaces Rules:
+               - 2 Major surfaces C in [0.06..0.12] -> Page, Frame
+               - Remaining Major surface C in [0.03..0.07] -> Paper
+               - Wash surfaces C in [0.05..0.10]
+               - Primary Text C <= 0.015
+               - Accent C in [0.12..0.20]
+            */
+            --hue: 195; 
+
+            /* Major Surfaces */
+            --c-page-bg: oklch(0.92 0.08 var(--hue));   /* High Chroma [0.06..0.12] */
+            --c-frame-bg: oklch(0.90 0.09 var(--hue));  /* High Chroma [0.06..0.12] */
+            --c-paper-bg: oklch(0.98 0.04 var(--hue));  /* Tinted [0.03..0.07] */
+
+            /* Supporting Surfaces */
+            --c-wash-bg: oklch(0.95 0.06 var(--hue));   /* Wash [0.05..0.10] */
+            --c-nav-bg: transparent; /* Nav shares frame base */
+
+            /* Text */
+            --c-text-primary: oklch(0.20 0.015 var(--hue)); /* C <= 0.015 */
+            --c-text-secondary: oklch(0.40 0.015 var(--hue));
+            --c-text-quiet: oklch(0.55 0.015 var(--hue));
+
+            /* Accents & Affordances */
+            --c-accent: oklch(0.60 0.16 var(--hue)); /* C [0.12..0.20] */
+            --c-hairline: oklch(0.85 0.02 var(--hue));
+            --c-focus-ring: oklch(0.60 0.16 var(--hue));
+
+            /* Spacing Scale */
+            --sp-xs: 0.25rem;
+            --sp-sm: 0.5rem;
+            --sp-md: 1rem;
+            --sp-lg: 1.5rem;
+            --sp-xl: 2.5rem;
+            --sp-xxl: 4rem;
+
+            /* Typography */
+            --font-stack: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        /* Reset & Base */
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: var(--font-stack);
+            background-color: var(--c-page-bg);
+            color: var(--c-text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        button {
+            font-family: inherit;
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 0;
+            color: inherit;
+        }
+
+        /* Focus States (Stage 5.5.2) */
+        :focus-visible {
+            outline: 2px solid var(--c-focus-ring);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* =========================================
+           LAYOUT ARCHITECTURE (DocumentFrameShell)
+           ========================================= */
+        .viewport-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: var(--c-page-bg);
+        }
+
+        .top-controls-region {
+            /* Aligned to frame shell constraints logic */
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background-color: var(--c-frame-bg);
+            border-bottom: 1px solid var(--c-hairline);
+            padding: var(--sp-md) var(--sp-lg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .document-frame-shell {
+            flex: 1;
+            width: 100%;
+            max-width: 1200px; /* Wide readable constraint */
+            margin: 0 auto;
+            background-color: var(--c-frame-bg); /* Shared base surface for Nav + Paper */
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (min-width: 1024px) {
+            .document-frame-shell {
+                flex-direction: row;
+                padding: var(--sp-xl) var(--sp-lg);
+                gap: var(--sp-xl);
+            }
+        }
+
+        /* Navigation Rail (Desktop) */
+        .nav-rail {
+            display: none; /* Mobile hidden */
+            width: 180px;
+            flex-shrink: 0;
+        }
+
+        @media (min-width: 1024px) {
+            .nav-rail {
+                display: block;
+                position: sticky;
+                top: calc(var(--sp-xl) + 60px); /* Offset for top controls height */
+                max-height: calc(100vh - 100px);
+                overflow-y: auto;
+                scrollbar-width: none; /* Hide scrollbar per add-on */
+            }
+            .nav-rail::-webkit-scrollbar {
+                display: none;
+            }
+        }
+
+        /* Navigation List Styles (Flat, no indent) */
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .nav-item {
+            display: block;
+            padding: var(--sp-xs) 0;
+            text-decoration: none;
+            color: var(--c-text-secondary);
+            font-size: 0.9rem;
+            border-left: 2px solid transparent;
+            padding-left: var(--sp-sm);
+            transition: color 0.15s ease, font-weight 0.15s ease;
+        }
+
+        .nav-item:hover {
+            color: var(--c-text-primary);
+            text-decoration: underline;
+            text-decoration-color: var(--c-accent);
+            text-underline-offset: 4px;
+        }
+
+        .nav-item.active {
+            font-weight: 700;
+            color: var(--c-text-primary);
+            border-left-color: var(--c-accent); /* Optional accent marker permitted by Override 5.4.3 */
+        }
+
+        /* Hierarchy via Type Scale Only (Stage 5.4.5) */
+        .nav-item[data-depth="0"] { font-size: 0.95rem; }
+        .nav-item[data-depth="1"] { font-size: 0.85rem; color: var(--c-text-quiet); }
+        .nav-item[data-depth="2"] { font-size: 0.8rem; color: var(--c-text-quiet); }
+
+        .nav-section-label {
+            margin-top: var(--sp-md);
+            margin-bottom: var(--sp-xs);
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--c-text-quiet);
+            padding-left: var(--sp-sm);
+            pointer-events: none;
+        }
+
+        /* Paper Region */
+        .paper-region {
+            flex: 1;
+            min-width: 0; /* Flexbox overflow fix */
+            background-color: var(--c-paper-bg);
+            padding: var(--sp-lg);
+            /* Minimal box shadow for separation from frame in High Chroma modes */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+        }
+
+        @media (min-width: 768px) {
+            .paper-region {
+                padding: var(--sp-xl) var(--sp-xxl);
+            }
+        }
+
+        /* =========================================
+           CONTENT TYPOGRAPHY & SPACING
+           ========================================= */
+        h1, h2, h3, p, ul, ol { margin: 0; }
+        
+        .section-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            border-bottom: 1px solid var(--c-hairline);
+            padding-bottom: var(--sp-sm);
+            margin-bottom: var(--sp-xl);
+            margin-top: var(--sp-xl);
+        }
+        
+        .section-header:first-child { margin-top: 0; }
+
+        /* Top-level Question Node */
+        .question-node {
+            margin-bottom: var(--sp-xxl); /* Largest spacing unit */
+            position: relative;
+        }
+
+        .question-node.child-node {
+            margin-bottom: 0; /* Children handled via container spacing */
+            margin-top: var(--sp-lg);
+        }
+
+        /* Question Body */
+        .question-body {
+            display: flex;
+            gap: var(--sp-md);
+            align-items: baseline;
+        }
+
+        .q-identifier {
+            font-weight: 600;
+            color: var(--c-text-secondary);
+            flex-shrink: 0;
+            min-width: 1.5rem;
+        }
+
+        .q-content {
+            flex: 1;
+            color: var(--c-text-primary);
+            font-size: 1.05rem;
+        }
+        
+        /* Solution Block */
+        .solution-block {
+            margin-top: var(--sp-md);
+            padding-left: calc(1.5rem + var(--sp-md)); /* Indent to align with content */
+        }
+
+        /* Answer */
+        .answer-region {
+            margin-bottom: var(--sp-md);
+        }
+        
+        .answer-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            margin-bottom: var(--sp-xs);
+            display: block;
+        }
+        
+        .answer-content {
+            font-weight: 500;
+            color: var(--c-text-primary);
+        }
+
+        /* Solution Details Disclosure */
+        .sd-disclosure-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--sp-xs);
+            font-size: 0.9rem;
+            color: var(--c-accent);
+            font-weight: 500;
+            margin-bottom: var(--sp-sm);
+        }
+
+        .sd-disclosure-btn:hover {
+            text-decoration: underline;
+        }
+
+        .sd-disclosure-icon {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+        .sd-disclosure-btn[aria-expanded="true"] .sd-disclosure-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Solution Details Region */
+        .solution-details-region {
+            background-color: var(--c-wash-bg); /* Surface differentiation */
+            padding: var(--sp-md);
+            margin-top: var(--sp-xs);
+            display: none; /* Hidden by default via JS toggle logic unless expanded */
+            /* Border-left cue for boundary clarity under density */
+            border-left: 2px solid var(--c-hairline); 
+        }
+
+        .solution-details-region.expanded {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Solution Details Subsections */
+        .sd-subsection {
+            margin-bottom: var(--sp-lg);
+        }
+        .sd-subsection:last-child { margin-bottom: 0; }
+
+        .sd-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--c-text-secondary);
+            margin-bottom: var(--sp-sm);
+            display: flex;
+            align-items: center;
+            gap: var(--sp-xs);
+        }
+
+        .sd-body {
+            font-size: 0.95rem;
+            color: var(--c-text-primary); /* Contrast floor guardrail: do not wash out */
+        }
+
+        /* Sub-question Indentation */
+        .children-container {
+            margin-top: var(--sp-lg);
+            padding-left: var(--sp-lg); /* Indentation for structure */
+            border-left: 1px solid transparent; /* Placeholder for alignment */
+        }
+
+        /* Mobile Drawer */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0,0,0,0.4);
+            z-index: 100;
+            display: none;
+        }
+        .drawer-overlay.open { display: block; }
+
+        .drawer-panel {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 280px;
+            background-color: var(--c-page-bg); /* Drawer uses page background */
+            z-index: 101;
+            transform: translateX(-100%);
+            transition: transform 0.25s ease-out;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .drawer-panel.open { transform: translateX(0); }
+
+        .drawer-header {
+            padding: var(--sp-md);
+            border-bottom: 1px solid var(--c-hairline);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--sp-md);
+        }
+
+        /* Controls */
+        .select-control {
+            padding: var(--sp-xs) var(--sp-sm);
+            font-size: 0.9rem;
+            border: 1px solid var(--c-hairline);
+            border-radius: 4px;
+            background-color: var(--c-paper-bg);
+            color: var(--c-text-primary);
+        }
+
+        .jump-to-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-xs);
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--c-accent);
+        }
+        @media (min-width: 1024px) {
+            .jump-to-btn { display: none; } /* Hidden on desktop */
+        }
+
+        /* Markdown & KaTeX Overrides */
+        /* Table minimal styling */
+        .md-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: var(--sp-md) 0;
+            font-size: 0.9rem;
+        }
+        .md-content th, .md-content td {
+            border: 1px solid var(--c-hairline);
+            padding: var(--sp-sm);
+            text-align: left;
+        }
+        .md-content th {
+            font-weight: 600;
+            background-color: transparent;
+        }
+
+        /* KaTeX Containment Invariant */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: var(--sp-xs) 0;
+            margin: var(--sp-sm) 0;
+            /* Scrollbar hiding logic */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .katex-display::-webkit-scrollbar { display: none; }
+        
+        /* Inline math background transparency */
+        .katex { background-color: transparent !important; }
+
+        /* Error View */
+        .error-message {
+            padding: var(--sp-xl);
+            text-align: center;
+            color: var(--c-text-secondary);
+            font-weight: 600;
+            font-size: 1.2rem;
+            border: 2px dashed var(--c-hairline);
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="viewport-shell">
+    <!-- Top Controls -->
+    <header class="top-controls-region">
+        <select id="paper-selector" class="select-control" aria-label="Select paper">
+            <option>Loading...</option>
+        </select>
+        <button id="jump-to-trigger" class="jump-to-btn" aria-label="Open navigation">
+            <span>Jump to</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+    </header>
+
+    <!-- Document Frame Shell -->
+    <div class="document-frame-shell">
+        <!-- Desktop Nav Rail -->
+        <nav class="nav-rail" aria-label="Document navigation">
+            <div id="desktop-nav-content" class="nav-list">
+                <!-- Nav items injected here -->
+            </div>
+        </nav>
+
+        <!-- Paper Content Column -->
+        <main class="paper-region" id="paper-content" tabindex="-1">
+            <!-- Paper content injected here -->
+            <div style="padding: 2rem; text-align: center; color: var(--c-text-quiet);">Initializing...</div>
+        </main>
+    </div>
+</div>
+
+<!-- Mobile Navigation Drawer -->
+<div id="mobile-drawer-overlay" class="drawer-overlay" aria-hidden="true"></div>
+<aside id="mobile-drawer-panel" class="drawer-panel" aria-hidden="true">
+    <div class="drawer-header">
+        <span style="font-weight:700; font-size:1.1rem;">Jump to</span>
+        <button id="drawer-close" aria-label="Close navigation">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+    <nav class="drawer-content">
+        <div id="mobile-nav-content" class="nav-list">
+            <!-- Nav items injected here -->
+        </div>
+    </nav>
+</aside>
+
+<script>
+// =======================================================
+// STAGE 0: CONSTANTS (CANONICAL)
+// =======================================================
+const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+// const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json"; // Not used in this prototype style
+
+// =======================================================
+// MARKDOWN & KATEX CONFIGURATION
+// =======================================================
+// Check for libraries
+const md = window.markdownit ? window.markdownit({
+    html: true,       // Enable inline SVG/HTML
+    linkify: true,
+    breaks: false     // Disable <br> on newlines to protect KaTeX
+}) : null;
+
+if (md) {
+    // Disable escape rule to preserve TeX backslashes
+    md.inline.ruler.disable(['escape']);
+}
+
+// =======================================================
+// APP LOGIC
+// =======================================================
+
+let papersData = [];
+let currentPaper = null;
+
+// Intersection Observer for Scrollspy
+const observerOptions = {
+    root: null,
+    rootMargin: '-10% 0px -80% 0px', // Active near top
+    threshold: 0
+};
+
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            updateActiveNav(entry.target.id);
+        }
+    });
+}, observerOptions);
+
+function updateActiveNav(id) {
+    const selector = `.nav-item[href="#${id}"]`;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll(selector).forEach(el => el.classList.add('active'));
+}
+
+// Fetch Payload
+async function init() {
+    try {
+        const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+        if (!response.ok) throw new Error("Payload not found");
+        
+        const json = await response.json();
+        papersData = json.papers || [];
+        
+        if (papersData.length === 0) throw new Error("No papers in payload");
+        
+        renderSelector();
+        // Load first paper by default
+        loadPaper(papersData[0].key);
+        
+    } catch (e) {
+        console.error(e);
+        document.getElementById('paper-content').innerHTML = `
+            <div class="error-message">PAPERS PAYLOAD MISSING</div>
+        `;
+        document.getElementById('paper-selector').innerHTML = '<option>Error</option>';
+        document.getElementById('paper-selector').disabled = true;
+    }
+}
+
+function renderSelector() {
+    const selector = document.getElementById('paper-selector');
+    selector.innerHTML = papersData.map(p => 
+        `<option value="${p.key}">${p.label || p.key}</option>`
+    ).join('');
+    
+    selector.addEventListener('change', (e) => {
+        loadPaper(e.target.value);
+    });
+}
+
+function loadPaper(key) {
+    currentPaper = papersData.find(p => p.key === key);
+    if (!currentPaper) return;
+    
+    // Clear observer
+    observer.disconnect();
+
+    // Render Content
+    const contentEl = document.getElementById('paper-content');
+    contentEl.innerHTML = renderPaperHTML(currentPaper);
+    
+    // Render Nav
+    const navHTML = renderNavHTML(currentPaper);
+    document.getElementById('desktop-nav-content').innerHTML = navHTML;
+    document.getElementById('mobile-nav-content').innerHTML = navHTML;
+    
+    // Init Interactivity
+    setupDisclosures();
+    setupKaTeX(contentEl);
+    setupScrollSpy();
+    
+    // Scroll to top
+    window.scrollTo(0, 0);
+}
+
+// --- RENDERING CORE ---
+
+function renderPaperHTML(paper) {
+    let html = '';
+    
+    // Check for sections
+    if (paper.sections && paper.sections.length > 0) {
+        paper.sections.forEach(section => {
+            if (section.label && section.label.trim() !== '') {
+                html += `<div class="section-header">${section.label}</div>`;
+            }
+            if (section.questions) {
+                section.questions.forEach(q => {
+                    html += renderQuestionNode(q, 0);
+                });
+            }
+        });
+    } else if (paper.questions) {
+        // Flat list
+        paper.questions.forEach(q => {
+            html += renderQuestionNode(q, 0);
+        });
+    }
+    
+    return html;
+}
+
+function renderQuestionNode(node, depth) {
+    const isChild = depth > 0;
+    const indentClass = isChild ? 'child-node' : 'question-node';
+    const anchorId = `q-${node.id.replace(/\s+/g, '-')}`;
+    
+    // Markdown render safe wrapper
+    const safeMD = (text) => md ? md.render(text || '') : (text || '');
+    
+    let html = `
+    <div id="${anchorId}" class="${indentClass}" data-depth="${depth}">
+        <div class="question-body">
+            <div class="q-identifier">${node.id}</div>
+            <div class="q-content md-content">${safeMD(node.question)}</div>
+        </div>
+    `;
+    
+    // Solution Block Logic
+    if (node.solutionBlock) {
+        const sb = node.solutionBlock;
+        const hasAnswer = !!sb.answer;
+        const hasDetails = !!sb.solutionDetails;
+        
+        if (hasAnswer || hasDetails) {
+            html += `<div class="solution-block">`;
+            
+            // Answer (Visible by default if present)
+            if (hasAnswer) {
+                html += `
+                <div class="answer-region">
+                    <span class="answer-label">Answer</span>
+                    <div class="answer-content md-content">${safeMD(sb.answer)}</div>
+                </div>`;
+            }
+            
+            // Solution Details
+            if (hasDetails) {
+                const defaultsExpanded = currentPaper.defaults && currentPaper.defaults.expandedAll === false ? false : true;
+                const expandedAttr = defaultsExpanded ? 'aria-expanded="true"' : 'aria-expanded="false"';
+                const hiddenClass = defaultsExpanded ? 'expanded' : '';
+                const btnText = defaultsExpanded ? 'Hide working' : 'Show working';
+                const regionId = `${anchorId}-details`;
+                
+                html += `
+                <button class="sd-disclosure-btn" ${expandedAttr} aria-controls="${regionId}">
+                    <span class="btn-text">${btnText}</span>
+                    <svg class="sd-disclosure-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+                
+                <div id="${regionId}" class="solution-details-region ${hiddenClass}">
+                `;
+                
+                const sd = sb.solutionDetails;
+                
+                // 1. Keep in mind
+                if (sd.keepInMind) {
+                    html += `
+                    <div class="sd-subsection">
+                        <div class="sd-label">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            Keep in mind
+                        </div>
+                        <div class="sd-body md-content">${safeMD(sd.keepInMind)}</div>
+                    </div>`;
+                }
+                
+                // 2. Formulas used
+                if (sd.formulasUsed) {
+                    html += `
+                    <div class="sd-subsection">
+                        <div class="sd-label">Formulas used</div>
+                        <div class="sd-body md-content">${safeMD(sd.formulasUsed)}</div>
+                    </div>`;
+                }
+                
+                // 3. Working
+                if (sd.working) {
+                    html += `
+                    <div class="sd-subsection">
+                        <div class="sd-label">Working</div>
+                        <div class="sd-body md-content">${safeMD(sd.working)}</div>
+                    </div>`;
+                }
+                
+                // 4. Alternative Working
+                if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                    sd.alternativeWorking.forEach(alt => {
+                        html += `
+                        <div class="sd-subsection">
+                            <div class="sd-label">Alternative working</div>
+                            <div class="sd-body md-content">${safeMD(alt)}</div>
+                        </div>`;
+                    });
+                } else if (sd.alternativeWorking) {
+                     html += `
+                    <div class="sd-subsection">
+                        <div class="sd-label">Alternative working</div>
+                        <div class="sd-body md-content">${safeMD(sd.alternativeWorking)}</div>
+                    </div>`;
+                }
+                
+                html += `</div>`; // End details region
+            }
+            
+            html += `</div>`; // End solution block
+        }
+    }
+    
+    // Children
+    if (node.children && node.children.length > 0) {
+        html += `<div class="children-container">`;
+        node.children.forEach(child => {
+            html += renderQuestionNode(child, depth + 1);
+        });
+        html += `</div>`;
+    }
+    
+    html += `</div>`; // End node
+    return html;
+}
+
+function renderNavHTML(paper) {
+    let html = '';
+    
+    const renderItem = (q, d) => {
+        const anchorId = `q-${q.id.replace(/\s+/g, '-')}`;
+        let itemHtml = `<a href="#${anchorId}" class="nav-item" data-depth="${d}">${q.id}</a>`;
+        if (q.children) {
+            q.children.forEach(c => itemHtml += renderItem(c, d + 1));
+        }
+        return itemHtml;
+    };
+    
+    if (paper.sections && paper.sections.length > 0) {
+        paper.sections.forEach(sec => {
+            if (sec.label && sec.label.trim() !== '') {
+                html += `<div class="nav-section-label">${sec.label}</div>`;
+            }
+            if (sec.questions) {
+                sec.questions.forEach(q => html += renderItem(q, 0));
+            }
+        });
+    } else if (paper.questions) {
+        paper.questions.forEach(q => html += renderItem(q, 0));
+    }
+    
+    return html;
+}
+
+// --- INTERACTIVITY ---
+
+function setupDisclosures() {
+    document.querySelectorAll('.sd-disclosure-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+            const regionId = btn.getAttribute('aria-controls');
+            const region = document.getElementById(regionId);
+            const labelSpan = btn.querySelector('.btn-text');
+            
+            if (isExpanded) {
+                btn.setAttribute('aria-expanded', 'false');
+                region.classList.remove('expanded');
+                labelSpan.textContent = 'Show working';
+            } else {
+                btn.setAttribute('aria-expanded', 'true');
+                region.classList.add('expanded');
+                labelSpan.textContent = 'Hide working';
+            }
+        });
+    });
+}
+
+function setupKaTeX(root) {
+    if (window.renderMathInElement) {
+        renderMathInElement(root, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false,
+            // Security: trust payload content from canonical source
+            trust: true 
+        });
+    }
+}
+
+function setupScrollSpy() {
+    document.querySelectorAll('[id^="q-"]').forEach(el => observer.observe(el));
+    
+    // Smooth scroll for nav
+    document.querySelectorAll('.nav-item').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const id = link.getAttribute('href').substring(1);
+            const target = document.getElementById(id);
+            if (target) {
+                // Close mobile drawer if open
+                toggleDrawer(false);
+                
+                // Offset for sticky header
+                const headerOffset = 70;
+                const elementPosition = target.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+}
+
+// Mobile Drawer Logic
+const drawerOverlay = document.getElementById('mobile-drawer-overlay');
+const drawerPanel = document.getElementById('mobile-drawer-panel');
+const drawerClose = document.getElementById('drawer-close');
+const jumpTrigger = document.getElementById('jump-to-trigger');
+
+function toggleDrawer(open) {
+    const isHidden = !open;
+    drawerOverlay.classList.toggle('open', open);
+    drawerPanel.classList.toggle('open', open);
+    drawerOverlay.setAttribute('aria-hidden', isHidden);
+    drawerPanel.setAttribute('aria-hidden', isHidden);
+}
+
+jumpTrigger.addEventListener('click', () => toggleDrawer(true));
+drawerClose.addEventListener('click', () => toggleDrawer(false));
+drawerOverlay.addEventListener('click', () => toggleDrawer(false));
+
+// Init
+window.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>

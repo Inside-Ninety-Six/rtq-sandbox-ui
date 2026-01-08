@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"269","totalWithinVariant":"320","hueFamily":"red","intensityMode":"accent_only","timestamp":"2026-01-07T22:05:33.263Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;269&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;red&quot;,&quot;intensityMode&quot;:&quot;accent_only&quot;,&quot;timestamp&quot;:&quot;2026-01-07T22:05:33.263Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Stage 6 Baseline)</title>
+
+    <!-- Tailwind CSS (Prototyping) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Stage 5.3: Soft-warm neutral base
+                        page: '#fcfcfb', // Very subtle warm tint
+                        surface: '#ffffff',
+                        border: '#e7e5e4', // stone-200
+                        
+                        // Typography
+                        primary: '#1c1917', // stone-900
+                        secondary: '#57534e', // stone-600
+                        tertiary: '#78716c', // stone-500
+
+                        // Stage 5 Override: Restrained Accent (Blue)
+                        // Used only for links, focus, active nav marker. NEVER for correctness.
+                        accent: {
+                            DEFAULT: '#2563eb', // blue-600
+                            hover: '#1d4ed8',   // blue-700
+                            light: '#eff6ff',   // blue-50 (focus rings etc)
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- KaTeX CSS (No SRI) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+    <!-- KaTeX JS (No SRI) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Stage 3/6: Document Continuity */
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            background-color: #fcfcfb; /* Stage 5.3 */
+            color: #1c1917;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Stage 6: Hide Scrollbars for Nav but allow scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Stage 6: KaTeX Containment Invariant */
+        /* Prevent horizontal page overflow, allow math-internal scroll */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            /* Stage 5: Block math subtle underlay permitted, inline forbidden */
+        }
+        
+        /* Stage 5: Markdown Tables */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid #e7e5e4;
+            padding: 0.5em 0.75em;
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+            color: #1c1917;
+        }
+        /* Mobile table scroll containment */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Focus management */
+        :focus-visible {
+            outline: 2px solid #2563eb; /* Accent */
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // =====================================================================
+        // STAGE 0: CONSTANTS & STAGE 6 BASELINE CONFIG
+        // =====================================================================
+        
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // Markdown Setup (Stage 6 Config: html=true, breaks=false)
+        const md = window.markdownit ? window.markdownit({
+            html: true, 
+            linkify: true,
+            breaks: false 
+        }) : null;
+
+        if (md) {
+            md.inline.ruler.disable(['escape']); // Preserve TeX backslashes
+        }
+
+        // =====================================================================
+        // COMPONENTS
+        // =====================================================================
+
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- Icons ---
+        const IconChevronDown = ({ className }) => <i data-lucide="chevron-down" className={className}></i>;
+        const IconChevronRight = ({ className }) => <i data-lucide="chevron-right" className={className}></i>;
+        const IconMenu = ({ className }) => <i data-lucide="menu" className={className}></i>;
+        const IconX = ({ className }) => <i data-lucide="x" className={className}></i>;
+        const IconInfo = ({ className }) => <i data-lucide="info" className={className}></i>;
+
+        // --- Markdown Renderer ---
+        // Handles content parsing and KaTeX render trigger
+        const MarkdownContent = ({ content, className = "" }) => {
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                if (containerRef.current && window.renderMathInElement) {
+                    window.renderMathInElement(containerRef.current, {
+                        delimiters: [
+                            {left: "$$", right: "$$", display: true},
+                            {left: "$", right: "$", display: false}
+                        ],
+                        throwOnError: false
+                    });
+                    lucide.createIcons({ root: containerRef.current });
+                }
+            }, [content]);
+
+            if (!content) return null;
+
+            // Render markdown to HTML
+            const html = md ? md.render(content) : content;
+
+            return (
+                <div 
+                    ref={containerRef}
+                    className={`markdown-body ${className}`}
+                    dangerouslySetInnerHTML={{ __html: html }}
+                />
+            );
+        };
+
+        // --- Navigation ---
+        
+        // Desktop Sticky Rail
+        const DesktopNavigation = ({ paper, activeId }) => {
+            const listRef = useRef(null);
+
+            // Determine structure (sections vs flat)
+            const hasSections = paper.sections && paper.sections.length > 0;
+            
+            // Flatten logic for mapping
+            // Note: Stage 3 semantics: Section labels are separators. Questions list under them.
+            
+            return (
+                <nav 
+                    className="w-64 flex-shrink-0 h-[calc(100vh-80px)] sticky top-[80px] overflow-y-auto no-scrollbar pr-4 hidden lg:block"
+                    aria-label="Document navigation"
+                >
+                    <div className="flex flex-col space-y-4">
+                        {hasSections ? (
+                            paper.sections.map((section, sIdx) => (
+                                <div key={`sec-${sIdx}`} className="flex flex-col">
+                                    {section.label && section.label.trim() !== "" && (
+                                        <div className="text-xs font-semibold text-tertiary uppercase tracking-wider mb-2 mt-2 select-none">
+                                            {section.label}
+                                        </div>
+                                    )}
+                                    <div className="flex flex-col space-y-1">
+                                        {section.questions.map(q => (
+                                            <NavItem key={q.id} question={q} activeId={activeId} />
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="flex flex-col space-y-1">
+                                {paper.questions && paper.questions.map(q => (
+                                    <NavItem key={q.id} question={q} activeId={activeId} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </nav>
+            );
+        };
+
+        // Recursive Helper to flatten nav items for Drawer/Rail to avoid complex nesting in nav view
+        // Stage 3 says nav is FLATTENED list of identifiers.
+        // We need to extract all IDs recursively.
+        const getAllNavItems = (questions) => {
+            let items = [];
+            questions.forEach(q => {
+                items.push({ id: q.id, depth: 0 }); // Root depth
+                if (q.children && q.children.length > 0) {
+                    items = items.concat(getDeepNavItems(q.children, 1));
+                }
+            });
+            return items;
+        };
+
+        const getDeepNavItems = (questions, depth) => {
+            let items = [];
+            questions.forEach(q => {
+                items.push({ id: q.id, depth });
+                if (q.children && q.children.length > 0) {
+                    items = items.concat(getDeepNavItems(q.children, depth + 1));
+                }
+            });
+            return items;
+        };
+
+        const NavItem = ({ question, activeId }) => {
+            // Traverse to flatten children for the nav list
+            const flatItems = [{id: question.id, depth: 0}, ...getDeepNavItems(question.children || [], 1)];
+
+            return (
+                <>
+                    {flatItems.map((item) => {
+                         const isActive = activeId === item.id;
+                         // Stage 5.4.5: Hierarchy via type scale/contrast only. Same left edge.
+                         const isChild = item.depth > 0;
+                         
+                         return (
+                            <a 
+                                key={item.id}
+                                href={`#q-${item.id}`}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    const el = document.getElementById(`q-${item.id}`);
+                                    if(el) {
+                                        // Smooth scroll with offset for header
+                                        const y = el.getBoundingClientRect().top + window.pageYOffset - 100;
+                                        window.scrollTo({top: y, behavior: 'smooth'});
+                                    }
+                                }}
+                                className={`
+                                    group flex items-center py-1 text-sm transition-colors duration-200
+                                    ${isActive ? 'text-accent font-bold' : 'text-secondary hover:text-primary'}
+                                    ${isChild ? 'text-xs' : 'text-sm'}
+                                `}
+                            >
+                                <span className={`
+                                    absolute left-0 w-[2px] h-4 bg-accent rounded-r-sm transition-opacity duration-200
+                                    ${isActive ? 'opacity-100' : 'opacity-0'}
+                                `}></span>
+                                <span className="ml-0">{item.id}</span> 
+                            </a>
+                         );
+                    })}
+                </>
+            );
+        };
+
+        // Mobile Drawer
+        const MobileDrawer = ({ isOpen, onClose, paper, activeId }) => {
+            if (!isOpen) return null;
+
+            const hasSections = paper.sections && paper.sections.length > 0;
+
+            return (
+                <div className="fixed inset-0 z-50 flex lg:hidden">
+                    {/* Scrim */}
+                    <div 
+                        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+                        onClick={onClose}
+                    ></div>
+                    
+                    {/* Drawer Content */}
+                    <div className="relative w-4/5 max-w-xs bg-surface h-full shadow-xl flex flex-col">
+                        <div className="p-4 border-b border-border flex items-center justify-between">
+                            <h2 className="text-base font-semibold text-primary">Jump to</h2>
+                            <button 
+                                onClick={onClose}
+                                className="p-2 -mr-2 text-secondary hover:text-primary rounded-md focus-visible:ring-2 focus-visible:ring-accent"
+                                aria-label="Close navigation"
+                            >
+                                <IconX className="w-5 h-5" />
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                             {hasSections ? (
+                                paper.sections.map((section, sIdx) => (
+                                    <div key={`m-sec-${sIdx}`} className="flex flex-col">
+                                        {section.label && section.label.trim() !== "" && (
+                                            <div className="text-xs font-semibold text-tertiary uppercase tracking-wider mb-2">
+                                                {section.label}
+                                            </div>
+                                        )}
+                                        <div className="flex flex-col space-y-2">
+                                            {section.questions.map(q => (
+                                                <div key={q.id} onClick={onClose}>
+                                                    <NavItem question={q} activeId={activeId} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="flex flex-col space-y-2">
+                                    {paper.questions && paper.questions.map(q => (
+                                        <div key={q.id} onClick={onClose}>
+                                            <NavItem question={q} activeId={activeId} />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Question Node ---
+        
+        const QuestionNode = ({ node, defaults, level = 0 }) => {
+            // Derive state
+            const hasSolutionBlock = !!node.solutionBlock;
+            const hasAnswer = hasSolutionBlock && !!node.solutionBlock.answer;
+            const hasSolutionDetails = hasSolutionBlock && !!node.solutionBlock.solutionDetails;
+            
+            // Initial expansion state based on payload defaults
+            // If solutionDetails exists, defaults.expandedAll determines state.
+            // If absent, no toggle exists.
+            const [expanded, setExpanded] = useState(
+                hasSolutionDetails ? (defaults?.expandedAll ?? true) : false
+            );
+
+            // Recursively Render Children
+            // Separation: Level 0 (Top) > Level 1 > Level 2
+            const childSpacing = level === 0 ? "mt-8" : "mt-4"; 
+            
+            return (
+                <div id={`q-${node.id}`} className="flex flex-col relative group">
+                    {/* Optional Surface Seam/Divider for Top Level */}
+                    {level === 0 && (
+                        <div className="h-px w-full bg-border mb-8 opacity-50" />
+                    )}
+
+                    {/* Question Body */}
+                    <div className="flex flex-col">
+                        <div className="flex items-baseline space-x-3 mb-2">
+                            <span className="text-secondary font-medium text-sm select-none shrink-0 min-w-[1.5rem]">
+                                {node.id}
+                            </span>
+                            <div className="flex-1 text-primary text-base leading-relaxed">
+                                <MarkdownContent content={node.question} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Solution Block (Optional) */}
+                    {hasSolutionBlock && (
+                        <div className="ml-9 mt-4 flex flex-col"> 
+                            
+                            {/* Answer (Visible by default if present) */}
+                            {hasAnswer && (
+                                <div className="mb-4">
+                                    <div className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1">Answer</div>
+                                    <div className="text-primary font-medium">
+                                        <MarkdownContent content={node.solutionBlock.answer} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Solution Details (Expandable) */}
+                            {hasSolutionDetails && (
+                                <div className="flex flex-col">
+                                    {/* Disclosure Control */}
+                                    {/* Text-first, subordinate to Answer */}
+                                    <button 
+                                        onClick={() => setExpanded(!expanded)}
+                                        className="flex items-center space-x-1.5 text-sm text-accent font-medium hover:text-accent-hover w-fit focus-visible:ring-2 focus-visible:ring-accent rounded-sm px-1 -ml-1 transition-colors"
+                                        aria-expanded={expanded}
+                                    >
+                                        <span>{expanded ? "Hide working" : "Show working"}</span>
+                                        {expanded ? <IconChevronDown className="w-4 h-4" /> : <IconChevronRight className="w-4 h-4" />}
+                                    </button>
+
+                                    {/* Expanded Region */}
+                                    {expanded && (
+                                        <div className="mt-4 pl-0 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            {/* Keep in mind */}
+                                            {node.solutionBlock.solutionDetails.keepInMind && (
+                                                <div className="mb-5">
+                                                    <div className="flex items-center space-x-2 mb-1 text-secondary">
+                                                        <IconInfo className="w-4 h-4" />
+                                                        <span className="text-xs font-bold uppercase tracking-wide">Keep in mind</span>
+                                                    </div>
+                                                    <div className="text-secondary text-sm leading-relaxed pl-6">
+                                                        <MarkdownContent content={node.solutionBlock.solutionDetails.keepInMind} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Formulas Used */}
+                                            {node.solutionBlock.solutionDetails.formulasUsed && (
+                                                <div className="mb-5">
+                                                    <div className="text-xs font-bold text-tertiary uppercase tracking-wide mb-1">Formulas used</div>
+                                                    <div className="text-secondary text-sm font-mono bg-stone-50 p-2 rounded border border-stone-100 inline-block">
+                                                        <MarkdownContent content={node.solutionBlock.solutionDetails.formulasUsed} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Working */}
+                                            {node.solutionBlock.solutionDetails.working && (
+                                                <div className="mb-6">
+                                                    <div className="text-xs font-bold text-tertiary uppercase tracking-wide mb-2">Working</div>
+                                                    <div className="text-secondary text-base leading-relaxed space-y-2">
+                                                        <MarkdownContent content={node.solutionBlock.solutionDetails.working} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Alternative Working */}
+                                            {node.solutionBlock.solutionDetails.alternativeWorking && 
+                                             node.solutionBlock.solutionDetails.alternativeWorking.length > 0 && (
+                                                <div className="mt-6 pt-6 border-t border-dashed border-border">
+                                                    {node.solutionBlock.solutionDetails.alternativeWorking.map((alt, idx) => (
+                                                        <div key={idx} className="mb-6 last:mb-0">
+                                                            <div className="text-xs font-bold text-tertiary uppercase tracking-wide mb-2">Alternative working</div>
+                                                            <div className="text-secondary text-base leading-relaxed">
+                                                                <MarkdownContent content={alt} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Recursive Children */}
+                    {node.children && node.children.length > 0 && (
+                        <div className={`flex flex-col ${childSpacing}`}>
+                            {node.children.map(child => (
+                                <QuestionNode 
+                                    key={child.id} 
+                                    node={child} 
+                                    defaults={defaults} 
+                                    level={level + 1} 
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- Paper View ---
+
+        const PaperViewer = ({ payload }) => {
+            const [selectedPaperKey, setSelectedPaperKey] = useState(payload.papers[0]?.key);
+            const [mobileNavOpen, setMobileNavOpen] = useState(false);
+            const [activeId, setActiveId] = useState(null);
+
+            const activePaper = payload.papers.find(p => p.key === selectedPaperKey) || payload.papers[0];
+
+            // Scroll Spy for Active Nav Item
+            useEffect(() => {
+                const handleScroll = () => {
+                    // Simple logic: find first question in view
+                    // This is a prototype approximation
+                    const questions = document.querySelectorAll('[id^="q-"]');
+                    let currentId = null;
+                    for (let q of questions) {
+                        const rect = q.getBoundingClientRect();
+                        if (rect.top >= 0 && rect.top < window.innerHeight / 2) {
+                            currentId = q.id.replace('q-', '');
+                            break;
+                        }
+                    }
+                    if (currentId) setActiveId(currentId);
+                };
+                window.addEventListener('scroll', handleScroll, { passive: true });
+                return () => window.removeEventListener('scroll', handleScroll);
+            }, [activePaper]);
+
+            if (!activePaper) return <div className="p-8 text-center text-secondary">No paper selected.</div>;
+
+            // Flatten questions for rendering if sections exist
+            // BUT: Design Brief says sections are separators in the single scroll.
+            // We just render them in order.
+            
+            return (
+                <div className="min-h-screen bg-page flex flex-col font-sans text-primary">
+                    
+                    {/* Top Controls (Aligned to Shell) */}
+                    <div className="sticky top-0 z-40 bg-page/95 backdrop-blur-sm border-b border-border h-[60px] flex items-center justify-center">
+                        <div className="w-full max-w-6xl px-4 lg:px-8 flex items-center justify-between">
+                            
+                            {/* Paper Selector */}
+                            <div className="flex items-center space-x-4">
+                                <div className="relative">
+                                    <select 
+                                        className="appearance-none bg-surface border border-border hover:border-accent focus:border-accent text-primary text-sm font-medium py-2 pl-3 pr-8 rounded-md focus:outline-none focus:ring-2 focus:ring-accent/20 transition-colors cursor-pointer"
+                                        value={selectedPaperKey}
+                                        onChange={(e) => {
+                                            setSelectedPaperKey(e.target.value);
+                                            window.scrollTo(0,0);
+                                        }}
+                                    >
+                                        {payload.papers.map(p => (
+                                            <option key={p.key} value={p.key}>{p.label}</option>
+                                        ))}
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary">
+                                        <IconChevronDown className="w-4 h-4" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Mobile Nav Trigger */}
+                            <button 
+                                className="lg:hidden flex items-center space-x-2 text-sm font-medium text-accent hover:text-accent-hover py-2 px-3 rounded-md hover:bg-surface transition-colors"
+                                onClick={() => setMobileNavOpen(true)}
+                            >
+                                <span>Jump to</span>
+                                <IconMenu className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Document Frame Shell */}
+                    <div className="flex-1 w-full max-w-6xl mx-auto px-4 lg:px-8 pt-8 pb-32">
+                        <div className="flex lg:space-x-12 relative">
+                            
+                            {/* Left Column: Navigation Rail (Desktop) */}
+                            <DesktopNavigation paper={activePaper} activeId={activeId} />
+
+                            {/* Right Column: Paper Content */}
+                            <main className="flex-1 min-w-0" role="main">
+                                {/* Render Content based on Structure (Flat vs Sectioned) */}
+                                {activePaper.sections ? (
+                                    activePaper.sections.map((section, idx) => (
+                                        <div key={idx} className="mb-12">
+                                            {section.label && section.label.trim() !== "" && (
+                                                <div className="flex items-center mb-8">
+                                                    <span className="text-sm font-bold text-primary bg-stone-100 px-2 py-1 rounded border border-border">
+                                                        Section {section.label}
+                                                    </span>
+                                                    <div className="flex-1 h-px bg-border ml-4"></div>
+                                                </div>
+                                            )}
+                                            <div className="space-y-12">
+                                                {section.questions.map(q => (
+                                                    <QuestionNode key={q.id} node={q} defaults={activePaper.defaults} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="space-y-12">
+                                        {activePaper.questions.map(q => (
+                                            <QuestionNode key={q.id} node={q} defaults={activePaper.defaults} />
+                                        ))}
+                                    </div>
+                                )}
+                            </main>
+
+                        </div>
+                    </div>
+
+                    {/* Mobile Drawer */}
+                    <MobileDrawer 
+                        isOpen={mobileNavOpen} 
+                        onClose={() => setMobileNavOpen(false)} 
+                        paper={activePaper}
+                        activeId={activeId}
+                    />
+
+                </div>
+            );
+        };
+
+        // --- Main App & Data Loading ---
+
+        const App = () => {
+            const [payload, setPayload] = useState(null);
+            const [error, setError] = useState(false);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                fetch(RTQ_PAPERS_PAYLOAD_PATH)
+                    .then(res => {
+                        if(!res.ok) throw new Error("Load failed");
+                        return res.json();
+                    })
+                    .then(data => {
+                        setPayload(data);
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        setError(true);
+                        setLoading(false);
+                    });
+            }, []);
+
+            useEffect(() => {
+                lucide.createIcons();
+            }, []);
+
+            if (loading) {
+                return (
+                    <div className="flex items-center justify-center min-h-screen text-secondary animate-pulse">
+                        Loading paper data...
+                    </div>
+                );
+            }
+
+            if (error || !payload) {
+                return (
+                    <div className="flex flex-col min-h-screen bg-page">
+                         <div className="h-[60px] border-b border-border bg-page/95"></div>
+                         <div className="flex-1 flex items-center justify-center">
+                             <div className="text-xl font-bold text-red-600 tracking-wide border border-red-200 bg-red-50 px-6 py-4 rounded">
+                                 PAPERS PAYLOAD MISSING
+                             </div>
+                         </div>
+                    </div>
+                );
+            }
+
+            return <PaperViewer payload={payload} />;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AB","indexWithinVariant":"187","totalWithinVariant":"200","hueFamily":"purple","intensityMode":"","timestamp":"2026-01-07T08:45:04.522Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AB&quot;,&quot;indexWithinVariant&quot;:&quot;187&quot;,&quot;totalWithinVariant&quot;:&quot;200&quot;,&quot;hueFamily&quot;:&quot;purple&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-07T08:45:04.522Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Manual only, enforced light mode by implementation
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        // ColorLab B: Forced Hue "Purple"
+                        // Mapping standard semantic roles to Purple and Slate (Neutral)
+                        accent: {
+                            50: '#faf5ff',
+                            100: '#f3e8ff',
+                            200: '#e9d5ff',
+                            300: '#d8b4fe',
+                            400: '#c084fc',
+                            500: '#a855f7',
+                            600: '#9333ea', // Primary interaction color
+                            700: '#7e22ce',
+                            800: '#6b21a8',
+                            900: '#581c87',
+                        },
+                        neutral: {
+                            50: '#f8fafc', // Warm-ish slate
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base typography and layout resets */
+        body {
+            @apply bg-neutral-50 text-neutral-900 font-sans antialiased overflow-y-scroll;
+        }
+
+        /* Scrollbar hiding utilities */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* KaTeX Overflow & Containment Invariant */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding-bottom: 0.25rem; /* Space for scrollbar if needed */
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Prevent page-level horizontal scroll */
+        .katex-html {
+            max-width: 100%;
+        }
+
+        /* Table minimal styling */
+        table {
+            @apply w-full border-collapse my-4 text-sm;
+        }
+        th, td {
+            @apply border border-neutral-200 px-3 py-2 text-left align-top;
+        }
+        th {
+            @apply font-semibold bg-neutral-50;
+        }
+        
+        /* Markdown Content Typography */
+        .md-content p {
+            @apply mb-3 leading-relaxed;
+        }
+        .md-content ul {
+            @apply list-disc list-outside ml-5 mb-3 space-y-1;
+        }
+        .md-content ol {
+            @apply list-decimal list-outside ml-5 mb-3 space-y-1;
+        }
+        .md-content :last-child {
+            @apply mb-0;
+        }
+        
+        /* Focus styles */
+        :focus-visible {
+            @apply outline-none ring-2 ring-accent-600 ring-offset-2;
+        }
+
+        /* Safe area handling */
+        .safe-pb {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        /**
+         * STAGE 0: CONSTANTS
+         */
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        /**
+         * ColorLab B: Hue "Purple" used via Tailwind config mapping above.
+         * Implementation strictly adheres to light mode.
+         */
+
+        const { useState, useEffect, useMemo, useRef, useCallback } = React;
+        const { Menu, X, ChevronDown, ChevronRight, Info } = lucide;
+
+        // --- Markdown & KaTeX Setup ---
+        // Setup Markdown-it with required config
+        const md = window.markdownit
+            ? window.markdownit({
+                html: true,
+                linkify: true,
+                breaks: false, // Authoritative: must be false
+            })
+            : null;
+
+        if (md) {
+            // Disable escape rule to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        const MarkdownContent = ({ content, className = "" }) => {
+            const containerRef = useRef(null);
+
+            const htmlContent = useMemo(() => {
+                if (!content || !md) return "";
+                return md.render(content);
+            }, [content]);
+
+            useEffect(() => {
+                if (containerRef.current) {
+                    renderMathInElement(containerRef.current, {
+                        delimiters: [
+                            { left: "$$", right: "$$", display: true },
+                            { left: "$", right: "$", display: false }
+                        ],
+                        throwOnError: false,
+                        trust: true // Allow basic HTML in math if needed
+                    });
+                }
+            }, [htmlContent]);
+
+            // Fallback for missing MD
+            if (!md) return <div className={className}>{content}</div>;
+
+            return (
+                <div 
+                    ref={containerRef}
+                    className={`md-content ${className}`}
+                    dangerouslySetInnerHTML={{ __html: htmlContent }} 
+                />
+            );
+        };
+
+        // --- Data Helper Functions ---
+        
+        // Flatten question tree for navigation
+        const flattenQuestions = (nodes, sectionLabel = null) => {
+            let flat = [];
+            
+            // If nodes are grouped by sections (for nav purposes)
+            if (nodes.type === 'section') {
+                // Section header item
+                if (nodes.label && nodes.label.trim().length > 0) {
+                     flat.push({ 
+                        type: 'section', 
+                        id: `section-${nodes.label}`, 
+                        label: nodes.label 
+                    });
+                }
+               
+                nodes.questions.forEach(q => {
+                    flat = flat.concat(flattenQuestions(q));
+                });
+                return flat;
+            }
+
+            // Normal question node recursion
+            const traverse = (node, depth = 0) => {
+                flat.push({
+                    type: 'question',
+                    id: node.id,
+                    label: node.id, // Nav uses identifier only
+                    depth: depth
+                });
+                if (node.children && node.children.length > 0) {
+                    node.children.forEach(child => traverse(child, depth + 1));
+                }
+            };
+
+            // Handle input: might be array of questions or sections
+            if (Array.isArray(nodes)) {
+                 nodes.forEach(node => {
+                    // Check if it's a section object or a question object
+                    if (node.label && node.questions) {
+                         if (node.label.trim().length > 0) {
+                            flat.push({ type: 'section', id: `section-${node.label}`, label: node.label });
+                         }
+                         node.questions.forEach(q => traverse(q));
+                    } else {
+                        traverse(node);
+                    }
+                 });
+            } else {
+                traverse(nodes);
+            }
+
+            return flat;
+        };
+
+        // Get default expanded state
+        const getInitialExpandedState = (paper) => {
+            const defaults = paper.defaults || {};
+            const expandedAll = defaults.expandedAll !== false; // Default true unless explicitly false
+            
+            const state = {};
+            const traverse = (nodes) => {
+                nodes.forEach(node => {
+                    if (node.solutionBlock && node.solutionBlock.solutionDetails) {
+                        state[node.id] = expandedAll;
+                    }
+                    if (node.children) traverse(node.children);
+                });
+            };
+
+            if (paper.sections) {
+                paper.sections.forEach(s => traverse(s.questions));
+            } else if (paper.questions) {
+                traverse(paper.questions);
+            }
+            return state;
+        };
+
+        // --- Components ---
+
+        const NavItem = ({ item, isActive, onClick }) => {
+            if (item.type === 'section') {
+                return (
+                    <div className="pt-4 pb-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider select-none">
+                        {item.label}
+                    </div>
+                );
+            }
+
+            // Hierarchy via type scale/quietness (Stage 5.4.5)
+            // No indentation. Sub-questions quieter.
+            const isTopLevel = item.depth === 0;
+            const baseClasses = "block w-full text-left py-1.5 px-0 text-sm transition-colors duration-200 border-l-2 pl-3 -ml-[2px]";
+            
+            // Active state
+            const activeClasses = isActive 
+                ? "border-accent-600 text-accent-700 font-bold" 
+                : "border-transparent text-neutral-600 hover:text-neutral-900 hover:border-neutral-300";
+
+            // Depth styling
+            const depthClasses = isTopLevel ? "text-sm" : "text-xs text-neutral-500";
+
+            return (
+                <button 
+                    onClick={() => onClick(item.id)}
+                    className={`${baseClasses} ${activeClasses} ${depthClasses}`}
+                    aria-current={isActive ? 'page' : undefined}
+                >
+                    {item.label}
+                </button>
+            );
+        };
+
+        const NavigationList = ({ navItems, activeId, onNavigate }) => {
+            return (
+                <nav className="space-y-0.5" aria-label="Paper navigation">
+                    {navItems.map((item, idx) => (
+                        <NavItem 
+                            key={`${item.id}-${idx}`} 
+                            item={item} 
+                            isActive={activeId === item.id} 
+                            onClick={onNavigate} 
+                        />
+                    ))}
+                </nav>
+            );
+        };
+
+        const DisclosureControl = ({ expanded, onToggle }) => {
+            return (
+                <button 
+                    onClick={onToggle}
+                    className="group flex items-center gap-2 text-sm font-medium text-accent-600 hover:text-accent-800 transition-colors focus-visible:ring-2 focus-visible:ring-accent-600 rounded-sm py-1"
+                    aria-expanded={expanded}
+                >
+                    <span className="text-xs transition-transform duration-200">
+                        {expanded ? "Hide working" : "Show working"}
+                    </span>
+                    {expanded 
+                        ? <ChevronDown size={14} className="stroke-[3]" /> 
+                        : <ChevronRight size={14} className="stroke-[3]" />
+                    }
+                </button>
+            );
+        };
+
+        // Inner grammar components for Solution Details
+        const KeepInMind = ({ content }) => (
+            <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1 text-sm font-bold text-neutral-700">
+                    <Info size={14} className="text-neutral-500" />
+                    <span>Keep in mind</span>
+                </div>
+                <MarkdownContent content={content} className="text-sm text-neutral-600 pl-6" />
+            </div>
+        );
+
+        const FormulasUsed = ({ content }) => (
+            <div className="mb-4 pl-6 border-l-2 border-neutral-200">
+                <div className="text-xs font-bold text-neutral-500 mb-1 uppercase tracking-wide">Formulas used</div>
+                <MarkdownContent content={content} className="text-sm text-neutral-600" />
+            </div>
+        );
+
+        const WorkingBlock = ({ label, content, isAlternative = false }) => (
+            <div className={`mt-4 ${isAlternative ? 'pt-4 border-t border-neutral-200/50' : ''}`}>
+                <div className="text-sm font-bold text-neutral-700 mb-2">{label}</div>
+                <MarkdownContent content={content} className="text-sm text-neutral-800 space-y-3" />
+            </div>
+        );
+
+        const SolutionDetails = ({ details }) => {
+            // Order: Keep in mind -> Formulas used -> Working -> Alternative working
+            return (
+                <div className="mt-2 pt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {/* Optional very subtle wash for expanded region under density */}
+                    <div className="relative">
+                        {details.keepInMind && <KeepInMind content={details.keepInMind} />}
+                        
+                        {(details.keepInMind && details.formulasUsed) && <div className="h-4"></div>}
+                        
+                        {details.formulasUsed && <FormulasUsed content={details.formulasUsed} />}
+                        
+                        {/* Spacing between intro blocks and working */}
+                        {((details.keepInMind || details.formulasUsed) && details.working) && <div className="h-4"></div>}
+                        
+                        {details.working && (
+                            <WorkingBlock label="Working" content={details.working} />
+                        )}
+                        
+                        {details.alternativeWorking && details.alternativeWorking.map((alt, idx) => (
+                            <WorkingBlock 
+                                key={idx} 
+                                label={`Alternative working ${details.alternativeWorking.length > 1 ? idx + 1 : ''}`} 
+                                content={alt} 
+                                isAlternative={true} 
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const QuestionNode = ({ node, depth = 0, expandedState, toggleWorking }) => {
+            const { id, question, solutionBlock, children } = node;
+            const hasSolutionBlock = !!solutionBlock;
+            const answer = solutionBlock?.answer;
+            const solutionDetails = solutionBlock?.solutionDetails;
+            const hasDetails = !!solutionDetails;
+            const isExpanded = expandedState[id];
+
+            // Anchor logic for navigation
+            const anchorRef = useRef(null);
+            useEffect(() => {
+                if (anchorRef.current) {
+                    anchorRef.current.id = `q-${id}`;
+                }
+            }, [id]);
+
+            // Styling based on nesting depth for separation
+            // Top level: more vertical space. Children: less.
+            const containerClass = depth === 0 ? "mb-12" : "mb-6 mt-4";
+            const indentClass = depth > 0 ? "pl-0 md:pl-6 border-l-0 md:border-l border-transparent" : ""; 
+            // Note: Stage 3 mandates visual indentation via spacing only, no heavy borders. 
+            // Using padding for nesting visual.
+
+            return (
+                <div ref={anchorRef} className={`question-node group ${containerClass} ${indentClass}`}>
+                    {/* Question Body */}
+                    <div className="flex flex-col gap-2 mb-3">
+                        <div className="flex items-baseline gap-3">
+                            <span className="text-neutral-500 font-medium text-sm select-none shrink-0 min-w-[1.5rem]">{id}</span>
+                            <div className="flex-1 min-w-0">
+                                <MarkdownContent content={question} className="text-base font-medium text-neutral-900" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Solution Block */}
+                    {hasSolutionBlock && (
+                        <div className="ml-[calc(1.5rem+0.75rem)] border-l-2 border-transparent hover:border-neutral-100 transition-colors pl-4 -ml-4 py-1">
+                            {/* Answer */}
+                            {answer && (
+                                <div className="mb-3">
+                                    <div className="text-xs font-bold text-neutral-500 mb-1">Answer</div>
+                                    <MarkdownContent content={answer} className="text-neutral-900 font-medium" />
+                                </div>
+                            )}
+
+                            {/* Solution Details Control & Region */}
+                            {hasDetails && (
+                                <div className="mt-2">
+                                    <DisclosureControl 
+                                        expanded={isExpanded} 
+                                        onToggle={() => toggleWorking(id)} 
+                                    />
+                                    
+                                    {isExpanded && (
+                                        <SolutionDetails details={solutionDetails} />
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Recursive Children */}
+                    {children && children.length > 0 && (
+                        <div className="mt-4">
+                            {children.map((child, idx) => (
+                                <QuestionNode 
+                                    key={idx} 
+                                    node={child} 
+                                    depth={depth + 1} 
+                                    expandedState={expandedState} 
+                                    toggleWorking={toggleWorking} 
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const PaperSection = ({ label, questions, expandedState, toggleWorking }) => {
+            return (
+                <div className="mb-12">
+                    {label && label.trim().length > 0 && (
+                        <div className="mb-6 pt-4 border-t border-neutral-200">
+                            <h2 className="text-neutral-500 font-bold uppercase tracking-wider text-sm">{label}</h2>
+                        </div>
+                    )}
+                    <div>
+                        {questions.map((q, idx) => (
+                            <QuestionNode 
+                                key={idx} 
+                                node={q} 
+                                expandedState={expandedState} 
+                                toggleWorking={toggleWorking} 
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const PaperView = ({ paper, expandedState, toggleWorking }) => {
+            if (!paper) return null;
+
+            return (
+                <div className="max-w-3xl mx-auto w-full pb-32">
+                    {paper.sections ? (
+                        paper.sections.map((section, idx) => (
+                            <PaperSection 
+                                key={idx} 
+                                label={section.label} 
+                                questions={section.questions} 
+                                expandedState={expandedState} 
+                                toggleWorking={toggleWorking} 
+                            />
+                        ))
+                    ) : (
+                        <div>
+                            {paper.questions.map((q, idx) => (
+                                <QuestionNode 
+                                    key={idx} 
+                                    node={q} 
+                                    expandedState={expandedState} 
+                                    toggleWorking={toggleWorking} 
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- Main App Shell ---
+
+        const App = () => {
+            const [papers, setPapers] = useState([]);
+            const [activePaperKey, setActivePaperKey] = useState(null);
+            const [expandedState, setExpandedState] = useState({});
+            const [mobileNavOpen, setMobileNavOpen] = useState(false);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(false);
+
+            // Active Intersection State for Nav
+            const [activeNavId, setActiveNavId] = useState(null);
+
+            // Load Payload
+            useEffect(() => {
+                const loadPayload = async () => {
+                    try {
+                        const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                        if (!response.ok) throw new Error("Fetch failed");
+                        const data = await response.json();
+                        
+                        if (data && data.papers && data.papers.length > 0) {
+                            setPapers(data.papers);
+                            // Default to first paper
+                            const first = data.papers[0];
+                            setActivePaperKey(first.key);
+                            setExpandedState(getInitialExpandedState(first));
+                        } else {
+                            setError(true);
+                        }
+                    } catch (err) {
+                        console.error("Payload load error:", err);
+                        setError(true);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                loadPayload();
+            }, []);
+
+            const activePaper = useMemo(() => 
+                papers.find(p => p.key === activePaperKey), 
+                [papers, activePaperKey]
+            );
+
+            const navItems = useMemo(() => {
+                if (!activePaper) return [];
+                const nodes = activePaper.sections || activePaper.questions;
+                // Add type: 'section' if accessing array of sections directly in flatten
+                const input = activePaper.sections 
+                    ? activePaper.sections.map(s => ({...s, type: 'section'})) 
+                    : activePaper.questions;
+                return flattenQuestions(input);
+            }, [activePaper]);
+
+            // Switch Paper
+            const handlePaperSwitch = (e) => {
+                const key = e.target.value;
+                const newPaper = papers.find(p => p.key === key);
+                if (newPaper) {
+                    setActivePaperKey(key);
+                    setExpandedState(getInitialExpandedState(newPaper));
+                    window.scrollTo(0, 0);
+                    setActiveNavId(null);
+                }
+            };
+
+            // Toggle logic
+            const toggleWorking = useCallback((questionId) => {
+                setExpandedState(prev => ({
+                    ...prev,
+                    [questionId]: !prev[questionId]
+                }));
+            }, []);
+
+            // Navigation Jump
+            const handleNavigate = (id) => {
+                setMobileNavOpen(false);
+                // Strip "section-" prefix if present for sections (though they are non-clickable headers mostly)
+                // Actually sections are non-clickable per spec. Button logic in NavItem handles this.
+                // Assuming ID is question ID.
+                const el = document.getElementById(`q-${id}`);
+                if (el) {
+                    // Smooth scroll, centered-ish
+                    const top = el.getBoundingClientRect().top + window.scrollY - 100;
+                    window.scrollTo({ top, behavior: 'smooth' });
+                    // Set active manually for immediate feedback
+                    setActiveNavId(id);
+                }
+            };
+
+            // Intersection Observer for Active Nav
+            useEffect(() => {
+                if (loading || error) return;
+                
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            // Extract raw ID from q-{id}
+                            const rawId = entry.target.id.replace('q-', '');
+                            setActiveNavId(rawId);
+                        }
+                    });
+                }, { rootMargin: '-10% 0px -80% 0px' }); // Trigger near top
+
+                const nodes = document.querySelectorAll('.question-node');
+                nodes.forEach(node => observer.observe(node));
+
+                return () => observer.disconnect();
+            }, [activePaper, expandedState, loading, error]);
+
+            // Render Logic
+            if (loading) return <div className="p-8 text-neutral-500">Loading papers...</div>;
+            if (error) return <div className="p-8 text-red-700 font-bold">PAPERS PAYLOAD MISSING</div>;
+
+            return (
+                <div className="min-h-screen flex flex-col md:flex-row max-w-7xl mx-auto">
+                    {/* Top Controls (Mobile & Desktop shared visual alignment) */}
+                    <div className="fixed top-0 left-0 right-0 z-40 bg-neutral-50/90 backdrop-blur-md border-b border-neutral-200 md:hidden px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <select 
+                                className="bg-white border border-neutral-200 text-sm rounded px-2 py-1.5 focus:ring-2 focus:ring-accent-600 outline-none"
+                                value={activePaperKey}
+                                onChange={handlePaperSwitch}
+                            >
+                                {papers.map(p => (
+                                    <option key={p.key} value={p.key}>{p.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <button 
+                            onClick={() => setMobileNavOpen(true)}
+                            className="text-sm font-medium text-accent-700 flex items-center gap-1"
+                        >
+                            <Menu size={18} /> Jump to
+                        </button>
+                    </div>
+
+                    {/* Mobile Drawer */}
+                    {mobileNavOpen && (
+                        <div className="fixed inset-0 z-50 flex justify-end">
+                            <div className="absolute inset-0 bg-neutral-900/20 backdrop-blur-sm" onClick={() => setMobileNavOpen(false)} />
+                            <div className="relative w-64 bg-white h-full shadow-xl flex flex-col animate-in slide-in-from-right duration-200">
+                                <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
+                                    <span className="font-semibold text-neutral-700">Jump to</span>
+                                    <button onClick={() => setMobileNavOpen(false)} className="text-neutral-500 hover:text-neutral-900">
+                                        <X size={20} />
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    <NavigationList navItems={navItems} activeId={activeNavId} onNavigate={handleNavigate} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Desktop Sidebar (Sticky Rail) */}
+                    <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-transparent sticky top-0 h-screen overflow-y-auto no-scrollbar py-8 pl-6 pr-6">
+                        <div className="mb-8">
+                            <label className="block text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Paper</label>
+                            <select 
+                                className="w-full bg-white border border-neutral-200 text-sm rounded px-2 py-2 focus:ring-2 focus:ring-accent-600 outline-none text-neutral-700"
+                                value={activePaperKey}
+                                onChange={handlePaperSwitch}
+                            >
+                                {papers.map(p => (
+                                    <option key={p.key} value={p.key}>{p.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                             <NavigationList navItems={navItems} activeId={activeNavId} onNavigate={handleNavigate} />
+                        </div>
+                    </aside>
+
+                    {/* Main Content Area */}
+                    <main className="flex-1 min-w-0 pt-20 md:pt-8 px-4 md:px-12">
+                        <PaperView 
+                            paper={activePaper} 
+                            expandedState={expandedState} 
+                            toggleWorking={toggleWorking} 
+                        />
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+    
+    <script>
+        // Init Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

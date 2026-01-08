@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AB","indexWithinVariant":"70","totalWithinVariant":"200","hueFamily":"cyan","intensityMode":"","timestamp":"2026-01-06T23:22:13.631Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AB&quot;,&quot;indexWithinVariant&quot;:&quot;70&quot;,&quot;totalWithinVariant&quot;:&quot;200&quot;,&quot;hueFamily&quot;:&quot;cyan&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-06T23:22:13.631Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Prototype)</title>
+
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // ColorLab B: Forced Hue Family "Cyan" + Neutrals (Slate)
+                        gray: tailwind.colors.slate, // Neutral base
+                        accent: tailwind.colors.cyan, // Forced accent family
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    maxWidth: {
+                        'paper': '48rem', // ~768px for optimal reading line length
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- KaTeX CSS (via CDN - No Integrity per Stage 6.0.7b) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Icons (Phosphor - No Integrity) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        /* === Stage 3/5/6 CSS Invariants === */
+
+        /* Base settings */
+        body {
+            @apply bg-gray-50 text-gray-900;
+            font-family: 'Inter', sans-serif;
+            overflow-y: scroll; /* Always show vertical scrollbar to prevent shift */
+        }
+
+        /* 1. KaTeX Containment Invariant (Locked) */
+        /* Horizontal scrolling only allowed within block-level math containers */
+        .katex-display {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 0.25rem; /* Space for scrollbar */
+            -webkit-overflow-scrolling: touch;
+        }
+        /* No background on inline math */
+        .katex {
+            font-size: 1.1em; /* Slight bump for readability */
+        }
+
+        /* 2. Navigation Scrollbar Hiding (Stage 6 Add-on) */
+        .nav-scroll-container {
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+        .nav-scroll-container::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+
+        /* 3. Table Styles (Minimal/Structural per Stage 5.8.5) */
+        .md-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.95em;
+        }
+        .md-content th, .md-content td {
+            border: 1px solid #e2e8f0; /* slate-200 */
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+        }
+        .md-content th {
+            font-weight: 600;
+            background-color: transparent; /* No fill */
+        }
+        /* Table overflow wrapper handled in JS render */
+
+        /* 4. Focus States (Stage 5.5.2) */
+        /* Custom restrained focus */
+        :focus-visible {
+            outline: 2px solid theme('colors.accent.500');
+            outline-offset: 2px;
+            border-radius: 0.125rem;
+        }
+
+        /* 5. Typography & Spacing Utilities */
+        /* Paragraph spacing in Markdown */
+        .md-content p {
+            margin-bottom: 1em;
+            line-height: 1.6;
+        }
+        .md-content p:last-child {
+            margin-bottom: 0;
+        }
+        .md-content ul {
+            list-style-type: disc;
+            padding-left: 1.5em;
+            margin-bottom: 1em;
+        }
+        .md-content ol {
+            list-style-type: decimal;
+            padding-left: 1.5em;
+            margin-bottom: 1em;
+        }
+
+        /* Utility: Screen Reader Only */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- === Stage 0: Constants Definition (Runtime) === -->
+    <script>
+        // CANONICAL CONSTANT — PAPERS PAYLOAD PATH (v1.0)
+        // This is the single source of truth for the literal string.
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+
+        // CANONICAL CONSTANT — SHADCN TOKEN PROFILES PATH (v1.0)
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+        
+        // ColorLab B Hue Force
+        const RTQ_COLORLAB_FORCE_HUE_FAMILY = "cyan";
+    </script>
+
+    <!-- === Libraries (KaTeX + Markdown-it) === -->
+    <!-- Markdown-it (CDN - No Integrity) -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    <!-- KaTeX JS (CDN - No Integrity) -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- === App Shell === -->
+    <div id="app" class="flex flex-col flex-grow relative">
+        <!-- Loading State -->
+        <div id="loading-overlay" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+            <p class="text-gray-500 animate-pulse font-medium">Loading Paper...</p>
+        </div>
+        
+        <!-- App Content injected here -->
+        <div id="app-content" class="hidden flex flex-col flex-grow">
+            <!-- Top Controls (Paper Selector + Mobile Trigger) -->
+            <header class="sticky top-0 z-40 bg-gray-50/95 backdrop-blur border-b border-gray-200">
+                <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+                    <!-- Paper Selector -->
+                    <div class="flex items-center gap-3">
+                        <label for="paper-select" class="sr-only">Select Paper</label>
+                        <select id="paper-select" class="bg-white border border-gray-300 text-gray-700 text-sm rounded-md focus:border-accent-500 focus:ring-accent-500 block w-full p-2 py-1.5 shadow-sm">
+                            <!-- Options injected via JS -->
+                        </select>
+                    </div>
+
+                    <!-- Mobile "Jump to" Trigger -->
+                    <button id="mobile-nav-trigger" class="lg:hidden flex items-center gap-2 text-sm font-medium text-accent-700 hover:text-accent-800 transition-colors px-2 py-1.5 rounded-md hover:bg-accent-50">
+                        <span>Jump to</span>
+                        <i class="ph ph-list text-lg"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- DocumentFrameShell -->
+            <div class="flex-grow w-full max-w-6xl mx-auto flex items-stretch">
+                
+                <!-- Desktop Navigation Rail (Sticky) -->
+                <nav class="hidden lg:block w-48 flex-shrink-0 border-r border-transparent pr-6 py-8 h-[calc(100vh-3.5rem)] sticky top-14">
+                    <div id="desktop-nav-list" class="nav-scroll-container h-full overflow-y-auto pb-10">
+                        <!-- Nav items injected via JS -->
+                    </div>
+                </nav>
+
+                <!-- Separator (Desktop) -->
+                <div class="hidden lg:block w-px bg-transparent mx-0"></div> 
+                <!-- Note: Using whitespace/gutter logic, actual separator is spacing per design brief -->
+
+                <!-- Paper Region -->
+                <main class="flex-grow min-w-0 py-8 px-4 lg:px-8">
+                    <div id="paper-container" class="max-w-paper mx-auto pb-32">
+                        <!-- Questions injected via JS -->
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Mobile Drawer (Hidden by default) -->
+        <div id="mobile-drawer" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+            <!-- Scrim -->
+            <div id="mobile-drawer-scrim" class="absolute inset-0 bg-gray-900/20 backdrop-blur-sm transition-opacity opacity-0"></div>
+            <!-- Drawer Panel -->
+            <div id="mobile-drawer-panel" class="absolute right-0 top-0 bottom-0 w-64 bg-white shadow-xl transform translate-x-full transition-transform duration-200 flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-900">Jump to</h2>
+                    <button id="mobile-drawer-close" class="p-2 text-gray-500 hover:text-gray-700 rounded-md">
+                        <i class="ph ph-x text-lg"></i>
+                        <span class="sr-only">Close navigation</span>
+                    </button>
+                </div>
+                <div id="mobile-nav-list" class="flex-1 overflow-y-auto p-4 nav-scroll-container">
+                    <!-- Nav items injected via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === Application Logic === -->
+    <script>
+        /**
+         * RTQ Prototype Logic
+         * - Loads payload from canonical path.
+         * - Renders strictly based on payload content.
+         * - Handles Markdown + KaTeX rendering.
+         * - Manages state: current paper, expanded sections, active nav.
+         */
+
+        // --- State ---
+        const state = {
+            papers: [],
+            currentPaperId: null,
+            expandedNodes: new Set(), // Set of Question IDs
+            isMobileDrawerOpen: false,
+            activeQuestionId: null // For nav highlighting
+        };
+
+        // --- Markdown Configuration (Authoritative Stage 6 Config) ---
+        const md = window.markdownit({
+            html: true,       // Allow inline SVG passthrough
+            linkify: true,
+            breaks: false     // MUST stay false to prevent <br> in KaTeX blocks
+        });
+        // Disable escape rule to preserve TeX backslashes
+        md.inline.ruler.disable(['escape']);
+
+        // --- DOM Elements ---
+        const els = {
+            loading: document.getElementById('loading-overlay'),
+            appContent: document.getElementById('app-content'),
+            paperSelect: document.getElementById('paper-select'),
+            paperContainer: document.getElementById('paper-container'),
+            desktopNavList: document.getElementById('desktop-nav-list'),
+            mobileNavTrigger: document.getElementById('mobile-nav-trigger'),
+            mobileDrawer: document.getElementById('mobile-drawer'),
+            mobileDrawerScrim: document.getElementById('mobile-drawer-scrim'),
+            mobileDrawerPanel: document.getElementById('mobile-drawer-panel'),
+            mobileNavList: document.getElementById('mobile-nav-list'),
+            mobileDrawerClose: document.getElementById('mobile-drawer-close'),
+        };
+
+        // --- Initialization ---
+        async function init() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const payload = await response.json();
+                
+                if (!payload.papers || payload.papers.length === 0) {
+                    throw new Error("No papers in payload");
+                }
+
+                state.papers = payload.papers;
+                
+                // Init Paper Selector
+                renderPaperSelector();
+                
+                // Load first paper
+                loadPaper(state.papers[0].key);
+                
+                // Show App
+                els.loading.classList.add('hidden');
+                els.appContent.classList.remove('hidden');
+
+                // Setup Intersection Observer for Nav
+                setupIntersectionObserver();
+
+            } catch (err) {
+                console.error("Payload Load Error:", err);
+                renderErrorState();
+            }
+        }
+
+        function renderErrorState() {
+            els.loading.innerHTML = `
+                <div class="text-center px-4">
+                    <p class="text-red-600 font-bold mb-2">PAPERS PAYLOAD MISSING</p>
+                    <p class="text-sm text-gray-500">Could not load ${RTQ_PAPERS_PAYLOAD_PATH}</p>
+                </div>
+            `;
+        }
+
+        // --- Core Rendering ---
+
+        function renderPaperSelector() {
+            els.paperSelect.innerHTML = state.papers.map(p => 
+                `<option value="${p.key}">${p.label}</option>`
+            ).join('');
+
+            els.paperSelect.addEventListener('change', (e) => {
+                loadPaper(e.target.value);
+            });
+        }
+
+        function loadPaper(paperKey) {
+            const paper = state.papers.find(p => p.key === paperKey);
+            if (!paper) return;
+
+            state.currentPaperId = paperKey;
+            state.expandedNodes.clear();
+
+            // Handle default expansion
+            // If expandedAll is true (default in many cases unless specified false), we technically
+            // don't need to populate the Set because we check `has(id)` for toggle state.
+            // Wait, logic needs to be robust. 
+            // Design brief: "Default state: expanded unless paper.defaults.expandedAll=false"
+            // To implement "Expanded by default", we treat the Set as "Collapsed IDs" if default is expanded?
+            // Or easier: Pre-populate the Set with all IDs if default is expanded.
+            // Let's use the Set to track "Expanded State".
+            // If default is Expanded, we populate set with ALL IDs recursively.
+            
+            const expandAll = paper.defaults?.expandedAll !== false; // Default to true if undefined
+            if (expandAll) {
+                const collectIds = (nodes) => {
+                    nodes.forEach(node => {
+                        state.expandedNodes.add(node.id);
+                        if (node.children) collectIds(node.children);
+                    });
+                };
+                // Handle flat vs sectioned
+                if (paper.sections) {
+                    paper.sections.forEach(s => collectIds(s.questions));
+                } else {
+                    collectIds(paper.questions);
+                }
+            }
+
+            renderUI();
+            
+            // Scroll to top
+            window.scrollTo(0,0);
+        }
+
+        function renderUI() {
+            const paper = state.papers.find(p => p.key === state.currentPaperId);
+            if (!paper) return;
+
+            // 1. Render Navigation
+            const navHTML = generateNavHTML(paper);
+            els.desktopNavList.innerHTML = navHTML;
+            els.mobileNavList.innerHTML = navHTML;
+
+            // 2. Render Paper Content
+            let paperHTML = '';
+            
+            if (paper.sections) {
+                // Sectioned Paper
+                paper.sections.forEach(section => {
+                    const hasLabel = section.label && section.label.trim().length > 0;
+                    if (hasLabel) {
+                        paperHTML += `
+                            <div class="mb-8 border-b border-gray-200 pb-2">
+                                <h2 class="text-lg font-medium text-gray-500">${section.label}</h2>
+                            </div>
+                        `;
+                    }
+                    paperHTML += `<div class="mb-12">${renderQuestionList(section.questions)}</div>`;
+                });
+            } else {
+                // Flat Paper
+                paperHTML = renderQuestionList(paper.questions);
+            }
+
+            els.paperContainer.innerHTML = paperHTML;
+
+            // 3. Post-Process: KaTeX
+            renderMathInElement(els.paperContainer, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError: false,
+                output: 'html' // Use HTML output for speed/accessibility
+            });
+
+            // 4. Attach Event Listeners (Disclosure)
+            attachDisclosureListeners();
+            
+            // 5. Update active nav (initial)
+            updateActiveNav();
+        }
+
+        // --- Question Rendering (Recursive) ---
+
+        function renderQuestionList(questions) {
+            return questions.map(q => renderQuestionNode(q, 0)).join('');
+        }
+
+        function renderQuestionNode(node, depth) {
+            const indentClass = depth > 0 ? 'pl-0' : ''; // Stage 5.4.5: No visual indentation
+            // Spacing: Top-level gets largest. Children get less.
+            const marginClass = depth === 0 ? 'mb-16' : 'mb-8'; 
+            
+            // Render parts
+            const questionBody = renderQuestionBody(node);
+            const solutionBlock = renderSolutionBlock(node);
+            
+            let childrenHTML = '';
+            if (node.children && node.children.length > 0) {
+                childrenHTML = `
+                    <div class="mt-6 border-l border-transparent ml-1">
+                        ${node.children.map(child => renderQuestionNode(child, depth + 1)).join('')}
+                    </div>
+                `;
+            }
+
+            return `
+                <div id="q-${escapeId(node.id)}" class="group question-node ${marginClass} ${indentClass}" data-id="${node.id}">
+                    <!-- Question Body -->
+                    <div class="mb-4">
+                        ${questionBody}
+                    </div>
+
+                    <!-- Solution Block -->
+                    ${solutionBlock}
+
+                    <!-- Children -->
+                    ${childrenHTML}
+                </div>
+            `;
+        }
+
+        function renderQuestionBody(node) {
+            const htmlContent = md.render(node.question || '');
+            return `
+                <div class="flex gap-4 items-baseline">
+                    <span class="flex-shrink-0 text-gray-500 font-medium text-sm w-12 text-right select-none" aria-hidden="true">${node.id}</span>
+                    <div class="flex-grow min-w-0 md-content text-gray-900 text-lg leading-relaxed">
+                        ${htmlContent}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSolutionBlock(node) {
+            if (!node.solutionBlock) return '';
+
+            const { answer, solutionDetails } = node.solutionBlock;
+            const hasAnswer = !!answer;
+            const hasDetails = !!solutionDetails;
+            
+            if (!hasAnswer && !hasDetails) return '';
+
+            const isExpanded = state.expandedNodes.has(node.id);
+            
+            // Answer Section
+            let answerHTML = '';
+            if (hasAnswer) {
+                const answerContent = md.render(answer);
+                answerHTML = `
+                    <div class="flex gap-4 mb-3">
+                        <div class="w-12 flex-shrink-0"></div> <!-- Spacer alignment -->
+                        <div class="flex-grow">
+                            <div class="text-sm font-bold text-gray-500 mb-1 uppercase tracking-wide">Answer</div>
+                            <div class="md-content text-gray-800">
+                                ${answerContent}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Solution Details Section
+            let detailsControlHTML = '';
+            let detailsRegionHTML = '';
+
+            if (hasDetails) {
+                const btnLabel = isExpanded ? 'Hide working' : 'Show working';
+                const btnIconClass = isExpanded ? 'ph-caret-up' : 'ph-caret-down';
+                
+                // Toggle Button
+                detailsControlHTML = `
+                    <div class="flex gap-4 mb-2 no-print">
+                        <div class="w-12 flex-shrink-0"></div>
+                        <button 
+                            class="disclosure-btn flex items-center gap-2 text-accent-700 hover:text-accent-800 font-medium text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 rounded px-1 -ml-1"
+                            data-node-id="${node.id}"
+                            aria-expanded="${isExpanded}"
+                        >
+                            <span>${btnLabel}</span>
+                            <i class="ph ${btnIconClass}"></i>
+                        </button>
+                    </div>
+                `;
+
+                // Expanded Content
+                if (isExpanded) {
+                    detailsRegionHTML = `
+                        <div class="flex gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div class="w-12 flex-shrink-0"></div>
+                            <div class="flex-grow border-l-2 border-gray-100 pl-4 py-2 -ml-4">
+                                ${renderSolutionDetailsContent(solutionDetails)}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            return `
+                <div class="solution-block mt-4">
+                    ${answerHTML}
+                    ${detailsControlHTML}
+                    ${detailsRegionHTML}
+                </div>
+            `;
+        }
+
+        function renderSolutionDetailsContent(details) {
+            const parts = [];
+
+            // 1. Keep in mind
+            if (details.keepInMind) {
+                parts.push(`
+                    <div class="mb-6">
+                        <h4 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                            <i class="ph ph-lightbulb text-gray-400"></i> Keep in mind
+                        </h4>
+                        <div class="md-content text-gray-600 text-sm">
+                            ${md.render(details.keepInMind)}
+                        </div>
+                    </div>
+                `);
+            }
+
+            // 2. Formulas used
+            if (details.formulasUsed) {
+                parts.push(`
+                    <div class="mb-6">
+                        <h4 class="text-sm font-bold text-gray-700 mb-2">Formulas used</h4>
+                        <div class="md-content text-gray-600 text-sm">
+                            ${md.render(details.formulasUsed)}
+                        </div>
+                    </div>
+                `);
+            }
+
+            // 3. Working (Primary)
+            if (details.working) {
+                parts.push(`
+                    <div class="mb-6">
+                        <h4 class="text-sm font-bold text-gray-700 mb-2">Working</h4>
+                        <div class="md-content text-gray-800">
+                            ${md.render(details.working)}
+                        </div>
+                    </div>
+                `);
+            }
+
+            // 4. Alternative Working (Array)
+            if (details.alternativeWorking && Array.isArray(details.alternativeWorking)) {
+                details.alternativeWorking.forEach((alt, idx) => {
+                    parts.push(`
+                        <div class="mt-8 pt-6 border-t border-gray-100">
+                            <h4 class="text-sm font-bold text-gray-700 mb-2">Alternative working ${details.alternativeWorking.length > 1 ? idx + 1 : ''}</h4>
+                            <div class="md-content text-gray-800">
+                                ${md.render(alt)}
+                            </div>
+                        </div>
+                    `);
+                });
+            } else if (typeof details.alternativeWorking === 'string') {
+                 // Fallback if schema varies
+                 parts.push(`
+                    <div class="mt-8 pt-6 border-t border-gray-100">
+                        <h4 class="text-sm font-bold text-gray-700 mb-2">Alternative working</h4>
+                        <div class="md-content text-gray-800">
+                            ${md.render(details.alternativeWorking)}
+                        </div>
+                    </div>
+                `);
+            }
+
+            return parts.join('');
+        }
+
+
+        // --- Navigation Rendering ---
+
+        function generateNavHTML(paper) {
+            let html = '';
+            
+            if (paper.sections) {
+                paper.sections.forEach(section => {
+                    const hasLabel = section.label && section.label.trim().length > 0;
+                    if (hasLabel) {
+                        html += `<div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-4 px-2 select-none">${section.label}</div>`;
+                    } else {
+                        html += `<div class="mt-4"></div>`; // Spacing for unlabeled sections
+                    }
+                    html += generateNavItems(section.questions);
+                });
+            } else {
+                html += generateNavItems(paper.questions);
+            }
+            return html;
+        }
+
+        function generateNavItems(questions, depth = 0) {
+            return questions.map(q => {
+                // Typographic hierarchy via lightness/size (Flat list per Stage 5.4.5)
+                // Top level: darker. Nested: lighter.
+                const colorClass = depth === 0 ? 'text-gray-600' : 'text-gray-500';
+                const sizeClass = depth === 0 ? 'text-sm' : 'text-xs';
+                
+                let itemHTML = `
+                    <button 
+                        onclick="scrollToQuestion('${q.id}')"
+                        class="nav-item block w-full text-left px-2 py-1.5 rounded hover:bg-gray-100 transition-colors ${colorClass} ${sizeClass}"
+                        data-target-id="${q.id}"
+                    >
+                        ${q.id}
+                    </button>
+                `;
+                
+                if (q.children) {
+                    itemHTML += generateNavItems(q.children, depth + 1);
+                }
+                return itemHTML;
+            }).join('');
+        }
+
+        // --- Interaction Handlers ---
+
+        function attachDisclosureListeners() {
+            document.querySelectorAll('.disclosure-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const nodeId = btn.dataset.nodeId;
+                    if (state.expandedNodes.has(nodeId)) {
+                        state.expandedNodes.delete(nodeId);
+                    } else {
+                        state.expandedNodes.add(nodeId);
+                    }
+                    // Re-render only keeps scroll position mostly stable, but full re-render is simple
+                    // For prototype, we'll re-render everything.
+                    // To preserve scroll, we might need a tick.
+                    const scrollY = window.scrollY;
+                    renderUI();
+                    // Chrome handles scroll restoration well, but let's ensure.
+                    // Actually, re-rendering DOM nodes destroys scroll anchor if looking at bottom.
+                    // This is acceptable for a "harness" prototype without React reconciliation.
+                    // Or we could be smarter: replace only the parent node.
+                    // For now, full render is robust for state correctness.
+                });
+            });
+        }
+
+        window.scrollToQuestion = function(id) {
+            const el = document.getElementById(`q-${escapeId(id)}`);
+            if (el) {
+                // Close mobile drawer if open
+                closeMobileDrawer();
+                
+                // Scroll with offset
+                const headerOffset = 80; // 56px header + buffer
+                const elementPosition = el.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: "smooth"
+                });
+            }
+        };
+
+        function escapeId(id) {
+            // CSS.escape like polyfill for ID selectors
+            return id.replace(/[ !"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, "\\$&");
+        }
+
+        // --- Intersection Observer (Active Nav) ---
+        let observer;
+        function setupIntersectionObserver() {
+            if (observer) observer.disconnect();
+
+            const options = {
+                root: null,
+                rootMargin: '-20% 0px -60% 0px', // Active when in upper-middle of screen
+                threshold: 0
+            };
+
+            observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.dataset.id;
+                        updateActiveNav(id);
+                    }
+                });
+            }, options);
+
+            // Observe all question nodes
+            document.querySelectorAll('.question-node').forEach(node => {
+                observer.observe(node);
+            });
+        }
+
+        function updateActiveNav(activeId) {
+            if (activeId) state.activeQuestionId = activeId;
+            
+            // Update classes
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                const targetId = btn.dataset.targetId;
+                const isActive = targetId === state.activeQuestionId;
+                
+                if (isActive) {
+                    btn.classList.add('font-bold', 'text-accent-700', 'bg-accent-50');
+                    btn.classList.remove('text-gray-600', 'text-gray-500');
+                } else {
+                    btn.classList.remove('font-bold', 'text-accent-700', 'bg-accent-50');
+                    // Reset to depth defaults (approximate since we lost depth context here, but keeping clean is fine)
+                    // Simple reset:
+                    btn.classList.add('text-gray-600'); 
+                }
+            });
+        }
+
+        // --- Mobile Drawer Logic ---
+        els.mobileNavTrigger.addEventListener('click', () => {
+            state.isMobileDrawerOpen = true;
+            els.mobileDrawer.classList.remove('hidden');
+            // Trigger transition
+            setTimeout(() => {
+                els.mobileDrawerScrim.classList.remove('opacity-0');
+                els.mobileDrawerPanel.classList.remove('translate-x-full');
+            }, 10);
+            document.body.style.overflow = 'hidden'; // Lock scroll
+        });
+
+        function closeMobileDrawer() {
+            state.isMobileDrawerOpen = false;
+            els.mobileDrawerScrim.classList.add('opacity-0');
+            els.mobileDrawerPanel.classList.add('translate-x-full');
+            setTimeout(() => {
+                els.mobileDrawer.classList.add('hidden');
+                document.body.style.overflow = ''; // Unlock scroll
+            }, 200);
+        }
+
+        els.mobileDrawerClose.addEventListener('click', closeMobileDrawer);
+        els.mobileDrawerScrim.addEventListener('click', closeMobileDrawer);
+
+        // --- Start ---
+        init();
+
+    </script>
+</body>
+</html>

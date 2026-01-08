@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"84","totalWithinVariant":"320","hueFamily":"amber","intensityMode":"deep_theme","timestamp":"2026-01-07T13:16:35.206Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;84&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;amber&quot;,&quot;intensityMode&quot;:&quot;deep_theme&quot;,&quot;timestamp&quot;:&quot;2026-01-07T13:16:35.206Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Viewer</title>
+
+    <!-- Tailwind CSS (via CDN for prototype) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- KaTeX CSS (SRI disabled per Stage 6 baseline) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+    <!-- Custom Config for Tailwind based on ColorLab C: "deep_theme" + ColorLab B: "amber" -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // ColorLab B: Amber (~85 hue)
+                        // ColorLab C: deep_theme intensity
+                        page: 'oklch(0.95 0.10 85)',    // Bg L[0.92..0.98], C[0.08..0.16]
+                        frame: 'oklch(0.93 0.12 85)',   // Frame L[0.90..0.96], C[0.08..0.16]
+                        paper: 'oklch(0.97 0.08 85)',   // Paper L[0.94..0.99], C[0.06..0.14]
+                        
+                        txt: {
+                            primary: 'oklch(0.20 0.015 85)',   // L[0.15..0.25], C<=0.015
+                            secondary: 'oklch(0.40 0.02 85)',  // L[0.25..0.40], C<=0.020
+                            tertiary: 'oklch(0.55 0.02 85)',
+                        },
+
+                        accent: {
+                            DEFAULT: 'oklch(0.55 0.20 85)', // L[0.45..0.65], C[0.16..0.26]
+                            hover: 'oklch(0.50 0.22 85)',
+                            focus: 'oklch(0.55 0.20 85)',
+                        },
+
+                        solution: {
+                            wash: 'oklch(0.95 0.09 85)', // Distinguishable from paper
+                        },
+                        
+                        divider: 'oklch(0.85 0.02 85)', // Low chroma C<=0.02
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base Reset & Typography */
+        body {
+            background-color: theme('colors.page');
+            color: theme('colors.txt.primary');
+            font-family: theme('fontFamily.sans');
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Scrollbar hiding for Nav (Stage 6 Add-on) */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* KaTeX Containment Invariant (Locked) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            /* Scrollbar styling for math blocks */
+            scrollbar-width: thin;
+            scrollbar-color: theme('colors.txt.secondary') transparent;
+        }
+        
+        /* Inline math transparent background invariant */
+        .katex {
+            background-color: transparent !important;
+        }
+
+        /* Markdown Table Styling (Minimal) */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid theme('colors.divider');
+            padding: 0.5rem;
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+            color: theme('colors.txt.primary');
+        }
+
+        /* Focus styles (Stage 5.5.2) */
+        :focus-visible {
+            outline: 2px solid theme('colors.accent.focus');
+            outline-offset: 2px;
+        }
+        
+        /* Smooth scrolling for anchor jumps */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Utility for math containment within flex parents */
+        .math-safe-width {
+            min-width: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen flex flex-col items-center">
+        
+        <!-- FAILURE MODE RENDER -->
+        <div v-if="error" class="flex items-center justify-center min-h-screen w-full">
+            <h1 class="text-2xl font-bold text-txt-primary">PAPERS PAYLOAD MISSING</h1>
+        </div>
+
+        <!-- APP SHELL -->
+        <div v-else-if="currentPaper" class="w-full max-w-[1400px] flex flex-col flex-1 bg-frame shadow-sm min-h-screen">
+            
+            <!-- TOP CONTROLS REGION -->
+            <header class="sticky top-0 z-20 w-full bg-frame border-b border-divider px-4 py-3 flex items-center justify-between h-16">
+                
+                <!-- Paper Selector -->
+                <div class="flex items-center gap-3">
+                    <label class="text-sm font-medium text-txt-secondary hidden sm:block">Paper:</label>
+                    <select 
+                        v-model="currentPaperKey" 
+                        class="bg-paper border border-divider rounded px-3 py-1.5 text-sm font-medium text-txt-primary focus:border-accent-focus focus:ring-0 cursor-pointer"
+                        @change="switchPaper"
+                    >
+                        <option v-for="p in papers" :key="p.key" :value="p.key">
+                            {{ p.label }}
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Mobile Jump To Trigger (Option A) -->
+                <button 
+                    @click="isDrawerOpen = true"
+                    class="lg:hidden text-sm font-medium text-accent hover:text-accent-hover flex items-center gap-1"
+                >
+                    <span>Jump to</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+            </header>
+
+            <!-- DOCUMENT FRAME SHELL (2 Columns on Desktop) -->
+            <div class="flex flex-1 w-full relative">
+                
+                <!-- DESKTOP NAV RAIL (Sticky, scrollable independently) -->
+                <nav class="hidden lg:block w-64 flex-shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto no-scrollbar border-r border-divider py-6 px-4">
+                    <div class="flex flex-col gap-1">
+                        <template v-for="(item, idx) in navItems" :key="idx">
+                            <!-- Section Label (Non-clickable) -->
+                            <div v-if="item.isSection" class="mt-4 first:mt-0 mb-2 text-xs font-bold text-txt-tertiary uppercase tracking-wider px-2 select-none">
+                                {{ item.label }}
+                            </div>
+                            <!-- Question ID -->
+                            <a 
+                                v-else 
+                                :href="'#' + item.id" 
+                                class="block py-1 px-2 text-sm text-txt-secondary hover:text-txt-primary hover:bg-black/5 rounded transition-colors duration-150"
+                                :class="{'font-bold text-accent': activeNavId === item.id}"
+                                @click="handleNavClick(item.id)"
+                            >
+                                {{ item.id }}
+                            </a>
+                        </template>
+                    </div>
+                </nav>
+
+                <!-- PAPER DOCUMENT COLUMN -->
+                <main class="flex-1 min-w-0 bg-paper px-4 sm:px-8 py-8 lg:py-12">
+                    <div class="max-w-[800px] mx-auto space-y-12">
+                        
+                        <!-- PAPER CONTENT LOOP -->
+                        <!-- Handle Sections if present, else flat list -->
+                        <template v-if="currentPaper.sections">
+                            <div v-for="(section, sIdx) in currentPaper.sections" :key="sIdx" class="mb-12">
+                                <!-- Section Header -->
+                                <div v-if="section.label" class="mb-8 pb-2 border-b border-divider">
+                                    <h2 class="text-xl font-bold text-txt-primary">{{ section.label }}</h2>
+                                </div>
+                                <!-- Questions in Section -->
+                                <div class="space-y-12">
+                                    <div v-for="q in section.questions" :key="q.id" :id="q.id" class="scroll-mt-24">
+                                        <question-node 
+                                            :node="q" 
+                                            :expanded-states="expandedStates" 
+                                            @toggle="toggleWorking"
+                                        ></question-node>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Flat List -->
+                        <template v-else>
+                            <div v-for="q in currentPaper.questions" :key="q.id" :id="q.id" class="scroll-mt-24">
+                                <question-node 
+                                    :node="q" 
+                                    :expanded-states="expandedStates" 
+                                    @toggle="toggleWorking"
+                                ></question-node>
+                            </div>
+                        </template>
+
+                    </div>
+                    <!-- Bottom padding for comfort -->
+                    <div class="h-32"></div>
+                </main>
+
+            </div>
+
+        </div>
+
+        <!-- MOBILE NAV DRAWER -->
+        <div v-if="isDrawerOpen" class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+            <!-- Scrim -->
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="isDrawerOpen = false"></div>
+            <!-- Drawer Panel -->
+            <div class="absolute right-0 top-0 bottom-0 w-64 bg-frame shadow-xl flex flex-col animate-slide-in">
+                <div class="p-4 border-b border-divider flex justify-between items-center bg-frame">
+                    <span class="font-bold text-txt-primary">Jump to</span>
+                    <button @click="isDrawerOpen = false" class="text-txt-secondary hover:text-txt-primary p-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 bg-frame">
+                    <div class="flex flex-col gap-1">
+                        <template v-for="(item, idx) in navItems" :key="idx">
+                            <div v-if="item.isSection" class="mt-4 first:mt-0 mb-2 text-xs font-bold text-txt-tertiary uppercase tracking-wider px-2">
+                                {{ item.label }}
+                            </div>
+                            <a 
+                                v-else 
+                                :href="'#' + item.id" 
+                                class="block py-2 px-2 text-sm text-txt-secondary border-l-2 border-transparent hover:text-txt-primary"
+                                :class="{'font-bold text-accent border-accent': activeNavId === item.id}"
+                                @click="handleNavClick(item.id); isDrawerOpen = false;"
+                            >
+                                {{ item.id }}
+                            </a>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SCRIPTS -->
+    
+    <!-- Dependencies (SRI Disabled per Stage 6 baseline) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        // --- CONSTANTS (Canonical) ---
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+
+        // --- MARKDOWN SETUP ---
+        // Authoritative config: html: true, breaks: false, escape disabled
+        const md = window.markdownit ? window.markdownit({
+            html: true,
+            linkify: true,
+            breaks: false
+        }) : null;
+
+        if (md) {
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // --- VUE APP ---
+        const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+        // Recursive component for Question Node
+        const QuestionNode = {
+            name: 'question-node',
+            props: ['node', 'expandedStates'],
+            emits: ['toggle'],
+            template: `
+                <div class="question-node group">
+                    <!-- Question Body -->
+                    <div class="mb-4">
+                        <div class="flex flex-row gap-3">
+                            <div class="flex-shrink-0 w-12 pt-1 text-right">
+                                <span class="text-sm font-semibold text-txt-secondary select-none">{{ node.id }}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="prose prose-sm max-w-none text-txt-primary text-base leading-relaxed math-safe-width" v-html="render(node.question)"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Solution Block (Optional) -->
+                    <div v-if="hasSolutionBlock(node)" class="ml-15 pl-12 border-l border-divider/50"> <!-- Indented alignment with content -->
+                        
+                        <!-- Answer (Optional) -->
+                        <div v-if="node.solutionBlock?.answer" class="mb-4">
+                            <div class="text-xs font-bold text-txt-tertiary mb-1 uppercase tracking-wide">Answer</div>
+                            <div class="text-txt-primary font-medium math-safe-width" v-html="render(node.solutionBlock.answer)"></div>
+                        </div>
+
+                        <!-- Solution Details Toggle (If details exist) -->
+                        <div v-if="hasSolutionDetails(node)" class="mb-2">
+                            <button 
+                                @click="$emit('toggle', node.id)"
+                                class="flex items-center gap-2 text-sm font-medium text-accent hover:text-accent-hover transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded px-1 -ml-1"
+                            >
+                                <span>{{ isExpanded(node.id) ? 'Hide working' : 'Show working' }}</span>
+                                <svg 
+                                    class="w-4 h-4 transition-transform duration-200" 
+                                    :class="{'rotate-180': isExpanded(node.id)}"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                >
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Expanded Solution Details -->
+                        <div v-if="hasSolutionDetails(node) && isExpanded(node.id)" 
+                             class="bg-solution-wash rounded p-4 sm:p-6 mt-3 space-y-6 animate-fade-in border border-divider/50"
+                        >
+                            <!-- Keep in mind -->
+                            <div v-if="node.solutionBlock.solutionDetails.keepInMind">
+                                <div class="text-xs font-bold text-accent mb-2 uppercase tracking-wide flex items-center gap-2">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Keep in mind
+                                </div>
+                                <div class="text-sm text-txt-secondary leading-relaxed math-safe-width" v-html="render(node.solutionBlock.solutionDetails.keepInMind)"></div>
+                            </div>
+
+                            <!-- Formulas Used -->
+                            <div v-if="node.solutionBlock.solutionDetails.formulasUsed">
+                                <div class="text-xs font-bold text-txt-tertiary mb-2 uppercase tracking-wide">Formulas used</div>
+                                <div class="text-sm text-txt-secondary font-mono bg-white/50 p-2 rounded border border-divider math-safe-width" v-html="render(node.solutionBlock.solutionDetails.formulasUsed)"></div>
+                            </div>
+
+                            <!-- Working -->
+                            <div v-if="node.solutionBlock.solutionDetails.working">
+                                <div class="text-xs font-bold text-txt-tertiary mb-2 uppercase tracking-wide">Working</div>
+                                <div class="text-sm text-txt-primary space-y-3 leading-relaxed math-safe-width" v-html="render(node.solutionBlock.solutionDetails.working)"></div>
+                            </div>
+
+                            <!-- Alternative Working -->
+                            <div v-if="node.solutionBlock.solutionDetails.alternativeWorking && node.solutionBlock.solutionDetails.alternativeWorking.length">
+                                <div class="border-t border-divider my-4"></div>
+                                <div v-for="(alt, idx) in node.solutionBlock.solutionDetails.alternativeWorking" :key="idx" class="mt-4">
+                                    <div class="text-xs font-bold text-txt-tertiary mb-2 uppercase tracking-wide">Alternative working</div>
+                                    <div class="text-sm text-txt-primary space-y-3 leading-relaxed math-safe-width" v-html="render(alt)"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Children (Recursive) -->
+                    <div v-if="node.children && node.children.length" class="mt-6 ml-6 sm:ml-12 border-l border-transparent"> <!-- Indentation via spacing -->
+                        <div v-for="child in node.children" :key="child.id" :id="child.id" class="mt-8 scroll-mt-24">
+                            <question-node 
+                                :node="child" 
+                                :expanded-states="expandedStates" 
+                                @toggle="$emit('toggle', $event)"
+                            ></question-node>
+                        </div>
+                    </div>
+                </div>
+            `,
+            methods: {
+                render(text) {
+                    if (!text || !md) return text || '';
+                    return md.render(text);
+                },
+                hasSolutionBlock(node) {
+                    return !!node.solutionBlock;
+                },
+                hasSolutionDetails(node) {
+                    return node.solutionBlock && node.solutionBlock.solutionDetails;
+                },
+                isExpanded(id) {
+                    return !!this.expandedStates[id];
+                }
+            }
+        };
+
+        createApp({
+            components: { QuestionNode },
+            setup() {
+                const papers = ref([]);
+                const currentPaperKey = ref('');
+                const currentPaper = ref(null);
+                const expandedStates = ref({});
+                const error = ref(false);
+                const isDrawerOpen = ref(false);
+                const activeNavId = ref('');
+
+                // Load Payload
+                const init = async () => {
+                    try {
+                        const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                        if (!response.ok) throw new Error('Network response not ok');
+                        const data = await response.json();
+                        papers.value = data.papers || [];
+                        if (papers.value.length > 0) {
+                            // Default to first paper
+                            currentPaperKey.value = papers.value[0].key;
+                            loadPaper(papers.value[0]);
+                        } else {
+                            error.value = true;
+                        }
+                    } catch (e) {
+                        console.error('Payload load failed', e);
+                        error.value = true;
+                    }
+                };
+
+                const switchPaper = () => {
+                    const p = papers.value.find(x => x.key === currentPaperKey.value);
+                    if (p) loadPaper(p);
+                };
+
+                const loadPaper = (p) => {
+                    currentPaper.value = p;
+                    expandedStates.value = {};
+                    // Apply defaults
+                    const defaultExpanded = p.defaults?.expandedAll !== false;
+                    
+                    const traverse = (nodes) => {
+                        nodes.forEach(node => {
+                            if (node.solutionBlock?.solutionDetails) {
+                                expandedStates.value[node.id] = defaultExpanded;
+                            }
+                            if (node.children) traverse(node.children);
+                        });
+                    };
+
+                    if (p.sections) {
+                        p.sections.forEach(s => traverse(s.questions));
+                    } else if (p.questions) {
+                        traverse(p.questions);
+                    }
+
+                    nextTick(() => {
+                        renderMath();
+                        window.scrollTo(0, 0);
+                    });
+                };
+
+                const toggleWorking = (id) => {
+                    expandedStates.value[id] = !expandedStates.value[id];
+                    nextTick(() => renderMath());
+                };
+
+                const renderMath = () => {
+                    if (window.renderMathInElement) {
+                        renderMathInElement(document.getElementById('app'), {
+                            delimiters: [
+                                {left: '$$', right: '$$', display: true},
+                                {left: '$', right: '$', display: false}
+                            ],
+                            throwOnError: false
+                        });
+                    }
+                };
+
+                const handleNavClick = (id) => {
+                    activeNavId.value = id;
+                };
+
+                // Compute flat nav items
+                const navItems = computed(() => {
+                    if (!currentPaper.value) return [];
+                    const items = [];
+                    
+                    const processNodes = (nodes) => {
+                        nodes.forEach(node => {
+                            items.push({ id: node.id, isSection: false });
+                            if (node.children) processNodes(node.children);
+                        });
+                    };
+
+                    if (currentPaper.value.sections) {
+                        currentPaper.value.sections.forEach(section => {
+                            if (section.label) {
+                                items.push({ label: section.label, isSection: true });
+                            }
+                            processNodes(section.questions);
+                        });
+                    } else if (currentPaper.value.questions) {
+                        processNodes(currentPaper.value.questions);
+                    }
+                    return items;
+                });
+
+                // Scroll Spy for Nav
+                onMounted(() => {
+                    init();
+                    
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting) {
+                                activeNavId.value = entry.target.id;
+                            }
+                        });
+                    }, { rootMargin: '-20% 0px -60% 0px' });
+
+                    watch(currentPaper, () => {
+                        nextTick(() => {
+                            document.querySelectorAll('.question-node').forEach(el => {
+                                // Observing the wrapper div of question node, but we need ID which is on parent usually
+                                // In template: <div :id="q.id">...
+                                const container = document.getElementById(el.closest('[id]')?.id);
+                                if (container) observer.observe(container);
+                            });
+                        });
+                    });
+                });
+
+                return {
+                    papers,
+                    currentPaperKey,
+                    currentPaper,
+                    expandedStates,
+                    error,
+                    navItems,
+                    activeNavId,
+                    isDrawerOpen,
+                    switchPaper,
+                    toggleWorking,
+                    handleNavClick
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

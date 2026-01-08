@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"219","totalWithinVariant":"320","hueFamily":"teal","intensityMode":"high_chroma_surfaces","timestamp":"2026-01-07T19:32:21.131Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;219&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;teal&quot;,&quot;intensityMode&quot;:&quot;high_chroma_surfaces&quot;,&quot;timestamp&quot;:&quot;2026-01-07T19:32:21.131Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Viewer (Stage 6 Baseline)</title>
+
+    <!-- 
+      STAGE 6 ADD-ON: Real KaTeX Rendering
+      Loading via CDN without integrity/SRI as per Stage 6.0.7b
+    -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <style>
+        /* 
+         * STAGE 6 ADD-ON: COLORLAB C (High Chroma Surfaces) + COLORLAB B (Teal)
+         * Mode: high_chroma_surfaces (Light Mode Only)
+         * Hue: Teal (185)
+         */
+        :root {
+            /* Palette Definition - OKLCH */
+            --hue-teal: 185;
+
+            /* High Chroma Surfaces: At least 2 major surfaces in C [0.06 .. 0.12] */
+            /* Surface 1: Page Background */
+            --color-bg-page: oklch(0.95 0.08 var(--hue-teal)); 
+            
+            /* Surface 2: Document Frame Base (shared by nav & paper wrapper) */
+            --color-bg-frame: oklch(0.93 0.09 var(--hue-teal));
+
+            /* Remaining Surface: Paper content surface (C in [0.03 .. 0.07]) */
+            --color-bg-paper: oklch(0.98 0.04 var(--hue-teal));
+
+            /* Wash Surfaces (C in [0.05 .. 0.10]) */
+            --color-bg-wash: oklch(0.94 0.07 var(--hue-teal));
+
+            /* Text (Primary C <= 0.015, Secondary C <= 0.015) */
+            --color-text-primary: oklch(0.20 0.015 var(--hue-teal));
+            --color-text-secondary: oklch(0.40 0.015 var(--hue-teal));
+
+            /* Accent (C in [0.12 .. 0.20]) for links, focus, disclosure */
+            --color-accent: oklch(0.55 0.16 var(--hue-teal));
+            --color-accent-hover: oklch(0.50 0.18 var(--hue-teal));
+
+            /* Borders/Dividers (Neutral leaning, low chroma) */
+            --color-border: oklch(0.85 0.02 var(--hue-teal));
+
+            /* Spacing Scale */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2.5rem; /* Inter-question spacing */
+            
+            /* Font */
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Reset & Base */
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--color-bg-page);
+            color: var(--color-text-primary);
+            font-family: var(--font-family);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 
+         * Layout Architecture (Stage 3)
+         * Viewport -> Top Controls -> DocumentFrameShell -> (Nav | Paper)
+         */
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Top Controls Region */
+        .top-controls {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background-color: var(--color-bg-frame); /* Aligned to frame surface */
+            border-bottom: 1px solid var(--color-border);
+            padding: var(--space-sm) var(--space-md);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .paper-selector {
+            font-size: 0.9rem;
+            padding: var(--space-xs) var(--space-sm);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            background: var(--color-bg-paper);
+            color: var(--color-text-primary);
+        }
+
+        .mobile-jump-trigger {
+            display: none; /* Desktop default */
+            background: none;
+            border: none;
+            color: var(--color-accent);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        /* DocumentFrameShell */
+        .document-frame-shell {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 240px 1fr; /* Nav | Paper */
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            background-color: var(--color-bg-frame); /* Shared base surface */
+        }
+
+        /* Navigation Column (Desktop) */
+        .nav-rail {
+            position: sticky;
+            top: 60px; /* Offset for top controls */
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+            padding: var(--space-md);
+            border-right: 1px solid var(--color-border);
+            /* Scrollbar hiding logic */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .nav-rail::-webkit-scrollbar { display: none; }
+
+        /* Navigation List Styling */
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .nav-section-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--color-text-secondary);
+            margin-top: var(--space-md);
+            margin-bottom: var(--space-sm);
+            padding-left: var(--space-xs);
+        }
+
+        .nav-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            padding: 4px var(--space-xs);
+            margin-bottom: 2px;
+            font-size: 0.9rem;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: color 0.15s ease, font-weight 0.15s ease;
+        }
+
+        .nav-item:hover {
+            color: var(--color-text-primary);
+            text-decoration: underline;
+            text-decoration-color: var(--color-accent);
+        }
+
+        .nav-item.active {
+            font-weight: 700;
+            color: var(--color-text-primary);
+            border-left: 2px solid var(--color-accent); /* Active marker */
+            padding-left: calc(var(--space-xs) - 2px);
+        }
+
+        /* Hierarchy via type scale only (Stage 5.4.5) */
+        .nav-item[data-depth="0"] { font-size: 0.95rem; }
+        .nav-item[data-depth="1"] { font-size: 0.85rem; color: var(--color-text-secondary); }
+        .nav-item[data-depth="2"] { font-size: 0.8rem; opacity: 0.9; }
+
+        /* Paper Column */
+        .paper-column {
+            padding: var(--space-xl) var(--space-lg);
+            background-color: var(--color-bg-paper); /* Explicit paper surface */
+            min-height: 100%;
+        }
+
+        /* Question Node Structure */
+        .question-node {
+            margin-bottom: var(--space-xl);
+            position: relative;
+        }
+
+        .question-header {
+            display: flex;
+            gap: var(--space-sm);
+            align-items: baseline;
+            margin-bottom: var(--space-md);
+        }
+
+        .question-id {
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            font-size: 1rem;
+            flex-shrink: 0;
+            min-width: 1.5rem;
+        }
+
+        .question-prompt {
+            color: var(--color-text-primary);
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        /* Section Header in Paper */
+        .paper-section-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-text-primary);
+            border-bottom: 1px solid var(--color-border);
+            padding-bottom: var(--space-sm);
+            margin-top: var(--space-xl);
+            margin-bottom: var(--space-xl);
+        }
+
+        /* Solution Block */
+        .solution-block {
+            margin-left: 0; /* Flat alignment */
+            margin-top: var(--space-md);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        /* Answer */
+        .answer-region {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+        
+        .answer-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .answer-content {
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+
+        /* Solution Details */
+        .disclosure-control {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--color-accent);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            width: fit-content;
+        }
+        .disclosure-control:hover {
+            text-decoration: underline;
+        }
+
+        .solution-details-region {
+            background-color: var(--color-bg-wash); /* Surface Differentiation */
+            padding: var(--space-md);
+            border-radius: 4px;
+            margin-top: var(--space-xs);
+            display: none; /* Hidden by default state in CSS, managed by JS */
+        }
+        .solution-details-region.expanded {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Internal Solution Details Subsections */
+        .sd-subsection {
+            margin-bottom: var(--space-md);
+        }
+        .sd-subsection:last-child {
+            margin-bottom: 0;
+        }
+
+        .sd-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xs);
+            display: block;
+        }
+
+        .sd-body {
+            font-size: 0.95rem;
+            color: var(--color-text-primary);
+        }
+
+        /* Sub-questions / Children */
+        .children-container {
+            margin-top: var(--space-md);
+            padding-left: var(--space-md); /* Adaptation for nesting */
+            border-left: 1px solid transparent; /* Placeholder for alignment */
+        }
+        
+        /* Mobile / Responsive */
+        @media (max-width: 768px) {
+            .document-frame-shell {
+                display: block; /* Stacked */
+            }
+            .nav-rail {
+                display: none; /* Hidden on mobile, use Drawer */
+            }
+            .mobile-jump-trigger {
+                display: block;
+            }
+            .paper-column {
+                padding: var(--space-md);
+            }
+            .children-container {
+                padding-left: var(--space-sm);
+            }
+        }
+
+        /* Mobile Drawer */
+        .mobile-drawer-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            display: none;
+        }
+        .mobile-drawer {
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            width: 80%;
+            max-width: 300px;
+            background: var(--color-bg-page);
+            z-index: 101;
+            transform: translateX(-100%);
+            transition: transform 0.2s ease-out;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--color-border);
+        }
+        .mobile-drawer.open {
+            transform: translateX(0);
+        }
+        .drawer-header {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .drawer-title { font-weight: 700; }
+        .drawer-close {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: var(--color-text-secondary);
+        }
+        .drawer-content {
+            overflow-y: auto;
+            flex: 1;
+            padding: var(--space-md);
+        }
+
+        /* Markdown Elements */
+        .md-content p { margin-top: 0; margin-bottom: 0.75em; }
+        .md-content p:last-child { margin-bottom: 0; }
+        .md-content ul, .md-content ol { margin-top: 0; margin-bottom: 0.75em; padding-left: 1.5em; }
+        .md-content table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            margin-bottom: 0.75em;
+        }
+        .md-content th, .md-content td {
+            border: 1px solid var(--color-border);
+            padding: var(--space-xs) var(--space-sm);
+            text-align: left;
+        }
+        .md-content th {
+            font-weight: 600;
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        /* KaTeX Overflow Handling (Containment Invariant) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            scrollbar-width: thin;
+        }
+        /* Inline math - transparent background per Stage 5.8.4 */
+        .katex { background-color: transparent !important; }
+
+        /* Payload Error State */
+        .error-state {
+            padding: var(--space-xl);
+            text-align: center;
+            font-weight: 700;
+            color: var(--color-text-secondary);
+            font-family: monospace;
+        }
+
+        /* Visual Focus */
+        :focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container" id="app">
+        <!-- Top Controls -->
+        <header class="top-controls">
+            <select id="paperSelector" class="paper-selector" aria-label="Select Paper">
+                <option value="" disabled selected>Loading papers...</option>
+            </select>
+            <button id="mobileJumpTrigger" class="mobile-jump-trigger">Jump to...</button>
+        </header>
+
+        <!-- Document Frame Shell -->
+        <main class="document-frame-shell">
+            <!-- Desktop Nav Rail -->
+            <nav class="nav-rail" id="desktopNav" aria-label="Document Navigation">
+                <!-- Injected via JS -->
+            </nav>
+
+            <!-- Paper Column -->
+            <div class="paper-column" id="paperContent">
+                <!-- Injected via JS -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Drawer -->
+    <div class="mobile-drawer-overlay" id="drawerOverlay"></div>
+    <div class="mobile-drawer" id="mobileDrawer">
+        <div class="drawer-header">
+            <span class="drawer-title">Jump to</span>
+            <button class="drawer-close" id="drawerClose">&times;</button>
+        </div>
+        <div class="drawer-content" id="mobileNav">
+            <!-- Injected via JS -->
+        </div>
+    </div>
+
+    <script>
+        // --- STAGE 0: CONSTANTS ---
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // --- STATE ---
+        let state = {
+            papers: [],
+            activePaperKey: null,
+            expandedMap: {} // { "questionId": boolean }
+        };
+
+        // --- MARKDOWN INIT (Stage 6 Config) ---
+        const md = window.markdownit ? window.markdownit({
+            html: true, // Allow inline SVG
+            linkify: true,
+            breaks: false // MUST be false to prevent breaking KaTeX
+        }) : null;
+
+        if (md) {
+            md.inline.ruler.disable(['escape']); // Preserve TeX backslashes
+        }
+
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadPayload();
+            setupInteractions();
+        });
+
+        async function loadPayload() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error("Payload not found");
+                const data = await response.json();
+                
+                if (!data.papers || !Array.isArray(data.papers)) {
+                    throw new Error("Invalid payload structure");
+                }
+
+                state.papers = data.papers;
+                populateSelector();
+                
+                // Select first paper by default
+                if (state.papers.length > 0) {
+                    loadPaper(state.papers[0].key);
+                }
+            } catch (err) {
+                console.error(err);
+                renderError();
+            }
+        }
+
+        function renderError() {
+            document.getElementById('paperContent').innerHTML = `<div class="error-state">PAPERS PAYLOAD MISSING</div>`;
+            document.getElementById('paperSelector').innerHTML = `<option disabled>Error loading</option>`;
+        }
+
+        function populateSelector() {
+            const selector = document.getElementById('paperSelector');
+            selector.innerHTML = '';
+            state.papers.forEach(paper => {
+                const option = document.createElement('option');
+                option.value = paper.key;
+                option.textContent = paper.label || paper.key;
+                selector.appendChild(option);
+            });
+        }
+
+        function loadPaper(paperKey) {
+            state.activePaperKey = paperKey;
+            state.expandedMap = {}; // Reset expansion state
+            const paper = state.papers.find(p => p.key === paperKey);
+            
+            if (!paper) return;
+
+            // Render Nav
+            renderNav(paper, 'desktopNav');
+            renderNav(paper, 'mobileNav');
+
+            // Render Content
+            const contentContainer = document.getElementById('paperContent');
+            contentContainer.innerHTML = '';
+
+            // Handle Sections vs Flat
+            if (paper.sections) {
+                paper.sections.forEach(section => {
+                    // Render Section Header if label exists
+                    if (section.label && section.label.trim() !== "") {
+                        const sectionHeader = document.createElement('div');
+                        sectionHeader.className = 'paper-section-header';
+                        sectionHeader.textContent = section.label;
+                        contentContainer.appendChild(sectionHeader);
+                    }
+                    // Render Questions
+                    if (section.questions) {
+                        section.questions.forEach(q => {
+                            contentContainer.appendChild(renderQuestionNode(q, 0, paper.defaults));
+                        });
+                    }
+                });
+            } else if (paper.questions) {
+                paper.questions.forEach(q => {
+                    contentContainer.appendChild(renderQuestionNode(q, 0, paper.defaults));
+                });
+            }
+
+            // Update selector value if changed programmatically
+            document.getElementById('paperSelector').value = paperKey;
+
+            // Trigger KaTeX
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+
+        function renderQuestionNode(node, depth, defaults) {
+            const nodeEl = document.createElement('div');
+            nodeEl.className = 'question-node';
+            nodeEl.id = `q-${node.id}`; // Anchor for nav
+
+            // 1. Question Header (ID + Prompt)
+            const header = document.createElement('div');
+            header.className = 'question-header';
+            
+            const idEl = document.createElement('div');
+            idEl.className = 'question-id';
+            idEl.textContent = node.id;
+            
+            const promptEl = document.createElement('div');
+            promptEl.className = 'question-prompt md-content';
+            promptEl.innerHTML = md ? md.render(node.question || "") : node.question;
+
+            header.appendChild(idEl);
+            header.appendChild(promptEl);
+            nodeEl.appendChild(header);
+
+            // 2. Solution Block (Optional)
+            if (node.solutionBlock) {
+                const sb = node.solutionBlock;
+                const sbEl = document.createElement('div');
+                sbEl.className = 'solution-block';
+
+                // Answer (Visible by default if present)
+                if (sb.answer) {
+                    const ansEl = document.createElement('div');
+                    ansEl.className = 'answer-region';
+                    ansEl.innerHTML = `
+                        <div class="answer-label">Answer</div>
+                        <div class="answer-content md-content">${md ? md.render(sb.answer) : sb.answer}</div>
+                    `;
+                    sbEl.appendChild(ansEl);
+                }
+
+                // Solution Details (Expanded by default unless defaults.expandedAll = false)
+                if (sb.solutionDetails) {
+                    const details = sb.solutionDetails;
+                    const isExpandedByDefault = defaults && defaults.expandedAll === false ? false : true;
+                    
+                    // Initialize state
+                    if (state.expandedMap[node.id] === undefined) {
+                        state.expandedMap[node.id] = isExpandedByDefault;
+                    }
+
+                    // Disclosure Control
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.className = 'disclosure-control';
+                    toggleBtn.setAttribute('aria-expanded', state.expandedMap[node.id]);
+                    toggleBtn.setAttribute('aria-controls', `sd-${node.id}`);
+                    toggleBtn.innerHTML = getToggleLabel(state.expandedMap[node.id]);
+                    
+                    // Solution Details Region
+                    const detailsRegion = document.createElement('div');
+                    detailsRegion.id = `sd-${node.id}`;
+                    detailsRegion.className = `solution-details-region ${state.expandedMap[node.id] ? 'expanded' : ''}`;
+
+                    // Toggle Logic
+                    toggleBtn.onclick = () => {
+                        const nowExpanded = !state.expandedMap[node.id];
+                        state.expandedMap[node.id] = nowExpanded;
+                        toggleBtn.innerHTML = getToggleLabel(nowExpanded);
+                        toggleBtn.setAttribute('aria-expanded', nowExpanded);
+                        if (nowExpanded) {
+                            detailsRegion.classList.add('expanded');
+                        } else {
+                            detailsRegion.classList.remove('expanded');
+                        }
+                    };
+
+                    // Render Internal Subsections (Order: Keep in mind -> Formulas -> Working -> Alt)
+                    if (details.keepInMind) {
+                        detailsRegion.appendChild(renderSubSection("Keep in mind", details.keepInMind));
+                    }
+                    if (details.formulasUsed) {
+                        detailsRegion.appendChild(renderSubSection("Formulas used", details.formulasUsed));
+                    }
+                    if (details.working) {
+                        detailsRegion.appendChild(renderSubSection("Working", details.working));
+                    }
+                    if (details.alternativeWorking && Array.isArray(details.alternativeWorking)) {
+                        details.alternativeWorking.forEach((alt, idx) => {
+                            detailsRegion.appendChild(renderSubSection("Alternative working", alt));
+                        });
+                    }
+
+                    sbEl.appendChild(toggleBtn);
+                    sbEl.appendChild(detailsRegion);
+                }
+                nodeEl.appendChild(sbEl);
+            }
+
+            // 3. Children
+            if (node.children && node.children.length > 0) {
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'children-container';
+                node.children.forEach(child => {
+                    childrenContainer.appendChild(renderQuestionNode(child, depth + 1, defaults));
+                });
+                nodeEl.appendChild(childrenContainer);
+            }
+
+            return nodeEl;
+        }
+
+        function renderSubSection(label, contentMarkdown) {
+            const container = document.createElement('div');
+            container.className = 'sd-subsection';
+            
+            const labelEl = document.createElement('span');
+            labelEl.className = 'sd-label';
+            labelEl.textContent = label;
+            
+            const bodyEl = document.createElement('div');
+            bodyEl.className = 'sd-body md-content';
+            bodyEl.innerHTML = md ? md.render(contentMarkdown) : contentMarkdown;
+
+            container.appendChild(labelEl);
+            container.appendChild(bodyEl);
+            return container;
+        }
+
+        function getToggleLabel(isExpanded) {
+            // Text-first disclosure with chevron
+            return isExpanded ? `Hide working` : `Show working`;
+        }
+
+        // --- NAVIGATION RENDERING ---
+        function renderNav(paper, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            const list = document.createElement('ul');
+            list.className = 'nav-list';
+
+            // Helper to collect flat list of items
+            const items = [];
+            
+            if (paper.sections) {
+                paper.sections.forEach(section => {
+                    if (section.label && section.label.trim() !== "") {
+                        items.push({ type: 'section', label: section.label });
+                    }
+                    if (section.questions) {
+                        section.questions.forEach(q => traverse(q, 0, items));
+                    }
+                });
+            } else if (paper.questions) {
+                paper.questions.forEach(q => traverse(q, 0, items));
+            }
+
+            // Render Items
+            items.forEach(item => {
+                if (item.type === 'section') {
+                    const li = document.createElement('li');
+                    const label = document.createElement('span');
+                    label.className = 'nav-section-label';
+                    label.textContent = item.label;
+                    li.appendChild(label);
+                    list.appendChild(li);
+                } else {
+                    const li = document.createElement('li');
+                    const btn = document.createElement('button');
+                    btn.className = 'nav-item';
+                    btn.textContent = item.id;
+                    btn.dataset.target = item.id;
+                    btn.dataset.depth = Math.min(item.depth, 2); // Cap visual depth classes
+                    
+                    btn.onclick = () => {
+                        const target = document.getElementById(`q-${item.id}`);
+                        if (target) {
+                            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            closeDrawer();
+                            highlightActiveNav(item.id);
+                        }
+                    };
+                    li.appendChild(btn);
+                    list.appendChild(li);
+                }
+            });
+
+            container.appendChild(list);
+            
+            // Setup intersection observer for active state
+            setupScrollSpy(items.filter(i => i.type === 'question').map(i => i.id));
+        }
+
+        function traverse(node, depth, list) {
+            list.push({ type: 'question', id: node.id, depth: depth });
+            if (node.children) {
+                node.children.forEach(child => traverse(child, depth + 1, list));
+            }
+        }
+
+        // --- INTERACTION LOGIC ---
+        function setupInteractions() {
+            // Paper Selector
+            document.getElementById('paperSelector').addEventListener('change', (e) => {
+                loadPaper(e.target.value);
+            });
+
+            // Mobile Drawer
+            const drawer = document.getElementById('mobileDrawer');
+            const overlay = document.getElementById('drawerOverlay');
+            
+            document.getElementById('mobileJumpTrigger').onclick = () => {
+                drawer.classList.add('open');
+                overlay.style.display = 'block';
+            };
+
+            const close = () => {
+                drawer.classList.remove('open');
+                overlay.style.display = 'none';
+            };
+
+            document.getElementById('drawerClose').onclick = close;
+            overlay.onclick = close;
+        }
+
+        function closeDrawer() {
+            document.getElementById('mobileDrawer').classList.remove('open');
+            document.getElementById('drawerOverlay').style.display = 'none';
+        }
+
+        // --- SCROLL SPY ---
+        let observer;
+        function setupScrollSpy(ids) {
+            if (observer) observer.disconnect();
+
+            const options = {
+                root: null,
+                rootMargin: '-10% 0px -80% 0px', // Active when near top
+                threshold: 0
+            };
+
+            observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const qId = entry.target.id.replace('q-', '');
+                        highlightActiveNav(qId);
+                    }
+                });
+            }, options);
+
+            ids.forEach(id => {
+                const el = document.getElementById(`q-${id}`);
+                if (el) observer.observe(el);
+            });
+        }
+
+        function highlightActiveNav(id) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll(`.nav-item[data-target="${id}"]`).forEach(el => el.classList.add('active'));
+        }
+
+    </script>
+</body>
+</html>

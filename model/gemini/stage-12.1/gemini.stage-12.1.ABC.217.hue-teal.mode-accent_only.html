@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"217","totalWithinVariant":"320","hueFamily":"teal","intensityMode":"accent_only","timestamp":"2026-01-07T19:27:01.946Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;217&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;teal&quot;,&quot;intensityMode&quot;:&quot;accent_only&quot;,&quot;timestamp&quot;:&quot;2026-01-07T19:27:01.946Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Viewer</title>
+
+    <!-- 
+        STAGE 6 BASELINE: LIBRARIES
+        SRI disabled per instruction.
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        /* 
+           COLORLAB CONFIGURATION
+           Add-on B: Force Hue = TEAL (H ~ 190)
+           Add-on C: Intensity Mode = ACCENT_ONLY (Light Mode)
+           
+           Rules:
+           - Surfaces C <= 0.015
+           - Text C <= 0.010
+           - Accent C [0.08 .. 0.14]
+        */
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Semantic Palette mapped to OKLCH values
+                        page: 'oklch(0.99 0.005 190)',       // Very subtle teal tint
+                        paper: 'oklch(1.0 0 0)',             // White
+                        frame: 'oklch(1.0 0 0)',             // White (shared with paper for desktop)
+                        
+                        txt: {
+                            primary: 'oklch(0.20 0.01 190)',   // Dark grey/teal
+                            secondary: 'oklch(0.45 0.01 190)', // Medium grey/teal
+                            tertiary: 'oklch(0.60 0.01 190)',  // Lighter grey/teal (nav inactive)
+                        },
+                        
+                        border: {
+                            subtle: 'oklch(0.94 0.01 190)',
+                            hairline: 'oklch(0.92 0.01 190)',
+                        },
+
+                        accent: {
+                            DEFAULT: 'oklch(0.62 0.13 190)', // Teal accent (C ~ 0.13)
+                            hover: 'oklch(0.58 0.13 190)',
+                            subtle: 'oklch(0.96 0.04 190)', // Very light wash for focus rings if needed
+                        },
+
+                        wash: {
+                            solution: 'oklch(0.985 0.01 190)', // Extremely subtle wash for solution details
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    spacing: {
+                        'nav-w': '240px',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* BASE STYLES & RESET overrides */
+        body {
+            background-color: theme('colors.page');
+            color: theme('colors.txt.primary');
+            -webkit-font-smoothing: antialiased;
+            overflow-y: scroll; /* Force vertical scrollbar to prevent layout shift */
+        }
+
+        /* MATH CONTAINMENT INVARIANT (Stage 6.0.8) */
+        /* Prevent page horizontal scroll, allow internal scroll for blocks */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5rem 0;
+            margin: 0.5em 0;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin; /* Firefox */
+        }
+        
+        /* Hide scrollbars on math blocks visually but keep functional */
+        .katex-display::-webkit-scrollbar {
+            height: 4px;
+        }
+        .katex-display::-webkit-scrollbar-thumb {
+            background-color: theme('colors.border.subtle');
+            border-radius: 4px;
+        }
+
+        img, svg, video, canvas, audio, iframe, embed, object {
+            display: block;
+            max-width: 100%;
+        }
+
+        /* NAVIGATION SCROLLBAR HIDING (Add-on) */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* FOCUS STYLES (Stage 5.5.2) */
+        *:focus-visible {
+            outline: 2px solid theme('colors.accent.DEFAULT');
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* UTILITIES */
+        .touch-manipulation {
+            touch-action: manipulation;
+        }
+        
+        /* Markdown Table Styles */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1rem 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid theme('colors.border.subtle');
+            padding: 0.5rem;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            font-weight: 600;
+            color: theme('colors.txt.primary');
+        }
+
+        /* ANIMATIONS (Stage 5.5.3 - Continuity) */
+        .details-enter {
+            animation: slideDown 0.2s ease-out forwards;
+            transform-origin: top;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-5px); max-height: 0; }
+            to { opacity: 1; transform: translateY(0); max-height: 2000px; } /* max-height approx */
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- TOP CONTROLS REGION -->
+    <div id="top-controls-region" class="w-full flex justify-center bg-frame border-b border-border-hairline z-20 relative">
+        <div class="w-full max-w-[1200px] px-4 md:px-8 py-3 flex items-center justify-between">
+            <!-- Paper Selector -->
+            <div class="flex items-center gap-3">
+                <label for="paper-select" class="text-sm font-medium text-txt-secondary sr-only">Select Paper</label>
+                <select id="paper-select" class="bg-transparent text-sm font-medium text-txt-primary border border-border-subtle rounded px-3 py-1.5 focus:border-accent hover:border-txt-secondary transition-colors cursor-pointer">
+                    <option value="" disabled selected>Loading papers...</option>
+                </select>
+            </div>
+
+            <!-- Mobile Jump Trigger -->
+            <button id="mobile-jump-trigger" class="md:hidden text-sm font-medium text-accent hover:text-accent-hover flex items-center gap-1 p-2 -mr-2">
+                <span>Jump to</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- DOCUMENT FRAME SHELL -->
+    <div id="document-shell" class="flex-1 w-full max-w-[1200px] mx-auto flex flex-row relative bg-frame">
+        
+        <!-- DESKTOP NAVIGATION RAIL -->
+        <nav id="desktop-nav" class="hidden md:block w-nav-w flex-shrink-0 sticky top-0 h-[calc(100vh-60px)] pt-6 pb-12 pl-4 pr-6 overflow-y-auto no-scrollbar border-r border-transparent">
+            <div id="desktop-nav-list" class="flex flex-col gap-1">
+                <!-- Injected via JS -->
+            </div>
+        </nav>
+
+        <!-- PAPER DOCUMENT COLUMN -->
+        <main id="paper-column" class="flex-1 min-w-0 pt-6 pb-24 px-4 md:px-12 bg-paper">
+            <div id="paper-content" class="max-w-[700px] mx-auto space-y-12">
+                <!-- Content Injected via JS -->
+                <div class="py-12 text-center text-txt-secondary animate-pulse">Initializing...</div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- MOBILE NAVIGATION DRAWER -->
+    <div id="mobile-drawer-backdrop" class="fixed inset-0 bg-black/20 z-40 hidden opacity-0 transition-opacity duration-200" aria-hidden="true"></div>
+    <div id="mobile-drawer" class="fixed inset-y-0 right-0 w-64 bg-paper shadow-xl transform translate-x-full transition-transform duration-300 ease-out z-50 flex flex-col" aria-hidden="true">
+        <div class="flex items-center justify-between p-4 border-b border-border-hairline">
+            <h2 class="text-sm font-bold text-txt-primary">Jump to</h2>
+            <button id="mobile-drawer-close" class="p-2 -mr-2 text-txt-secondary hover:text-txt-primary">
+                <span class="sr-only">Close navigation</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <nav class="flex-1 overflow-y-auto p-4">
+            <div id="mobile-nav-list" class="flex flex-col gap-3">
+                <!-- Injected via JS -->
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        // =================================================================
+        // STAGE 0: CONSTANTS (Canonical)
+        // =================================================================
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // =================================================================
+        // STATE & GLOBALS
+        // =================================================================
+        let APP_STATE = {
+            papers: [],
+            currentPaperId: null,
+            expandedWorkings: new Set(), // Set of question IDs
+            paperDefaults: {},
+            activeSection: null
+        };
+
+        // =================================================================
+        // MARKDOWN CONFIGURATION (Stage 6 Required Snippet)
+        // =================================================================
+        let md = null;
+        if (window.markdownit) {
+            md = window.markdownit({
+                html: true,     // Required: inline SVG passthrough
+                linkify: true,
+                breaks: false   // Required: must be false for KaTeX
+            });
+            // Disable inline escape rule to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // =================================================================
+        // DATA LOADING
+        // =================================================================
+        async function init() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error("Payload missing");
+                
+                const payload = await response.json();
+                APP_STATE.papers = payload.papers || [];
+
+                if (APP_STATE.papers.length === 0) {
+                    renderError("NO PAPERS FOUND IN PAYLOAD");
+                    return;
+                }
+
+                initPaperSelector();
+                // Load first paper by default
+                loadPaper(APP_STATE.papers[0].key);
+
+            } catch (e) {
+                console.error(e);
+                renderError("PAPERS PAYLOAD MISSING");
+            }
+        }
+
+        function renderError(msg) {
+            const container = document.getElementById('paper-content');
+            container.innerHTML = `<div class="py-20 text-center text-txt-secondary font-medium tracking-wide">${msg}</div>`;
+            document.getElementById('paper-select').innerHTML = '<option disabled>Error</option>';
+        }
+
+        // =================================================================
+        // PAPER MANAGEMENT
+        // =================================================================
+        function initPaperSelector() {
+            const select = document.getElementById('paper-select');
+            select.innerHTML = APP_STATE.papers.map(p => 
+                `<option value="${p.key}">${p.label}</option>`
+            ).join('');
+
+            select.addEventListener('change', (e) => {
+                loadPaper(e.target.value);
+            });
+        }
+
+        function loadPaper(paperKey) {
+            const paper = APP_STATE.papers.find(p => p.key === paperKey);
+            if (!paper) return;
+
+            APP_STATE.currentPaperId = paperKey;
+            APP_STATE.paperDefaults = paper.defaults || { expandedAll: true };
+            APP_STATE.expandedWorkings.clear();
+
+            // Prepare content tree
+            // Normalizing flat questions vs sections into a unified structure for rendering
+            const renderTree = paper.sections 
+                ? paper.sections // Already array of { label, questions[] }
+                : [{ label: "", questions: paper.questions || [] }]; // Wrap flat in implicit section
+
+            // Render Nav
+            renderNavigation(renderTree);
+
+            // Render Content
+            renderPaperContent(renderTree);
+
+            // Initialize Defaults (Expand all if set)
+            if (APP_STATE.paperDefaults.expandedAll !== false) {
+                // We need to walk the tree to find IDs with workings to add to set
+                // But simplified: render will check defaults if set is empty/missing check?
+                // Actually, let's just mark the DOM elements based on logic in render
+                // The render logic handles default visibility.
+            }
+
+            // Trigger Math Render
+            requestAnimationFrame(() => {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false
+                });
+            });
+
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        // =================================================================
+        // RENDERING: NAVIGATION
+        // =================================================================
+        function renderNavigation(sections) {
+            const deskNav = document.getElementById('desktop-nav-list');
+            const mobileNav = document.getElementById('mobile-nav-list');
+            
+            let html = '';
+
+            sections.forEach((section, sIdx) => {
+                // Section Label (Only if non-empty)
+                if (section.label && section.label.trim().length > 0) {
+                    html += `
+                        <div class="mt-4 mb-2 first:mt-0 text-xs font-bold text-txt-tertiary uppercase tracking-wider select-none px-2">
+                            ${escapeHtml(section.label)}
+                        </div>
+                    `;
+                } else if (sIdx > 0) {
+                     html += `<div class="h-4"></div>`; // Spacing between implicit sections
+                }
+
+                // Questions
+                section.questions.forEach(q => {
+                    html += buildNavNodes(q);
+                });
+            });
+
+            deskNav.innerHTML = html;
+            mobileNav.innerHTML = html; // Reusing same structure for simplicity, styled via shared classes
+        }
+
+        function buildNavNodes(question) {
+            let html = '';
+            
+            // Current Item
+            html += `
+                <a href="#q-${question.id}" 
+                   class="nav-item block px-2 py-1 text-sm text-txt-secondary hover:text-accent transition-colors rounded-sm focus-visible:ring-2 focus-visible:ring-accent"
+                   data-id="${question.id}"
+                   onclick="handleNavClick(event, 'q-${question.id}')"
+                >
+                    <span class="font-medium">${escapeHtml(question.id)}</span>
+                </a>
+            `;
+
+            // Children
+            if (question.children && question.children.length > 0) {
+                question.children.forEach(child => {
+                    // Recursive, but keeping visually flat hierarchy via type scale logic is tricky in loop
+                    // The brief says "visually flat", hierarchy via type scale.
+                    // Implementation: We'll add a class for sub-items to scale them slightly down if needed, 
+                    // or just rely on the ID structure.
+                    // Stage 5.4.5: Hierarchy via type scale/quietness. 
+                    // Let's modify the class for children.
+                    html += buildChildNavNodes(child, 1);
+                });
+            }
+            return html;
+        }
+
+        function buildChildNavNodes(question, depth) {
+            let html = '';
+            // Hierarchy expression: slightly smaller/quieter
+            const scaleClass = depth === 1 ? "text-xs opacity-90" : "text-[11px] opacity-80";
+            
+            html += `
+                <a href="#q-${question.id}" 
+                   class="nav-item block px-2 py-0.5 ${scaleClass} text-txt-secondary hover:text-accent transition-colors rounded-sm focus-visible:ring-2 focus-visible:ring-accent"
+                   data-id="${question.id}"
+                   onclick="handleNavClick(event, 'q-${question.id}')"
+                >
+                    <span class="font-medium">${escapeHtml(question.id)}</span>
+                </a>
+            `;
+
+            if (question.children) {
+                question.children.forEach(c => {
+                    html += buildChildNavNodes(c, depth + 1);
+                });
+            }
+            return html;
+        }
+
+        // =================================================================
+        // RENDERING: PAPER CONTENT
+        // =================================================================
+        function renderPaperContent(sections) {
+            const container = document.getElementById('paper-content');
+            let html = '';
+
+            sections.forEach((section, index) => {
+                // Section Header
+                if (section.label && section.label.trim().length > 0) {
+                    html += `
+                        <div class="border-b border-border-hairline pb-2 mb-8 mt-12 first:mt-0">
+                            <span class="text-lg font-bold text-txt-secondary">${escapeHtml(section.label)}</span>
+                        </div>
+                    `;
+                } else if (index > 0) {
+                    // Spacing between unlabeled sections
+                    html += `<div class="h-12"></div>`; 
+                }
+
+                // Question List
+                html += `<div class="space-y-16">`; // Top-level spacing (largest)
+                section.questions.forEach(q => {
+                    html += renderQuestionNode(q, 0);
+                });
+                html += `</div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderQuestionNode(q, depth) {
+            const isTopLevel = depth === 0;
+            const qId = q.id;
+            const safeId = `q-${qId}`;
+            
+            // Check content
+            const hasAnswer = q.solutionBlock && q.solutionBlock.answer;
+            const hasDetails = q.solutionBlock && q.solutionBlock.solutionDetails;
+            
+            // Default expanded state logic
+            const isExpanded = APP_STATE.paperDefaults.expandedAll !== false; 
+            if (isExpanded && hasDetails) {
+                APP_STATE.expandedWorkings.add(qId);
+            }
+
+            // Classes for nesting
+            // Stage 5: sub-questions separated less strongly.
+            const wrapperClass = isTopLevel ? "" : "mt-6 pl-4 md:pl-0"; // Indent on mobile, flat on desk? 
+            // Brief says: "horizontal indentation ... optional indentation (spacing only) ... indentation may adapt"
+            // Let's use left spacing for children.
+            const indentClass = depth > 0 ? "border-l-2 border-transparent ml-2 pl-4" : ""; // minimal visual indent via spacing
+
+            let html = `
+                <div id="${safeId}" class="question-node scroll-mt-24 ${wrapperClass} ${indentClass}">
+                    <!-- Question Body -->
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0 w-8 md:w-12 text-txt-secondary font-semibold text-lg md:text-xl select-none pt-0.5">
+                            ${qId}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <!-- Prompt -->
+                            <div class="prose text-txt-primary text-lg md:text-xl leading-relaxed">
+                                ${renderMarkdown(q.question)}
+                            </div>
+                            
+                            <!-- Solution Block -->
+                            ${(hasAnswer || hasDetails) ? renderSolutionBlock(q, hasAnswer, hasDetails, isExpanded) : ''}
+                        </div>
+                    </div>
+
+                    <!-- Children -->
+                    ${(q.children && q.children.length > 0) ? `
+                        <div class="children-container mt-6">
+                            ${q.children.map(c => renderQuestionNode(c, depth + 1)).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            return html;
+        }
+
+        function renderSolutionBlock(q, hasAnswer, hasDetails, isDefaultExpanded) {
+            const answerHTML = hasAnswer ? renderAnswer(q.solutionBlock.answer) : '';
+            const detailsHTML = hasDetails ? renderSolutionDetails(q, isDefaultExpanded) : '';
+
+            // Layout: Answer -> Spacing -> Details
+            return `
+                <div class="solution-block mt-6 space-y-4">
+                    ${answerHTML}
+                    ${detailsHTML}
+                </div>
+            `;
+        }
+
+        function renderAnswer(markdown) {
+            return `
+                <div class="answer-region">
+                    <div class="text-sm font-bold text-txt-secondary uppercase tracking-wide mb-1">Answer</div>
+                    <div class="text-txt-primary text-lg font-medium">
+                        ${renderMarkdown(markdown)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSolutionDetails(q, isExpanded) {
+            const sd = q.solutionBlock.solutionDetails;
+            const expandedClass = isExpanded ? "" : "hidden";
+            const buttonText = isExpanded ? "Hide working" : "Show working";
+            
+            // Build internal blocks
+            let internalHTML = '';
+            
+            // Keep in mind
+            if (sd.keepInMind) {
+                internalHTML += `
+                    <div class="sd-subsection mb-6">
+                        <div class="flex items-center gap-2 mb-2 text-txt-secondary">
+                            <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="text-sm font-bold uppercase tracking-wide">Keep in mind</span>
+                        </div>
+                        <div class="prose text-base text-txt-secondary leading-relaxed">
+                            ${renderMarkdown(sd.keepInMind)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Formulas
+            if (sd.formulasUsed) {
+                internalHTML += `
+                    <div class="sd-subsection mb-6">
+                        <div class="text-sm font-bold text-txt-secondary uppercase tracking-wide mb-2">Formulas used</div>
+                        <div class="prose text-base text-txt-secondary font-mono text-sm bg-wash-solution p-3 rounded-sm border border-border-subtle">
+                            ${renderMarkdown(sd.formulasUsed)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Working (Primary)
+            if (sd.working) {
+                internalHTML += `
+                    <div class="sd-subsection mb-6">
+                        <div class="text-sm font-bold text-txt-secondary uppercase tracking-wide mb-2">Working</div>
+                        <div class="working-body prose text-base text-txt-secondary leading-relaxed space-y-4">
+                            ${renderMarkdown(sd.working)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Alternative Workings
+            if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                sd.alternativeWorking.forEach((alt, idx) => {
+                    internalHTML += `
+                        <div class="sd-subsection mt-8 pt-6 border-t border-border-hairline">
+                            <div class="text-sm font-bold text-txt-secondary uppercase tracking-wide mb-2">Alternative Working</div>
+                            <div class="prose text-base text-txt-secondary leading-relaxed">
+                                ${renderMarkdown(alt)}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            return `
+                <div class="solution-details-wrapper group">
+                    <!-- Toggle -->
+                    <button class="text-sm font-medium text-accent hover:text-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded px-1 -ml-1 flex items-center gap-1 mb-2 select-none"
+                            onclick="toggleWorking(this, '${q.id}')"
+                            aria-expanded="${isExpanded}"
+                    >
+                        <span>${buttonText}</span>
+                        <svg class="w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+
+                    <!-- Content Region -->
+                    <div id="sd-${q.id}" class="sd-region ${expandedClass} origin-top">
+                         <!-- Visual boundary cue: wash or just spacing? Stage 6.0.10 says anti-faded. 
+                              Stage 5.3.3 says "subtle background value shifts" permitted.
+                              Let's use a very subtle wash only on the block to separate it from the question. -->
+                        <div class="p-4 bg-wash-solution rounded-sm border-l-2 border-border-subtle">
+                            ${internalHTML}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMarkdown(text) {
+            if (!text) return '';
+            if (!md) return text; // Fallback
+            return md.render(text);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // =================================================================
+        // INTERACTIONS
+        // =================================================================
+        
+        window.toggleWorking = function(btn, qId) {
+            const container = document.getElementById(`sd-${qId}`);
+            const isHidden = container.classList.contains('hidden');
+            const icon = btn.querySelector('svg');
+            const label = btn.querySelector('span');
+
+            if (isHidden) {
+                // Expand
+                container.classList.remove('hidden');
+                container.classList.add('details-enter');
+                icon.classList.add('rotate-180');
+                label.textContent = "Hide working";
+                btn.setAttribute('aria-expanded', 'true');
+                APP_STATE.expandedWorkings.add(qId);
+            } else {
+                // Collapse
+                container.classList.add('hidden');
+                container.classList.remove('details-enter');
+                icon.classList.remove('rotate-180');
+                label.textContent = "Show working";
+                btn.setAttribute('aria-expanded', 'false');
+                APP_STATE.expandedWorkings.delete(qId);
+            }
+        };
+
+        window.handleNavClick = function(e, targetId) {
+            e.preventDefault();
+            const el = document.getElementById(targetId);
+            if (el) {
+                // If mobile drawer is open, close it
+                closeMobileDrawer();
+                
+                el.scrollIntoView({ behavior: 'smooth' });
+                // Update active state manually or let intersection observer do it?
+                // Let's manually set focus for a moment
+                history.replaceState(null, null, `#${targetId.replace('q-','')}`);
+            }
+        };
+
+        // Mobile Drawer Logic
+        const drawer = document.getElementById('mobile-drawer');
+        const backdrop = document.getElementById('mobile-drawer-backdrop');
+        const jumpTrigger = document.getElementById('mobile-jump-trigger');
+        const closeTrigger = document.getElementById('mobile-drawer-close');
+
+        function openMobileDrawer() {
+            backdrop.classList.remove('hidden');
+            setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+            drawer.classList.remove('translate-x-full');
+            document.body.style.overflow = 'hidden'; // Lock scroll
+        }
+
+        function closeMobileDrawer() {
+            drawer.classList.add('translate-x-full');
+            backdrop.classList.add('opacity-0');
+            setTimeout(() => backdrop.classList.add('hidden'), 300);
+            document.body.style.overflow = ''; // Unlock scroll
+        }
+
+        jumpTrigger.addEventListener('click', openMobileDrawer);
+        closeTrigger.addEventListener('click', closeMobileDrawer);
+        backdrop.addEventListener('click', closeMobileDrawer);
+
+        // Active Nav Observer
+        // Simple intersection observer to highlight current question in nav
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const qId = entry.target.id.replace('q-', '');
+                    updateActiveNav(qId);
+                }
+            });
+        }, { rootMargin: '-10% 0px -80% 0px' }); // Trigger near top
+
+        function updateActiveNav(activeId) {
+            document.querySelectorAll('.nav-item').forEach(el => {
+                const id = el.dataset.id;
+                if (id === activeId) {
+                    el.classList.add('text-txt-primary', 'font-bold', 'border-l-2', 'border-accent', 'bg-wash-solution');
+                    el.classList.remove('text-txt-secondary', 'border-transparent');
+                    // Ensure visible in sticky nav
+                    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                } else {
+                    el.classList.remove('text-txt-primary', 'font-bold', 'border-l-2', 'border-accent', 'bg-wash-solution');
+                    el.classList.add('text-txt-secondary', 'border-transparent');
+                }
+            });
+        }
+
+        // Hook up observer after render
+        const originalRender = renderPaperContent;
+        renderPaperContent = function(s) {
+            originalRender(s);
+            document.querySelectorAll('.question-node').forEach(el => observer.observe(el));
+        };
+
+        // =================================================================
+        // BOOTSTRAP
+        // =================================================================
+        document.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>

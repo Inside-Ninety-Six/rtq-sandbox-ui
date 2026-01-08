@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"63","totalWithinVariant":"320","hueFamily":"pink","intensityMode":"high_chroma_surfaces","timestamp":"2026-01-07T12:17:58.100Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;63&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;pink&quot;,&quot;intensityMode&quot;:&quot;high_chroma_surfaces&quot;,&quot;timestamp&quot;:&quot;2026-01-07T12:17:58.100Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Viewer</title>
+
+    <!-- 
+      STAGE 6 ADD-ON: Real KaTeX Rendering
+      Loading via CDN without integrity attributes as per Stage 6.0.7b
+    -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+
+    <style>
+        /* 
+         * STAGE 0 & 5 & 6 CONSTANTS AND SEMANTICS
+         * 
+         * COLORLAB B: Force Hue Family = "pink" (Hue ~ 350)
+         * COLORLAB C: Intensity Mode = "high_chroma_surfaces" (Light Only)
+         * 
+         * Logic:
+         * 1. Two major surfaces C in [0.06 .. 0.12] (Frame, Page)
+         * 2. Remaining major surface C in [0.03 .. 0.07] (Paper)
+         * 3. Wash C in [0.05 .. 0.10]
+         * 4. Text C <= 0.015
+         * 5. Accent C in [0.12 .. 0.20]
+         */
+        :root {
+            /* Palette Definition (Pink 350) */
+            --hue: 350;
+
+            /* Surfaces */
+            /* Page: High Chroma [0.06..0.12] */
+            --c-page-bg: oklch(0.96 0.07 var(--hue));
+            /* Frame: High Chroma [0.06..0.12] */
+            --c-frame-bg: oklch(0.93 0.08 var(--hue));
+            /* Paper: Tinted [0.03..0.07] */
+            --c-paper-bg: oklch(0.99 0.03 var(--hue));
+            
+            /* Wash Surfaces (Solution Details) [0.05..0.10] */
+            --c-wash-bg: oklch(0.95 0.06 var(--hue));
+
+            /* Text (C <= 0.015) */
+            --c-text-primary: oklch(0.20 0.01 var(--hue));
+            --c-text-secondary: oklch(0.45 0.015 var(--hue));
+            --c-text-tertiary: oklch(0.60 0.015 var(--hue)); /* Navigation/Quiet */
+
+            /* Accents (C [0.12..0.20]) */
+            --c-accent: oklch(0.60 0.18 var(--hue));
+            --c-accent-hover: oklch(0.55 0.18 var(--hue));
+            --c-focus-ring: oklch(0.60 0.18 var(--hue) / 0.5);
+
+            /* Hairlines (Neutral, C <= 0.02) */
+            --c-divider: oklch(0.85 0.02 var(--hue));
+
+            /* Spacing Scale (Rhythm) */
+            --sp-xs: 4px;
+            --sp-sm: 8px;
+            --sp-md: 16px;
+            --sp-lg: 24px;
+            --sp-xl: 32px;
+            --sp-xxl: 48px; /* Top-level question separation */
+
+            /* Fonts */
+            --font-stack: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --radius-sm: 4px; /* Minimal, strict */
+        }
+
+        /* RESET & BASE */
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-stack);
+            background-color: var(--c-page-bg);
+            color: var(--c-text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            overflow-y: scroll; /* Always scrollbar to prevent shifts */
+        }
+        
+        button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+        
+        /* LAYOUT SHELL */
+        .app-layout {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            align-items: center;
+        }
+
+        /* Top Controls Region */
+        .top-controls {
+            width: 100%;
+            max-width: 1024px; /* Matches shell */
+            padding: var(--sp-md) var(--sp-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* DocumentFrameShell */
+        .doc-frame-shell {
+            width: 100%;
+            max-width: 1024px;
+            flex: 1;
+            background-color: var(--c-frame-bg);
+            /* Desktop: 2 columns */
+            display: grid;
+            grid-template-columns: 200px 1fr; /* Nav rail | Paper */
+            column-gap: var(--sp-lg);
+            padding: 0 var(--sp-md) var(--sp-xl) var(--sp-md);
+            position: relative;
+        }
+
+        /* MOBILE OVERRIDES */
+        @media (max-width: 768px) {
+            .doc-frame-shell {
+                display: block; /* Single column */
+                padding: 0 var(--sp-sm) var(--sp-xl) var(--sp-sm);
+            }
+            .nav-rail {
+                display: none; /* Hidden on mobile, use drawer */
+            }
+        }
+
+        /* NAVIGATION RAIL (Desktop) */
+        .nav-rail {
+            position: sticky;
+            top: var(--sp-md);
+            height: calc(100vh - var(--sp-xl));
+            overflow-y: auto;
+            /* Hide scrollbar visually but keep functional */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .nav-rail::-webkit-scrollbar { display: none; }
+
+        .nav-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        /* Navigation Typography & Hierarchy */
+        .nav-item {
+            display: block;
+            text-decoration: none;
+            color: var(--c-text-secondary);
+            font-size: 14px;
+            padding: 4px 0;
+            border-left: 2px solid transparent;
+            padding-left: var(--sp-sm);
+            transition: color 0.1s ease;
+        }
+        .nav-item:hover {
+            color: var(--c-text-primary);
+        }
+        .nav-item.active {
+            font-weight: 600;
+            color: var(--c-accent); /* Permitted override Stage 5 */
+            border-left-color: var(--c-accent);
+        }
+        
+        /* Flat list, hierarchy via type scale only */
+        .nav-item[data-depth="0"] { font-size: 14px; }
+        .nav-item[data-depth="1"] { font-size: 13px; color: var(--c-text-tertiary); }
+        .nav-item[data-depth="2"] { font-size: 12px; color: var(--c-text-tertiary); }
+        
+        .nav-section-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--c-text-tertiary);
+            margin-top: var(--sp-md);
+            margin-bottom: var(--sp-xs);
+            padding-left: var(--sp-sm);
+            font-weight: 700;
+        }
+
+        /* PAPER REGION */
+        .paper-column {
+            background-color: var(--c-paper-bg);
+            min-height: 80vh;
+            padding: var(--sp-lg);
+            /* No card effects per Stage 4 */
+        }
+
+        /* QUESTION NODE STRUCTURE */
+        .question-node {
+            display: flex;
+            flex-direction: column;
+        }
+        /* Spacing: Top level gets largest gap */
+        .question-node[data-depth="0"] {
+            margin-bottom: var(--sp-xxl);
+        }
+        .question-node[data-depth="1"] {
+            margin-top: var(--sp-md);
+            margin-bottom: var(--sp-md);
+        }
+        .question-node[data-depth="2"] {
+            margin-top: var(--sp-sm);
+            margin-bottom: var(--sp-sm);
+        }
+
+        /* Indentation for sub-questions (spacing only, no boxes) */
+        .children-container {
+            padding-left: var(--sp-lg); /* Stage 3 indentation */
+        }
+        @media (max-width: 480px) {
+            .children-container { padding-left: var(--sp-sm); }
+        }
+
+        /* Question Body */
+        .question-body {
+            display: flex;
+            gap: var(--sp-sm);
+            margin-bottom: var(--sp-sm);
+            color: var(--c-text-primary);
+        }
+        .q-id {
+            font-weight: 700;
+            min-width: 24px;
+            color: var(--c-text-secondary);
+        }
+        .q-prompt {
+            flex: 1;
+            font-size: 1.05rem; /* Primary anchor */
+            line-height: 1.6;
+        }
+
+        /* SOLUTION BLOCK */
+        .solution-block {
+            margin-left: calc(24px + var(--sp-sm)); /* Align with prompt */
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-sm);
+        }
+        
+        /* Answer */
+        .answer-region {
+            display: flex;
+            gap: var(--sp-sm);
+            align-items: baseline;
+            margin-bottom: var(--sp-xs);
+        }
+        .answer-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .answer-content {
+            font-weight: 500;
+        }
+
+        /* Disclosure Control */
+        .disclosure-control {
+            display: flex;
+            align-items: center;
+            gap: var(--sp-xs);
+            color: var(--c-accent);
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: var(--sp-xs) 0;
+            width: fit-content;
+        }
+        .disclosure-control:hover {
+            color: var(--c-accent-hover);
+            text-decoration: underline;
+        }
+        .chevron {
+            transition: transform 0.2s ease;
+            width: 1em; height: 1em;
+            fill: currentColor;
+        }
+        .disclosure-control[aria-expanded="true"] .chevron {
+            transform: rotate(180deg);
+        }
+
+        /* Solution Details Region */
+        .solution-details {
+            display: none; /* Hidden by default state in CSS, JS toggles */
+            background-color: var(--c-wash-bg); /* Surface diff */
+            padding: var(--sp-md);
+            /* Demarcation: Quiet hairline permitted by density rules if needed, 
+               but wash is sufficient here per Stage 5.3.3 override context */
+            border-left: 2px solid var(--c-divider); /* Subtle anchor */
+        }
+        .solution-details[data-visible="true"] {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-md);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Internal Solution Structure */
+        .sd-section {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-xs);
+        }
+        .sd-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        /* Keep in Mind specific */
+        .sd-kim .sd-label { color: var(--c-text-primary); } /* Higher contrast per spec */
+        .sd-kim ul {
+            margin: 0; padding-left: var(--sp-lg);
+        }
+        
+        /* Working / Alt Working */
+        .working-body, .alt-working-body {
+            font-size: 0.95rem;
+            color: var(--c-text-secondary); /* Subordinate */
+        }
+
+        /* Internal Separators */
+        .sd-divider {
+            height: 1px;
+            background-color: var(--c-divider);
+            margin: var(--sp-xs) 0;
+            border: none;
+        }
+
+        /* MARKDOWN & KATEX RESETS */
+        .md-content p { margin: 0 0 0.75em 0; }
+        .md-content p:last-child { margin-bottom: 0; }
+        
+        /* KaTeX Containment Invariant (Locked) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            /* Scrollbar hiding for neatness */
+            scrollbar-width: thin;
+        }
+        
+        /* MOBILE DRAWER */
+        .drawer-backdrop {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.2);
+            z-index: 90;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .drawer {
+            position: fixed; top: 0; left: 0; bottom: 0;
+            width: 280px;
+            background: var(--c-frame-bg);
+            z-index: 100;
+            transform: translateX(-100%);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex; flex-direction: column;
+            box-shadow: 2px 0 12px rgba(0,0,0,0.05);
+        }
+        .drawer.open { transform: translateX(0); }
+        .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+        
+        .drawer-header {
+            padding: var(--sp-md);
+            border-bottom: 1px solid var(--c-divider);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .drawer-close { font-size: 1.5rem; line-height: 1; padding: var(--sp-xs); }
+        .drawer-content { overflow-y: auto; flex: 1; padding: var(--sp-md); }
+
+        /* UTILS */
+        .hidden { display: none !important; }
+        .error-msg { 
+            color: var(--c-text-primary); 
+            font-weight: 700; 
+            text-align: center; 
+            margin-top: var(--sp-xl); 
+        }
+
+        /* Section Header in Paper */
+        .section-header-paper {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--c-text-primary);
+            border-bottom: 1px solid var(--c-divider);
+            padding-bottom: var(--sp-sm);
+            margin-top: var(--sp-lg);
+            margin-bottom: var(--sp-lg);
+        }
+        
+        /* Focus styles */
+        :focus-visible {
+            outline: 2px solid var(--c-focus-ring);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-layout">
+    <!-- Top Controls -->
+    <div class="top-controls">
+        <select id="paper-selector" aria-label="Select paper" style="font-size: 1rem; padding: 4px; border: 1px solid var(--c-divider); border-radius: var(--radius-sm); background: var(--c-paper-bg);">
+            <option disabled selected>Loading papers...</option>
+        </select>
+        
+        <!-- Mobile Jump To Trigger -->
+        <button id="jump-to-btn" class="nav-trigger" style="display: none; font-weight: 600; color: var(--c-accent);">
+            Jump to
+        </button>
+    </div>
+
+    <!-- Document Shell -->
+    <div class="doc-frame-shell">
+        <!-- Desktop Nav Rail -->
+        <nav class="nav-rail" id="desktop-nav" aria-label="Paper navigation">
+            <!-- Populated via JS -->
+        </nav>
+
+        <!-- Paper Content -->
+        <main class="paper-column" id="paper-content">
+            <!-- Populated via JS -->
+        </main>
+    </div>
+</div>
+
+<!-- Mobile Drawer -->
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+<div class="drawer" id="mobile-drawer" role="dialog" aria-modal="true" aria-label="Navigation">
+    <div class="drawer-header">
+        <span style="font-weight: 700;">Jump to</span>
+        <button class="drawer-close" id="drawer-close" aria-label="Close navigation">&times;</button>
+    </div>
+    <div class="drawer-content" id="drawer-nav-list">
+        <!-- Populated via JS (Clone) -->
+    </div>
+</div>
+
+<script>
+    // --- STAGE 0: CONSTANTS ---
+    const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+    const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json"; // Referenced but not used in this vanilla impl
+
+    // --- Markdown Setup (Stage 6 Config) ---
+    const md = window.markdownit ? window.markdownit({
+        html: true,
+        linkify: true,
+        breaks: false // MUST be false for KaTeX
+    }) : null;
+
+    if (md) {
+        md.inline.ruler.disable(['escape']);
+    }
+
+    // --- Global State ---
+    let papersData = [];
+    let currentPaperKey = null;
+
+    // --- DOM Elements ---
+    const dom = {
+        selector: document.getElementById('paper-selector'),
+        content: document.getElementById('paper-content'),
+        desktopNav: document.getElementById('desktop-nav'),
+        drawerNav: document.getElementById('drawer-nav-list'),
+        jumpBtn: document.getElementById('jump-to-btn'),
+        drawer: document.getElementById('mobile-drawer'),
+        backdrop: document.getElementById('drawer-backdrop'),
+        closeDrawer: document.getElementById('drawer-close')
+    };
+
+    // --- Initialization ---
+    async function init() {
+        try {
+            const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+            if (!response.ok) throw new Error("Fetch failed");
+            const data = await response.json();
+            
+            if (!data.papers || !Array.isArray(data.papers)) throw new Error("Invalid schema");
+            papersData = data.papers;
+
+            renderSelector();
+            
+            // Default to first paper
+            if (papersData.length > 0) {
+                loadPaper(papersData[0].key);
+            }
+        } catch (e) {
+            console.error(e);
+            dom.content.innerHTML = '<div class="error-msg">PAPERS PAYLOAD MISSING</div>';
+            dom.selector.innerHTML = '<option>Error loading payload</option>';
+        }
+
+        setupMobileInteractions();
+        setupResizeListener();
+    }
+
+    // --- Rendering Logic ---
+
+    function renderSelector() {
+        dom.selector.innerHTML = '';
+        papersData.forEach(paper => {
+            const opt = document.createElement('option');
+            opt.value = paper.key;
+            opt.textContent = paper.label || paper.key;
+            dom.selector.appendChild(opt);
+        });
+        dom.selector.addEventListener('change', (e) => loadPaper(e.target.value));
+    }
+
+    function loadPaper(key) {
+        currentPaperKey = key;
+        const paper = papersData.find(p => p.key === key);
+        if (!paper) return;
+
+        // Clear view
+        dom.content.innerHTML = '';
+        dom.desktopNav.innerHTML = '';
+        dom.drawerNav.innerHTML = '';
+        
+        // 1. Flatten Question List for Navigation
+        // Handling both flat papers and sectioned papers
+        let flatNavItems = []; // { id, label, isSectionHeader, depth, elementId }
+
+        if (paper.sections) {
+            paper.sections.forEach(section => {
+                if (section.label && section.label.trim() !== '') {
+                    flatNavItems.push({ 
+                        label: section.label, 
+                        type: 'section' 
+                    });
+                }
+                processQuestionsForNav(section.questions, flatNavItems);
+            });
+            renderSections(paper.sections);
+        } else if (paper.questions) {
+            processQuestionsForNav(paper.questions, flatNavItems);
+            renderQuestionList(paper.questions, dom.content, 0);
+        }
+
+        // 2. Render Navigation
+        renderNavList(flatNavItems, dom.desktopNav);
+        renderNavList(flatNavItems, dom.drawerNav);
+
+        // 3. Apply Defaults (Expanded logic)
+        // Note: Render logic sets default state. 
+        
+        // 4. KaTeX Auto Render
+        if (window.renderMathInElement) {
+            renderMathInElement(dom.content, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+
+        // 5. ScrollSpy
+        setupScrollSpy();
+    }
+
+    function processQuestionsForNav(questions, list) {
+        questions.forEach(q => {
+            list.push({
+                id: q.id,
+                type: 'item',
+                targetId: `q-${q.id}`,
+                depth: calculateDepth(q) // Use heuristic or just flat? Requirement: derived from children.
+                // We'll calculate depth relative to top of this subtree call?
+                // Actually, the nav needs to know hierarchy. 
+                // Let's simplified: The brief says flat list, hierarchy via type scale.
+                // I need to know depth.
+            });
+            // Nav list doesn't usually show children in standard exam papers unless top-level.
+            // Brief: "exposing full set of question identifiers".
+            // So we recurse.
+            if (q.children) {
+                processQuestionsForNavRecursively(q.children, list, 1);
+            }
+        });
+    }
+
+    function processQuestionsForNavRecursively(questions, list, depth) {
+        questions.forEach(q => {
+            list.push({
+                id: q.id,
+                type: 'item',
+                targetId: `q-${q.id}`,
+                depth: depth
+            });
+            if (q.children) processQuestionsForNavRecursively(q.children, list, depth + 1);
+        });
+    }
+
+    // --- Content Renderers ---
+
+    function renderSections(sections) {
+        sections.forEach(section => {
+            if (section.label && section.label.trim()) {
+                const header = document.createElement('div');
+                header.className = 'section-header-paper';
+                header.textContent = `Section ${section.label}`;
+                dom.content.appendChild(header);
+            }
+            renderQuestionList(section.questions, dom.content, 0);
+        });
+    }
+
+    function renderQuestionList(questions, container, depth) {
+        questions.forEach(q => {
+            container.appendChild(renderQuestionNode(q, depth));
+        });
+    }
+
+    function renderQuestionNode(q, depth) {
+        const node = document.createElement('div');
+        node.className = 'question-node';
+        node.setAttribute('data-depth', depth);
+        node.id = `q-${q.id}`;
+
+        // Question Body
+        const qBody = document.createElement('div');
+        qBody.className = 'question-body';
+        
+        const qId = document.createElement('div');
+        qId.className = 'q-id';
+        qId.textContent = q.id;
+        
+        const qPrompt = document.createElement('div');
+        qPrompt.className = 'q-prompt md-content';
+        qPrompt.innerHTML = md ? md.render(q.question) : q.question;
+
+        qBody.appendChild(qId);
+        qBody.appendChild(qPrompt);
+        node.appendChild(qBody);
+
+        // Solution Block
+        if (q.solutionBlock) {
+            const block = document.createElement('div');
+            block.className = 'solution-block';
+
+            // Answer
+            if (q.solutionBlock.answer) {
+                const ansRegion = document.createElement('div');
+                ansRegion.className = 'answer-region';
+                const ansLabel = document.createElement('div');
+                ansLabel.className = 'answer-label';
+                ansLabel.textContent = 'Answer';
+                const ansContent = document.createElement('div');
+                ansContent.className = 'answer-content md-content';
+                ansContent.innerHTML = md ? md.render(q.solutionBlock.answer) : q.solutionBlock.answer;
+                
+                ansRegion.appendChild(ansLabel);
+                ansRegion.appendChild(ansContent);
+                block.appendChild(ansRegion);
+            }
+
+            // Solution Details
+            const sdData = q.solutionBlock.solutionDetails;
+            if (sdData) {
+                // Determine Default State
+                const paper = papersData.find(p => p.key === currentPaperKey);
+                const isExpanded = paper.defaults?.expandedAll !== false; // Default true
+
+                // Toggle Control
+                const toggle = document.createElement('button');
+                toggle.className = 'disclosure-control';
+                toggle.setAttribute('aria-expanded', isExpanded);
+                toggle.innerHTML = `
+                    <span class="toggle-text">${isExpanded ? 'Hide working' : 'Show working'}</span>
+                    <svg class="chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                `;
+
+                // Details Region
+                const details = document.createElement('div');
+                details.className = 'solution-details';
+                details.setAttribute('data-visible', isExpanded);
+
+                // Build Internals
+                if (sdData.keepInMind) {
+                    const el = document.createElement('div');
+                    el.className = 'sd-section sd-kim';
+                    el.innerHTML = `<div class="sd-label">Keep in mind</div><div class="md-content">${md.render(sdData.keepInMind)}</div>`;
+                    details.appendChild(el);
+                    details.appendChild(createDivider());
+                }
+                
+                if (sdData.formulasUsed) {
+                    const el = document.createElement('div');
+                    el.className = 'sd-section';
+                    el.innerHTML = `<div class="sd-label">Formulas used</div><div class="md-content">${md.render(sdData.formulasUsed)}</div>`;
+                    details.appendChild(el);
+                    details.appendChild(createDivider());
+                }
+
+                if (sdData.working) {
+                    const el = document.createElement('div');
+                    el.className = 'sd-section';
+                    el.innerHTML = `<div class="sd-label">Working</div><div class="working-body md-content">${md.render(sdData.working)}</div>`;
+                    details.appendChild(el);
+                }
+
+                if (sdData.alternativeWorking && Array.isArray(sdData.alternativeWorking)) {
+                    sdData.alternativeWorking.forEach(alt => {
+                        details.appendChild(createDivider());
+                        const el = document.createElement('div');
+                        el.className = 'sd-section';
+                        el.innerHTML = `<div class="sd-label">Alternative working</div><div class="alt-working-body md-content">${md.render(alt)}</div>`;
+                        details.appendChild(el);
+                    });
+                }
+
+                // Event Logic
+                toggle.onclick = () => {
+                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', !expanded);
+                    details.setAttribute('data-visible', !expanded);
+                    toggle.querySelector('.toggle-text').textContent = !expanded ? 'Hide working' : 'Show working';
+                };
+
+                block.appendChild(toggle);
+                block.appendChild(details);
+            }
+
+            node.appendChild(block);
+        }
+
+        // Children
+        if (q.children && q.children.length > 0) {
+            const childrenCont = document.createElement('div');
+            childrenCont.className = 'children-container';
+            renderQuestionList(q.children, childrenCont, depth + 1);
+            node.appendChild(childrenCont);
+        }
+
+        return node;
+    }
+
+    function createDivider() {
+        const d = document.createElement('hr');
+        d.className = 'sd-divider';
+        return d;
+    }
+
+    function renderNavList(items, container) {
+        const list = document.createElement('div');
+        list.className = 'nav-list';
+        
+        items.forEach(item => {
+            if (item.type === 'section') {
+                const div = document.createElement('div');
+                div.className = 'nav-section-label';
+                div.textContent = item.label;
+                list.appendChild(div);
+            } else {
+                const a = document.createElement('a');
+                a.href = `#${item.targetId}`;
+                a.className = 'nav-item';
+                a.setAttribute('data-depth', Math.min(item.depth, 2)); // Clamp depth visual
+                a.textContent = item.id;
+                a.onclick = (e) => {
+                    e.preventDefault();
+                    document.getElementById(item.targetId).scrollIntoView({behavior: 'smooth', block: 'start'});
+                    closeDrawer();
+                };
+                list.appendChild(a);
+            }
+        });
+        container.appendChild(list);
+    }
+
+    // --- UI Logic ---
+
+    function setupMobileInteractions() {
+        // Toggle mobile Jump To visibility
+        const checkMobile = () => {
+            if (window.innerWidth <= 768) {
+                dom.jumpBtn.style.display = 'block';
+            } else {
+                dom.jumpBtn.style.display = 'none';
+                closeDrawer();
+            }
+        };
+        
+        dom.jumpBtn.onclick = openDrawer;
+        dom.closeDrawer.onclick = closeDrawer;
+        dom.backdrop.onclick = closeDrawer;
+
+        window.addEventListener('resize', checkMobile);
+        checkMobile();
+    }
+
+    function setupResizeListener() {
+        // Handled in setupMobileInteractions checkMobile
+    }
+
+    function openDrawer() {
+        dom.drawer.classList.add('open');
+        dom.backdrop.classList.add('open');
+        dom.closeDrawer.focus();
+    }
+
+    function closeDrawer() {
+        dom.drawer.classList.remove('open');
+        dom.backdrop.classList.remove('open');
+    }
+
+    function setupScrollSpy() {
+        // Simple Intersection Observer for Active State
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id; // q-1a
+                    const rawId = id.replace('q-', '');
+                    
+                    // Update Active Link
+                    document.querySelectorAll('.nav-item').forEach(link => {
+                        if (link.textContent === rawId) {
+                            link.classList.add('active');
+                            // Ensure visible in nav rail
+                            if (dom.desktopNav.contains(link)) {
+                                const rail = dom.desktopNav;
+                                // Simple logic to keep in view:
+                                const railRect = rail.getBoundingClientRect();
+                                const linkRect = link.getBoundingClientRect();
+                                if (linkRect.top < railRect.top || linkRect.bottom > railRect.bottom) {
+                                    link.scrollIntoView({block: "center"});
+                                }
+                            }
+                        } else {
+                            link.classList.remove('active');
+                        }
+                    });
+                }
+            });
+        }, { rootMargin: '-10% 0px -80% 0px', threshold: 0 });
+
+        document.querySelectorAll('.question-node').forEach(node => observer.observe(node));
+    }
+
+    // Run
+    init();
+
+</script>
+</body>
+</html>
