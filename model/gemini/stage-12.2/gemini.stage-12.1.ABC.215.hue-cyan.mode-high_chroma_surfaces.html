@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"215","totalWithinVariant":"320","hueFamily":"cyan","intensityMode":"high_chroma_surfaces","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-09T19:55:25.148Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;215&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;cyan&quot;,&quot;intensityMode&quot;:&quot;high_chroma_surfaces&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-09T19:55:25.148Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Stage 6)</title>
+    
+    <!-- STAGE 6: ADD-ON LIBRARIES (NO SRI) -->
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    
+    <!-- Markdown-it -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* CONSTANTS & CSS VARIABLES (ColorLab C: High Chroma Surfaces - Cyan) */
+        :root {
+            /* 
+               Hue: 200 (Cyan) 
+               Mode: high_chroma_surfaces 
+               Req: 2+ surfaces chromatic (C 0.06-0.12), remaining tinted (0.03-0.07).
+            */
+            --color-page-bg: oklch(0.96 0.06 200);      /* Major 1: Chromatic */
+            --color-frame-bg: oklch(0.93 0.08 200);     /* Major 2: Chromatic (Nav sits here) */
+            --color-paper-bg: oklch(0.99 0.03 200);     /* Major 3: Tinted (Content sits here) */
+            
+            --color-wash-bg: oklch(0.95 0.06 200);      /* Solution details wash */
+            
+            --color-text-primary: oklch(0.20 0.015 200);
+            --color-text-secondary: oklch(0.45 0.015 200);
+            
+            --color-accent: oklch(0.60 0.16 200);       /* C in 0.12-0.20 */
+            --color-divider: oklch(0.85 0.02 200);      /* C <= 0.02 */
+            
+            --color-focus: var(--color-accent);
+        }
+
+        body {
+            background-color: var(--color-page-bg);
+            color: var(--color-text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            overflow-y: scroll; /* Force vertical scrollbar to avoid layout shift */
+        }
+
+        /* TYPOGRAPHY OVERRIDES */
+        h1, h2, h3, h4, h5, h6 { font-weight: 600; }
+        
+        /* SCROLLBAR UTILITIES */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* KATEX CONTAINMENT (LOCKED) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            margin: 0.5em 0;
+            -webkit-overflow-scrolling: touch;
+        }
+        /* Inline math: no background */
+        .katex { background: transparent !important; }
+
+        /* MARKDOWN TABLE STYLES */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid var(--color-divider);
+            padding: 0.5em 0.75em;
+            text-align: left;
+        }
+        th { font-weight: 600; }
+        
+        /* CUSTOM UTILITIES */
+        .text-accent { color: var(--color-accent); }
+        .bg-wash { background-color: var(--color-wash-bg); }
+        .border-divider { border-color: var(--color-divider); }
+        
+        /* FOCUS STATES */
+        *:focus-visible {
+            outline: 2px solid var(--color-focus);
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- STAGE 0: CONSTANTS ---
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json"; // Included for completeness
+
+        // --- STAGE 6 ADD-ON: MARKDOWN RENDERER CONFIG ---
+        const md = window.markdownit
+            ? window.markdownit({
+                html: true, // Allow inline SVG
+                linkify: true,
+                breaks: false, // Critical: prevent <br> in math
+            })
+            : null;
+
+        if (md) {
+            // Disable escape to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // --- UTILS ---
+        
+        // Helper to render markdown content safely
+        const MarkdownContent = ({ content, className = "" }) => {
+            const containerRef = React.useRef(null);
+
+            React.useEffect(() => {
+                if (containerRef.current && window.renderMathInElement) {
+                    window.renderMathInElement(containerRef.current, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false}
+                        ],
+                        throwOnError: false
+                    });
+                }
+            }, [content]);
+
+            if (!content) return null;
+            if (!md) return <div className={className}>{content}</div>;
+
+            const html = md.render(content);
+            return (
+                <div 
+                    ref={containerRef}
+                    className={`markdown-body ${className} [&>p]:mb-2 [&>p:last-child]:mb-0 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5`} 
+                    dangerouslySetInnerHTML={{ __html: html }} 
+                />
+            );
+        };
+
+        // --- COMPONENTS ---
+
+        // 1. Disclosure Control
+        const DisclosureControl = ({ isOpen, onToggle, label = "working" }) => {
+            return (
+                <button 
+                    onClick={onToggle}
+                    className="group flex items-center gap-1.5 text-sm font-medium text-accent hover:opacity-80 transition-opacity mt-2 mb-1"
+                    aria-expanded={isOpen}
+                >
+                    <span className="text-[var(--color-text-secondary)]">{isOpen ? "Hide" : "Show"} {label}</span>
+                    <i data-lucide="chevron-down" className={`w-4 h-4 text-[var(--color-text-secondary)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}></i>
+                </button>
+            );
+        };
+
+        // 2. Solution Details Subsections
+        const SolutionDetailsRegion = ({ details }) => {
+            // Internal Separator: Spacing + Optional Hairline
+            const renderSeparator = () => <div className="h-px w-full bg-transparent my-4"></div>;
+
+            return (
+                <div className="bg-wash rounded-sm px-4 py-4 mt-2 mb-4 border-l-2 border-transparent">
+                    {/* Keep in mind */}
+                    {details.keepInMind && (
+                        <div className="mb-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <i data-lucide="lightbulb" className="w-4 h-4 text-[var(--color-text-secondary)]"></i>
+                                <span className="text-sm font-bold text-[var(--color-text-secondary)]">Keep in mind</span>
+                            </div>
+                            <MarkdownContent content={details.keepInMind} className="text-sm text-[var(--color-text-primary)] leading-relaxed" />
+                        </div>
+                    )}
+
+                    {/* Formulas used */}
+                    {details.formulasUsed && (
+                        <div className="mb-6">
+                            <span className="text-sm font-bold text-[var(--color-text-secondary)] block mb-2">Formulas used</span>
+                            <MarkdownContent content={details.formulasUsed} className="text-sm text-[var(--color-text-primary)]" />
+                        </div>
+                    )}
+
+                    {/* Working (Primary) */}
+                    {details.working && (
+                        <div className="mb-6">
+                            <span className="text-sm font-bold text-[var(--color-text-secondary)] block mb-2">Working</span>
+                            <MarkdownContent content={details.working} className="text-[var(--color-text-primary)] text-base leading-relaxed" />
+                        </div>
+                    )}
+
+                    {/* Alternative Working */}
+                    {details.alternativeWorking && Array.isArray(details.alternativeWorking) && details.alternativeWorking.map((alt, idx) => (
+                        <div key={idx} className="mt-8 pt-4 border-t border-divider">
+                            <span className="text-sm font-bold text-[var(--color-text-secondary)] block mb-2">Alternative working</span>
+                            <MarkdownContent content={alt} className="text-[var(--color-text-primary)] text-base leading-relaxed" />
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        // 3. Solution Block (Answer + Toggle + Details)
+        const SolutionBlock = ({ solutionBlock, defaultExpanded }) => {
+            // State for expansion
+            const [isExpanded, setIsExpanded] = React.useState(defaultExpanded);
+            const hasDetails = solutionBlock.solutionDetails && (
+                solutionBlock.solutionDetails.working || 
+                solutionBlock.solutionDetails.keepInMind || 
+                solutionBlock.solutionDetails.formulasUsed ||
+                (solutionBlock.solutionDetails.alternativeWorking && solutionBlock.solutionDetails.alternativeWorking.length > 0)
+            );
+
+            // Icon Refresh
+            React.useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [isExpanded]);
+
+            if (!solutionBlock) return null;
+
+            return (
+                <div className="mt-4">
+                    {/* Answer */}
+                    {solutionBlock.answer && (
+                        <div className="mb-3">
+                            <span className="text-sm font-bold text-[var(--color-text-secondary)] block mb-1">Answer</span>
+                            <div className="text-lg font-medium text-[var(--color-text-primary)]">
+                                <MarkdownContent content={solutionBlock.answer} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Details Toggle & Region */}
+                    {hasDetails && (
+                        <div>
+                            <DisclosureControl isOpen={isExpanded} onToggle={() => setIsExpanded(!isExpanded)} />
+                            
+                            {isExpanded && (
+                                <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <SolutionDetailsRegion details={solutionBlock.solutionDetails} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // 4. Question Node
+        const QuestionNode = ({ node, level = 0, paperDefaults }) => {
+            const isTopLevel = level === 0;
+            
+            // Determine default expansion based on paper defaults
+            // If paper.defaults.expandedAll is false, start collapsed. Else expanded.
+            const defaultExpanded = paperDefaults?.expandedAll !== false;
+
+            return (
+                <div id={`q-${node.id}`} className={`relative ${isTopLevel ? 'mb-12' : 'mb-6'} scroll-mt-24`}>
+                    {/* Question Body */}
+                    <div className="flex gap-4">
+                        {/* Identifier */}
+                        <div className="flex-none w-8 md:w-12 pt-1">
+                             <span className={`block font-semibold text-[var(--color-text-secondary)] ${isTopLevel ? 'text-lg' : 'text-base'}`}>
+                                {node.id}
+                             </span>
+                        </div>
+                        
+                        {/* Prompt & Children */}
+                        <div className="flex-1 min-w-0">
+                            {/* Prompt */}
+                            <div className={`text-[var(--color-text-primary)] leading-relaxed ${isTopLevel ? 'text-lg' : 'text-base'}`}>
+                                <MarkdownContent content={node.question} />
+                            </div>
+
+                            {/* Solution Block */}
+                            {node.solutionBlock && (
+                                <SolutionBlock solutionBlock={node.solutionBlock} defaultExpanded={defaultExpanded} />
+                            )}
+
+                            {/* Children */}
+                            {node.children && node.children.length > 0 && (
+                                <div className="mt-6">
+                                    {node.children.map((child, idx) => (
+                                        <QuestionNode key={idx} node={child} level={level + 1} paperDefaults={paperDefaults} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Top Level Divider (Optional visual cue) */}
+                    {isTopLevel && <div className="mt-12 border-b border-divider opacity-50"></div>}
+                </div>
+            );
+        };
+
+        // 5. Navigation List (Shared)
+        const NavigationList = ({ flatItems, currentId, onNavigate }) => {
+            return (
+                <nav className="flex flex-col gap-1 py-4">
+                    {flatItems.map((item, idx) => {
+                        if (item.type === 'section') {
+                            return (
+                                <div key={`sec-${idx}`} className="mt-4 first:mt-0 mb-1 px-3">
+                                    <span className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider opacity-70">
+                                        {item.label}
+                                    </span>
+                                </div>
+                            );
+                        }
+                        
+                        const isActive = currentId === item.id;
+                        // Hierarchy via type scale only (Stage 5.4.5)
+                        const isTopLevel = item.level === 0;
+                        
+                        return (
+                            <button
+                                key={item.id}
+                                onClick={() => onNavigate(item.id)}
+                                className={`
+                                    text-left px-3 py-1.5 rounded-sm transition-colors duration-200
+                                    ${isActive 
+                                        ? 'font-bold text-accent' 
+                                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                                    }
+                                    ${isTopLevel ? 'text-sm' : 'text-xs opacity-90'}
+                                `}
+                            >
+                                {isActive && (
+                                    <span className="absolute left-0 w-0.5 h-4 bg-accent rounded-r-full mt-0.5" aria-hidden="true"></span>
+                                )}
+                                <span className="truncate">{item.label}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+            );
+        };
+
+        // 6. Mobile Drawer
+        const MobileDrawer = ({ isOpen, onClose, children }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex justify-end isolate">
+                    {/* Scrim */}
+                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
+                    
+                    {/* Drawer */}
+                    <div className="relative w-64 h-full bg-[var(--color-frame-bg)] shadow-2xl flex flex-col p-4 overflow-y-auto">
+                        <div className="flex items-center justify-between mb-4 border-b border-divider pb-2">
+                            <span className="font-semibold text-[var(--color-text-primary)]">Jump to</span>
+                            <button onClick={onClose} className="p-2 text-[var(--color-text-secondary)]">
+                                <i data-lucide="x" className="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        {children}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP ---
+        
+        const App = () => {
+            const [payload, setPayload] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const [error, setError] = React.useState(false);
+            const [currentPaperKey, setCurrentPaperKey] = React.useState(null);
+            const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+            const [activeSectionId, setActiveSectionId] = React.useState(null); // Active question ID
+
+            // Fetch Payload
+            React.useEffect(() => {
+                fetch(RTQ_PAPERS_PAYLOAD_PATH)
+                    .then(res => {
+                        if (!res.ok) throw new Error("Failed to load");
+                        return res.json();
+                    })
+                    .then(data => {
+                        setPayload(data);
+                        if (data.papers && data.papers.length > 0) {
+                            setCurrentPaperKey(data.papers[0].key);
+                        }
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        setError(true);
+                        setLoading(false);
+                    });
+            }, []);
+
+            // Lucide Init
+            React.useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [loading, currentPaperKey, mobileNavOpen]);
+
+            // Scroll Spy logic (Simple)
+            React.useEffect(() => {
+                const handleScroll = () => {
+                    const questions = document.querySelectorAll('[id^="q-"]');
+                    let current = null;
+                    questions.forEach(q => {
+                        const rect = q.getBoundingClientRect();
+                        if (rect.top < 150) {
+                            current = q.id.replace('q-', '');
+                        }
+                    });
+                    if (current) setActiveSectionId(current);
+                };
+                window.addEventListener('scroll', handleScroll, { passive: true });
+                return () => window.removeEventListener('scroll', handleScroll);
+            }, [currentPaperKey]);
+
+            // Handlers
+            const handlePaperChange = (e) => {
+                setCurrentPaperKey(e.target.value);
+                window.scrollTo(0, 0);
+            };
+
+            const handleNavigate = (id) => {
+                const el = document.getElementById(`q-${id}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                    setMobileNavOpen(false);
+                }
+            };
+
+            // Loading / Error States
+            if (loading) return <div className="p-8 text-[var(--color-text-secondary)]">Loading papers...</div>;
+            if (error || !payload) return (
+                <div className="h-screen flex items-center justify-center bg-[var(--color-page-bg)]">
+                    <div className="text-xl font-bold text-[var(--color-text-secondary)] tracking-widest">
+                        PAPERS PAYLOAD MISSING
+                    </div>
+                </div>
+            );
+
+            // Derived Data
+            const currentPaper = payload.papers.find(p => p.key === currentPaperKey);
+            if (!currentPaper) return <div>Paper not found</div>;
+
+            // Helper to flatten nav items
+            const flattenNav = (items, level = 0) => {
+                let flat = [];
+                items.forEach(item => {
+                    flat.push({ id: item.id, label: item.id, level });
+                    if (item.children) {
+                        flat.push(...flattenNav(item.children, level + 1));
+                    }
+                });
+                return flat;
+            };
+
+            let flatNavItems = [];
+            let questionNodes = [];
+
+            if (currentPaper.sections) {
+                currentPaper.sections.forEach(sec => {
+                    if (sec.label && sec.label.trim().length > 0) {
+                        flatNavItems.push({ type: 'section', label: sec.label });
+                    }
+                    flatNavItems.push(...flattenNav(sec.questions));
+                    // For rendering content, we just push questions. 
+                    // Section headers in CONTENT are rendered via SectionBlock if needed, 
+                    // but the brief allows simply listing questions.
+                    // Stage 3 grammar: Section block (optional).
+                    if (sec.label && sec.label.trim().length > 0) {
+                         // We will render a Section Header component in the paper view
+                         questionNodes.push({ type: 'section', label: sec.label });
+                    }
+                    questionNodes.push(...sec.questions.map(q => ({ type: 'question', data: q })));
+                });
+            } else if (currentPaper.questions) {
+                flatNavItems = flattenNav(currentPaper.questions);
+                questionNodes = currentPaper.questions.map(q => ({ type: 'question', data: q }));
+            }
+
+            return (
+                <div className="min-h-screen flex flex-col items-center">
+                    
+                    {/* 1. TOP CONTROLS (Aligned to Frame) */}
+                    <div className="w-full max-w-[1200px] px-4 md:px-8 pt-6 pb-4 flex items-center justify-between sticky top-0 bg-[var(--color-page-bg)] z-30">
+                        {/* Paper Selector */}
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-[var(--color-text-secondary)] hidden sm:inline">Paper:</span>
+                            <select 
+                                value={currentPaperKey}
+                                onChange={handlePaperChange}
+                                className="bg-[var(--color-frame-bg)] border border-divider rounded-md px-3 py-1.5 text-sm font-medium text-[var(--color-text-primary)] focus:ring-2 focus:ring-accent outline-none"
+                            >
+                                {payload.papers.map(p => (
+                                    <option key={p.key} value={p.key}>{p.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Mobile Jump To */}
+                        <div className="md:hidden">
+                            <button 
+                                onClick={() => setMobileNavOpen(true)}
+                                className="flex items-center gap-2 text-sm font-medium text-accent px-3 py-1.5 rounded-md hover:bg-[var(--color-frame-bg)] transition-colors"
+                            >
+                                <span>Jump to</span>
+                                <i data-lucide="menu" className="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 2. DOCUMENT FRAME SHELL */}
+                    <div className="w-full max-w-[1200px] flex-1 flex flex-col md:flex-row bg-[var(--color-frame-bg)] shadow-sm min-h-[80vh] rounded-t-lg md:rounded-lg overflow-hidden my-0 md:my-4 border border-divider">
+                        
+                        {/* LEFT COLUMN: NAVIGATION RAIL (Desktop) */}
+                        <aside className="hidden md:block w-48 lg:w-56 flex-none py-8 pl-4 pr-2 sticky top-0 h-screen overflow-y-auto no-scrollbar border-r border-transparent">
+                             <NavigationList 
+                                flatItems={flatNavItems} 
+                                currentId={activeSectionId} 
+                                onNavigate={handleNavigate} 
+                             />
+                        </aside>
+
+                        {/* RIGHT COLUMN: PAPER CONTENT */}
+                        <main className="flex-1 bg-[var(--color-paper-bg)] px-4 sm:px-8 md:px-12 py-10 md:py-12 min-h-full">
+                            {/* Render Questions */}
+                            {questionNodes.map((node, idx) => {
+                                if (node.type === 'section') {
+                                    return (
+                                        <div key={`sec-header-${idx}`} className="mt-8 mb-6 border-b border-divider pb-2">
+                                            <h2 className="text-xl font-bold text-[var(--color-text-secondary)]">{node.label}</h2>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <QuestionNode 
+                                        key={node.data.id} 
+                                        node={node.data} 
+                                        level={0}
+                                        paperDefaults={currentPaper.defaults}
+                                    />
+                                );
+                            })}
+                            
+                            {/* End of Paper Cushion */}
+                            <div className="h-32 flex items-center justify-center text-[var(--color-text-secondary)] opacity-50 text-sm italic">
+                                End of Paper
+                            </div>
+                        </main>
+                    </div>
+
+                    {/* MOBILE DRAWER */}
+                    <MobileDrawer isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)}>
+                        <NavigationList 
+                            flatItems={flatNavItems} 
+                            currentId={activeSectionId} 
+                            onNavigate={handleNavigate} 
+                        />
+                    </MobileDrawer>
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AB","indexWithinVariant":"31","totalWithinVariant":"200","hueFamily":"teal","intensityMode":"","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-08T14:49:20.077Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AB&quot;,&quot;indexWithinVariant&quot;:&quot;31&quot;,&quot;totalWithinVariant&quot;:&quot;200&quot;,&quot;hueFamily&quot;:&quot;teal&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-08T14:49:20.077Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Stage 6)</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <!-- ColorLab B Configuration: Teal / Light Mode Only -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        // ColorLab B: Forced Hue "Teal"
+                        // Mapping semantic roles to Teal palette
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488', // Focus / Active
+                            700: '#0f766e', // Text / Accent
+                            800: '#115e59',
+                            900: '#134e4a',
+                        },
+                        neutral: {
+                             // Tinted neutrals (Teal-grey) for cohesiveness
+                            50: '#f8fafc', 
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Stage 0 Constants - Runtime Definition */
+        /* This is the ONLY place the literal path string appears */
+        :root {
+            --rtq-papers-payload-path: "../../../payload/rtq.papers.payload.v2.json";
+        }
+
+        /* Scrollbar hiding for Nav */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* KaTeX Containment Invariant */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding-bottom: 4px; /* Space for scrollbar */
+        }
+        
+        /* Typography & Layout */
+        body {
+            background-color: #f0fdfa; /* Teal-50: Light mode only */
+            color: #334155; /* Neutral-700 */
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Focus Styles - ColorLab B Teal */
+        *:focus-visible {
+            outline: 2px solid #0d9488; /* Primary-600 */
+            outline-offset: 2px;
+        }
+
+        /* Markdown Table Minimalist Styling */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1rem;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid #cbd5e1; /* Neutral-300 */
+            padding: 0.5rem;
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+            background-color: transparent;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ============================================================================
+        // CONSTANTS & CONFIG
+        // ============================================================================
+        
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        
+        // Markdown Configuration (Stage 6 Baseline)
+        const md = window.markdownit ? window.markdownit({
+            html: true,       // Enable inline SVG passthrough
+            linkify: true,
+            breaks: false,    // CRITICAL: Must be false to preserve math delimiters
+            typographer: true
+        }) : null;
+
+        if (md) {
+            // Disable escape rule to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // ============================================================================
+        // UTILS
+        // ============================================================================
+
+        const MarkdownContent = ({ content, className = "" }) => {
+            const containerRef = React.useRef(null);
+
+            React.useEffect(() => {
+                if (containerRef.current && content) {
+                    // 1. Render Markdown to HTML
+                    const rawHtml = md ? md.render(content) : content;
+                    containerRef.current.innerHTML = rawHtml;
+
+                    // 2. Render KaTeX
+                    if (window.renderMathInElement) {
+                        window.renderMathInElement(containerRef.current, {
+                            delimiters: [
+                                {left: '$$', right: '$$', display: true},
+                                {left: '$', right: '$', display: false},
+                                {left: '\\(', right: '\\)', display: false},
+                                {left: '\\[', right: '\\]', display: true}
+                            ],
+                            throwOnError: false,
+                            trust: true // Allow basic HTML in math if needed
+                        });
+                    }
+                }
+            }, [content]);
+
+            return <div ref={containerRef} className={`prose prose-slate max-w-none ${className}`} />;
+        };
+
+        // ============================================================================
+        // COMPONENTS
+        // ============================================================================
+
+        // --- Navigation Components ---
+
+        const NavItem = ({ id, label, isActive, onClick, depth = 0 }) => {
+            // Hierarchy via type scale only, strict left align
+            const isSub = depth > 0;
+            const textSize = isSub ? "text-sm" : "text-base";
+            const textColor = isActive 
+                ? "text-primary-700 font-bold" // Active: Teal-700 Bold
+                : isSub ? "text-neutral-500" : "text-neutral-600";
+            
+            return (
+                <button
+                    onClick={onClick}
+                    className={`
+                        w-full text-left py-1 px-0 group focus:outline-none 
+                        ${textSize} ${textColor}
+                        hover:text-primary-600 transition-colors duration-150
+                    `}
+                >
+                    <span className="block truncate">{label}</span>
+                </button>
+            );
+        };
+
+        const NavSectionLabel = ({ label }) => {
+            if (!label || label.trim() === "") return null;
+            return (
+                <div className="pt-4 pb-2 text-xs font-bold text-neutral-400 uppercase tracking-wider select-none">
+                    {label}
+                </div>
+            );
+        };
+
+        const NavigationList = ({ structure, activeId, onJump }) => {
+            // Flatten structure for rendering
+            const renderItems = (items) => {
+                return items.map((item, idx) => {
+                    if (item.type === 'section') {
+                        return (
+                            <div key={`sec-${idx}`}>
+                                <NavSectionLabel label={item.label} />
+                                <div className="space-y-0.5">
+                                    {item.questions.map(q => renderItems([q]))}
+                                </div>
+                            </div>
+                        );
+                    }
+                    // Question
+                    const isActive = activeId === item.id;
+                    return (
+                        <div key={item.id}>
+                            <NavItem 
+                                id={item.id} 
+                                label={item.id} 
+                                isActive={isActive} 
+                                onClick={() => onJump(item.id)} 
+                                depth={item.depth}
+                            />
+                        </div>
+                    );
+                });
+            };
+
+            return (
+                <nav className="flex flex-col pb-12">
+                    {renderItems(structure)}
+                </nav>
+            );
+        };
+
+        // --- Solution Details Sub-blocks ---
+
+        const SolutionSubBlock = ({ label, content, icon, isList = false }) => {
+            if (!content) return null;
+            return (
+                <div className="mb-4 last:mb-0">
+                    <div className="flex items-center gap-2 mb-1">
+                        {icon && <span className="text-neutral-400 text-sm">{icon}</span>}
+                        <h5 className="text-xs font-bold text-neutral-500 uppercase tracking-wide">{label}</h5>
+                    </div>
+                    <MarkdownContent content={content} className={`text-sm text-neutral-700 leading-relaxed ${isList ? 'pl-0' : ''}`} />
+                </div>
+            );
+        };
+
+        const AlternativeWorkingBlock = ({ content, index }) => {
+             // Separator handled by parent logic or spacing
+            return (
+                <div className="mt-6 pt-4 border-t border-neutral-200">
+                    <h5 className="text-xs font-bold text-neutral-500 uppercase tracking-wide mb-2">Alternative Working</h5>
+                    <MarkdownContent content={content} className="text-sm text-neutral-700 leading-relaxed" />
+                </div>
+            );
+        };
+
+        // --- Core Content Components ---
+
+        const SolutionDetails = ({ details, isExpanded }) => {
+            if (!isExpanded) return null;
+
+            // Internal Clarity: Subsections must not merge
+            return (
+                <div className="mt-3 pl-0 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {/* Surface differentiation: optional very subtle wash allowed by Stage 3/5 */}
+                    <div className="p-0"> 
+                        {/* 1. Keep in mind */}
+                        {details.keepInMind && (
+                            <SolutionSubBlock 
+                                label="Keep in mind" 
+                                content={details.keepInMind} 
+                                isList={true}
+                            />
+                        )}
+
+                        {/* Separator if needed */}
+                        {details.keepInMind && details.formulasUsed && <div className="h-4" />}
+
+                        {/* 2. Formulas used */}
+                        {details.formulasUsed && (
+                            <SolutionSubBlock 
+                                label="Formulas used" 
+                                content={details.formulasUsed}
+                            />
+                        )}
+
+                        {/* Separator if needed */}
+                        {(details.keepInMind || details.formulasUsed) && details.working && <div className="h-4" />}
+
+                        {/* 3. Working (Primary) */}
+                        {details.working && (
+                            <SolutionSubBlock 
+                                label="Working" 
+                                content={details.working} 
+                            />
+                        )}
+
+                        {/* 4. Alternative Working */}
+                        {details.alternativeWorking && Array.isArray(details.alternativeWorking) && details.alternativeWorking.map((alt, idx) => (
+                            <AlternativeWorkingBlock key={idx} content={alt} index={idx} />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const SolutionBlock = ({ data, defaultExpanded }) => {
+            const hasAnswer = !!data.answer;
+            const hasDetails = !!data.solutionDetails;
+            
+            // Toggle State
+            const [isExpanded, setIsExpanded] = React.useState(defaultExpanded);
+
+            if (!hasAnswer && !hasDetails) return null;
+
+            return (
+                <div className="mt-3">
+                    {/* Answer Region */}
+                    {hasAnswer && (
+                        <div className="mb-2">
+                            <span className="text-xs font-bold text-neutral-500 uppercase mr-2">Answer</span>
+                            <div className="inline-block">
+                                <MarkdownContent content={data.answer} className="text-base font-medium text-neutral-800 inline [&>p]:inline" />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Disclosure Control */}
+                    {hasDetails && (
+                        <div className="flex flex-col items-start">
+                            <button 
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                className="text-sm font-medium text-primary-700 hover:text-primary-800 flex items-center gap-1 focus:outline-none focus:underline mt-1 mb-1"
+                                aria-expanded={isExpanded}
+                            >
+                                <span>{isExpanded ? "Hide working" : "Show working"}</span>
+                                <svg 
+                                    className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
+                                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            
+                            {/* Expandable Region */}
+                            <SolutionDetails details={data.solutionDetails} isExpanded={isExpanded} />
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const QuestionNode = ({ node, defaultExpanded }) => {
+            // Recursive rendering for children
+            const hasSolutionBlock = !!node.solutionBlock;
+
+            return (
+                <div id={node.id} className="mb-8 scroll-mt-24">
+                    {/* Question Body */}
+                    <div className="flex gap-3">
+                        {/* Identifier */}
+                        <div className="flex-shrink-0 w-12 pt-0.5">
+                            <span className="text-base font-semibold text-neutral-500">{node.id}</span>
+                        </div>
+                        
+                        {/* Content Column */}
+                        <div className="flex-grow min-w-0">
+                            {/* Prompt */}
+                            <MarkdownContent content={node.question} className="text-base text-neutral-900 leading-relaxed font-normal" />
+
+                            {/* Solution Block (Optional) */}
+                            {hasSolutionBlock && (
+                                <SolutionBlock data={node.solutionBlock} defaultExpanded={defaultExpanded} />
+                            )}
+
+                            {/* Children Container */}
+                            {node.children && node.children.length > 0 && (
+                                <div className="mt-6 ml-0 border-l border-transparent"> 
+                                    {/* Indentation handled via spacing/rhythm, strict left alignment preserved generally but slight visual shift for children OK if quiet */}
+                                    {node.children.map(child => (
+                                        <QuestionNode key={child.id} node={child} defaultExpanded={defaultExpanded} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SectionBlock = ({ section, defaultExpanded }) => {
+            return (
+                <div className="mb-12">
+                    {/* Section Header */}
+                    {section.label && section.label.trim() !== "" && (
+                        <div className="border-b border-neutral-200 pb-2 mb-8 mt-4">
+                            <h2 className="text-lg font-bold text-neutral-800">{section.label}</h2>
+                        </div>
+                    )}
+                    
+                    {/* Question List */}
+                    <div>
+                        {section.questions.map(q => (
+                            <QuestionNode key={q.id} node={q} defaultExpanded={defaultExpanded} />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Shell Components ---
+
+        const PaperSelector = ({ papers, currentKey, onChange }) => {
+            return (
+                <div className="flex items-center gap-3">
+                    <label htmlFor="paper-select" className="text-sm font-medium text-neutral-500">Paper:</label>
+                    <div className="relative">
+                        <select 
+                            id="paper-select"
+                            value={currentKey}
+                            onChange={(e) => onChange(e.target.value)}
+                            className="appearance-none bg-white border border-neutral-300 text-neutral-700 py-1.5 pl-3 pr-8 rounded text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 cursor-pointer"
+                        >
+                            {papers.map(p => (
+                                <option key={p.key} value={p.key}>{p.label}</option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-neutral-500">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const Drawer = ({ isOpen, onClose, children }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                    {/* Scrim */}
+                    <div className="absolute inset-0 bg-neutral-900/20 backdrop-blur-sm" onClick={onClose}></div>
+                    
+                    {/* Drawer Content */}
+                    <div className="relative w-64 h-full bg-white shadow-xl flex flex-col animate-in slide-in-from-right duration-200">
+                        <div className="flex items-center justify-between p-4 border-b border-neutral-100">
+                            <h2 className="text-sm font-bold text-neutral-900">Jump to</h2>
+                            <button onClick={onClose} className="p-1 text-neutral-500 hover:text-neutral-800">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {children}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ============================================================================
+        // APP LOGIC
+        // ============================================================================
+
+        const App = () => {
+            const [status, setStatus] = React.useState('loading'); // loading, error, ready
+            const [payload, setPayload] = React.useState(null);
+            const [currentPaperKey, setCurrentPaperKey] = React.useState(null);
+            const [navOpen, setNavOpen] = React.useState(false);
+            const [activeId, setActiveId] = React.useState(null);
+
+            // Load Payload
+            React.useEffect(() => {
+                fetch(RTQ_PAPERS_PAYLOAD_PATH)
+                    .then(res => {
+                        if (!res.ok) throw new Error("Network response was not ok");
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (!data.papers || data.papers.length === 0) throw new Error("Invalid payload");
+                        setPayload(data);
+                        setCurrentPaperKey(data.papers[0].key);
+                        setStatus('ready');
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        setStatus('error');
+                    });
+            }, []);
+
+            // Scroll Spy logic to update activeId
+            React.useEffect(() => {
+                const handleScroll = () => {
+                    if (status !== 'ready') return;
+                    
+                    // Simple heuristic: find the question closest to top of viewport
+                    // Gather all question IDs
+                    const ids = []; // need flat list of visible questions
+                    // (Optimization: In a real app, memoize this list)
+                    document.querySelectorAll('[id]').forEach(el => {
+                        if (el.id && el.id !== 'root') ids.push(el.id);
+                    });
+
+                    let current = null;
+                    for (const id of ids) {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            const rect = el.getBoundingClientRect();
+                            if (rect.top < 200) { // threshold
+                                current = id;
+                            }
+                        }
+                    }
+                    if (current) setActiveId(current);
+                };
+
+                window.addEventListener('scroll', handleScroll, { passive: true });
+                return () => window.removeEventListener('scroll', handleScroll);
+            }, [status, currentPaperKey]);
+
+            // Helper to generate nav structure
+            const getNavStructure = (paper) => {
+                const mapQ = (q, depth=0) => ({
+                    id: q.id,
+                    type: 'question',
+                    depth: depth,
+                    children: q.children ? q.children.map(c => mapQ(c, depth + 1)) : [] // nav is flat list but we preserve data
+                });
+
+                if (paper.sections) {
+                    return paper.sections.map(sec => ({
+                        type: 'section',
+                        label: sec.label,
+                        questions: sec.questions.flatMap(q => {
+                            const list = [mapQ(q, 0)];
+                            // Flatten children for nav list immediately? 
+                            // Stage 6 Nav says "Mobile navigation must expose the full set... items must not be removed"
+                            // Recursively flatten
+                            const flatten = (node) => [node, ...(node.children || []).flatMap(flatten)];
+                            return flatten(mapQ(q, 0)); 
+                        })
+                    }));
+                } else if (paper.questions) {
+                    const flatten = (node) => [node, ...(node.children || []).flatMap(flatten)];
+                    return paper.questions.flatMap(q => flatten(mapQ(q, 0)));
+                }
+                return [];
+            };
+
+            const handleJump = (id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setNavOpen(false);
+                    setActiveId(id);
+                }
+            };
+
+            if (status === 'error') {
+                return (
+                    <div className="flex items-center justify-center min-h-screen text-neutral-500 font-bold tracking-widest">
+                        PAPERS PAYLOAD MISSING
+                    </div>
+                );
+            }
+
+            if (status === 'loading') {
+                return <div className="p-8 text-neutral-400">Loading...</div>;
+            }
+
+            const currentPaper = payload.papers.find(p => p.key === currentPaperKey);
+            const navStructure = getNavStructure(currentPaper);
+            const defaultExpanded = currentPaper.defaults ? currentPaper.defaults.expandedAll : true;
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Top Controls (Aligned with Shell) */}
+                    <div className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-neutral-200">
+                        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+                            <PaperSelector 
+                                papers={payload.papers} 
+                                currentKey={currentPaperKey} 
+                                onChange={setCurrentPaperKey} 
+                            />
+                            
+                            {/* Mobile Jump Trigger */}
+                            <button 
+                                className="md:hidden text-sm font-bold text-primary-700 hover:text-primary-800"
+                                onClick={() => setNavOpen(true)}
+                            >
+                                Jump to
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* DocumentFrameShell */}
+                    <div className="flex-1 max-w-6xl mx-auto w-full px-4 flex">
+                        
+                        {/* Desktop Navigation Rail */}
+                        <aside className="hidden md:block w-48 flex-shrink-0 pt-8 pr-8">
+                            <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto no-scrollbar">
+                                <NavigationList 
+                                    structure={navStructure} 
+                                    activeId={activeId} 
+                                    onJump={handleJump} 
+                                />
+                            </div>
+                        </aside>
+
+                        {/* Paper Content Column */}
+                        <main className="flex-1 pt-8 pb-32 min-w-0">
+                            {/* Paper Surface */}
+                            <div className="bg-white rounded-none md:shadow-none min-h-[50vh] p-4 md:p-8 md:pl-12 lg:pl-16 max-w-3xl">
+                                {currentPaper.sections ? (
+                                    currentPaper.sections.map((sec, idx) => (
+                                        <SectionBlock key={idx} section={sec} defaultExpanded={defaultExpanded} />
+                                    ))
+                                ) : (
+                                    currentPaper.questions.map(q => (
+                                        <QuestionNode key={q.id} node={q} defaultExpanded={defaultExpanded} />
+                                    ))
+                                )}
+                            </div>
+                        </main>
+                    </div>
+
+                    {/* Mobile Navigation Drawer */}
+                    <Drawer isOpen={navOpen} onClose={() => setNavOpen(false)}>
+                        <NavigationList 
+                            structure={navStructure} 
+                            activeId={activeId} 
+                            onJump={handleJump} 
+                        />
+                    </Drawer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

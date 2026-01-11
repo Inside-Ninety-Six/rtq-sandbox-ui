@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"269","totalWithinVariant":"320","hueFamily":"red","intensityMode":"accent_only","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-09T22:48:22.941Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;269&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;red&quot;,&quot;intensityMode&quot;:&quot;accent_only&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-09T22:48:22.941Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+    
+    <!-- KaTeX CSS (No integrity, per Stage 6 instructions) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    
+    <!-- Tailwind CSS (Prototype Mode) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- ColorLab & Typography Configuration -->
+    <script>
+        // ColorLab B: Force Hue Family = "red" (Hue ~ 25)
+        // ColorLab C: Intensity Mode = "accent_only"
+        // Rules: Surfaces C <= 0.015, Text C <= 0.010, Accent C [0.08..0.14]
+        
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        page: 'oklch(0.98 0.005 25)',       // very light warm neutral
+                        frame: 'oklch(0.97 0.008 25)',      // subtle distinction
+                        paper: 'oklch(1.0 0 0)',            // white
+                        wash: 'oklch(0.975 0.01 25)',       // very subtle wash for solution details
+                        primary: 'oklch(0.15 0.01 25)',     // dark neutral text
+                        secondary: 'oklch(0.40 0.01 25)',   // medium neutral text
+                        hairline: 'oklch(0.92 0.01 25)',    // quiet divider
+                        accent: 'oklch(0.55 0.14 25)',      // Red accent (Link, Focus, Nav Marker)
+                        focus: 'oklch(0.55 0.14 25)',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    spacing: {
+                        'nav-w': '240px',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base styles & Reset overrides */
+        body {
+            background-color: theme('colors.page');
+            color: theme('colors.primary');
+            overflow-x: hidden; /* Prevent page-level horizontal scroll */
+        }
+
+        /* Scrollable Nav without visible scrollbars */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none; /* Chrome, Safari and Opera */
+        }
+
+        /* Focus Styling (Stage 5.5.2) */
+        :focus-visible {
+            outline: 2px solid theme('colors.accent');
+            outline-offset: 2px;
+        }
+
+        /* KaTeX Overflow Handling (Stage 6.0.8) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 4px; /* Space for scrollbar if needed */
+            max-width: 100%;
+        }
+
+        /* Markdown Table Styling (Stage 5.8.5) */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1rem 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid theme('colors.hairline');
+            padding: 0.5rem;
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+        }
+        
+        /* Markdown List Styling */
+        .markdown-body ul {
+            list-style-type: disc;
+            padding-left: 1.5em;
+            margin-bottom: 1em;
+        }
+        .markdown-body ol {
+            list-style-type: decimal;
+            padding-left: 1.5em;
+            margin-bottom: 1em;
+        }
+        .markdown-body p {
+            margin-bottom: 0.75em;
+            line-height: 1.6;
+        }
+        .markdown-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Hide logic for disclosure */
+        .hidden-content {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center">
+
+    <!-- App Root -->
+    <div id="app" class="w-full max-w-[1200px] flex flex-col min-h-screen bg-frame/50 md:bg-frame shadow-sm md:shadow-none">
+        <!-- Shell Render Target -->
+    </div>
+
+    <!-- Scripts (No integrity) -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        // --- STAGE 0: CONSTANTS ---
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // --- RUNTIME STATE ---
+        const state = {
+            papers: [],
+            activePaperKey: null,
+            expandedWorkings: new Set(), // Set of question IDs with expanded solution details
+            mobileNavOpen: false,
+            loading: true,
+            error: false
+        };
+
+        // --- MARKDOWN SETUP (Stage 6 Add-on) ---
+        // html: true (SVG passthrough), breaks: false (KaTeX requirement)
+        const md = window.markdownit ? window.markdownit({
+            html: true,
+            linkify: true,
+            breaks: false,
+        }) : null;
+
+        if (md) {
+            // Disable escape rule to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // --- INIT ---
+        async function init() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error("Payload missing");
+                const data = await response.json();
+                
+                state.papers = data.papers || [];
+                
+                if (state.papers.length > 0) {
+                    state.activePaperKey = state.papers[0].key;
+                    applyPaperDefaults(state.papers[0]);
+                }
+                
+                state.loading = false;
+                render();
+            } catch (e) {
+                console.error(e);
+                state.error = true;
+                state.loading = false;
+                render();
+            }
+        }
+
+        function applyPaperDefaults(paper) {
+            state.expandedWorkings.clear();
+            const expandAll = paper.defaults?.expandedAll !== false; // Default to true per brief unless explicitly false
+            
+            if (expandAll) {
+                // We need to traverse all questions to set them as expanded
+                const traverse = (nodes) => {
+                    nodes.forEach(node => {
+                        if (node.solutionBlock?.solutionDetails) {
+                            state.expandedWorkings.add(node.id);
+                        }
+                        if (node.children) traverse(node.children);
+                    });
+                };
+                
+                if (paper.sections) {
+                    paper.sections.forEach(sec => traverse(sec.questions));
+                } else if (paper.questions) {
+                    traverse(paper.questions);
+                }
+            }
+        }
+
+        // --- RENDER LOOP ---
+        function render() {
+            const app = document.getElementById('app');
+            app.innerHTML = ''; // Clear
+
+            if (state.error) {
+                app.innerHTML = `<div class="p-10 text-center text-secondary font-medium">PAPERS PAYLOAD MISSING</div>`;
+                return;
+            }
+
+            if (state.loading) {
+                app.innerHTML = `<div class="p-10 text-center text-secondary">Loading...</div>`;
+                return;
+            }
+
+            // Top Controls
+            renderTopControls(app);
+
+            // Document Shell (Nav + Paper)
+            const shell = document.createElement('div');
+            shell.className = "flex flex-col md:flex-row flex-1 relative";
+            
+            // Desktop Nav Rail
+            renderDesktopNav(shell);
+            
+            // Mobile Drawer (if open)
+            renderMobileDrawer(app);
+
+            // Paper Content Column
+            renderPaperColumn(shell);
+
+            app.appendChild(shell);
+
+            // Post-render: KaTeX
+            renderMathInElement(app, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+
+        // --- COMPONENTS ---
+
+        function renderTopControls(parent) {
+            const wrapper = document.createElement('div');
+            wrapper.className = "sticky top-0 z-20 w-full bg-frame border-b border-hairline px-4 md:px-8 py-3 flex justify-between items-center";
+
+            // Paper Selector
+            const select = document.createElement('select');
+            select.className = "bg-paper border border-hairline rounded px-3 py-1.5 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-accent";
+            select.onchange = (e) => {
+                const newKey = e.target.value;
+                state.activePaperKey = newKey;
+                const paper = state.papers.find(p => p.key === newKey);
+                if (paper) applyPaperDefaults(paper);
+                render();
+            };
+
+            state.papers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.key;
+                opt.textContent = p.label;
+                opt.selected = p.key === state.activePaperKey;
+                select.appendChild(opt);
+            });
+            wrapper.appendChild(select);
+
+            // Mobile "Jump to" Trigger
+            const jumpBtn = document.createElement('button');
+            jumpBtn.className = "md:hidden text-accent text-sm font-medium px-3 py-1.5 hover:opacity-80";
+            jumpBtn.textContent = "Jump to";
+            jumpBtn.onclick = () => {
+                state.mobileNavOpen = true;
+                render();
+            };
+            wrapper.appendChild(jumpBtn);
+
+            parent.appendChild(wrapper);
+        }
+
+        function renderDesktopNav(parent) {
+            const container = document.createElement('nav');
+            container.className = "hidden md:block w-nav-w flex-shrink-0 bg-frame border-r border-hairline relative";
+            
+            const stickyWrapper = document.createElement('div');
+            stickyWrapper.className = "sticky top-[61px] max-h-[calc(100vh-61px)] overflow-y-auto no-scrollbar py-6 pl-4 pr-2";
+            
+            renderNavList(stickyWrapper);
+            container.appendChild(stickyWrapper);
+            parent.appendChild(container);
+        }
+
+        function renderMobileDrawer(parent) {
+            if (!state.mobileNavOpen) return;
+
+            // Scrim
+            const scrim = document.createElement('div');
+            scrim.className = "fixed inset-0 bg-black/20 z-40";
+            scrim.onclick = () => { state.mobileNavOpen = false; render(); };
+            
+            // Drawer
+            const drawer = document.createElement('div');
+            drawer.className = "fixed inset-y-0 right-0 w-[280px] bg-paper shadow-xl z-50 flex flex-col";
+            
+            // Header
+            const header = document.createElement('div');
+            header.className = "flex justify-between items-center p-4 border-b border-hairline";
+            const title = document.createElement('span');
+            title.className = "font-semibold text-primary";
+            title.textContent = "Jump to";
+            const close = document.createElement('button');
+            close.textContent = "Close";
+            close.className = "text-sm text-secondary";
+            close.onclick = () => { state.mobileNavOpen = false; render(); };
+            
+            header.appendChild(title);
+            header.appendChild(close);
+            drawer.appendChild(header);
+
+            // Content
+            const content = document.createElement('div');
+            content.className = "flex-1 overflow-y-auto p-4";
+            renderNavList(content);
+            drawer.appendChild(content);
+
+            parent.appendChild(scrim);
+            parent.appendChild(drawer);
+        }
+
+        function renderNavList(container) {
+            const paper = state.papers.find(p => p.key === state.activePaperKey);
+            if (!paper) return;
+
+            const list = document.createElement('div');
+            list.className = "flex flex-col space-y-1";
+
+            const createItem = (id, label) => {
+                const btn = document.createElement('button');
+                btn.className = "text-left px-2 py-1 text-sm rounded block w-full truncate text-secondary hover:text-primary hover:bg-black/5 transition-colors";
+                
+                // Active indication (Weight only per 6.0.2 + Accent marker allowed by Override 5.4.3)
+                // Using simple weight for baseline, can add left border logic if we want strict accent.
+                // Override says accent marker allowed in nav. Let's use a left border on active.
+                
+                // Note: We don't track "active question" based on scroll in this prototype state, 
+                // so we only have 'interactive' state.
+                // We'll just style them generally. 
+                
+                btn.innerHTML = `<span class="font-medium">${label}</span>`;
+                btn.onclick = () => {
+                    const el = document.getElementById(`q-${id}`);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        state.mobileNavOpen = false;
+                        render();
+                    }
+                };
+                return btn;
+            };
+
+            // Recursive identifier extractor
+            const renderNodes = (nodes) => {
+                nodes.forEach(node => {
+                    // Stage 5.4.5: Hierarchy via type scale only. 
+                    // To imply depth without indentation, we could reduce font size slightly or opacity.
+                    // For now, flat list with identifiers is required.
+                    const item = createItem(node.id, node.id);
+                    list.appendChild(item);
+                    if (node.children) renderNodes(node.children);
+                });
+            };
+
+            if (paper.sections) {
+                paper.sections.forEach(section => {
+                    // Section label (only if not empty)
+                    if (section.label && section.label.trim() !== "") {
+                        const secLabel = document.createElement('div');
+                        secLabel.className = "mt-4 mb-1 px-2 text-xs font-bold text-secondary uppercase tracking-wider select-none";
+                        secLabel.textContent = section.label;
+                        list.appendChild(secLabel);
+                    }
+                    renderNodes(section.questions);
+                    // Separator handled by margin on next label or natural spacing
+                });
+            } else if (paper.questions) {
+                renderNodes(paper.questions);
+            }
+
+            container.appendChild(list);
+        }
+
+        function renderPaperColumn(parent) {
+            const container = document.createElement('main');
+            container.className = "flex-1 bg-frame md:bg-frame flex justify-center";
+            
+            const paperSurface = document.createElement('div');
+            paperSurface.className = "w-full max-w-3xl bg-paper min-h-screen px-4 py-8 md:px-12 md:py-12";
+            
+            const paper = state.papers.find(p => p.key === state.activePaperKey);
+            
+            if (paper) {
+                if (paper.sections) {
+                    paper.sections.forEach(section => {
+                        if (section.label && section.label.trim() !== "") {
+                            const header = document.createElement('h2');
+                            header.className = "text-xl font-bold text-primary mb-6 pb-2 border-b border-hairline mt-8 first:mt-0";
+                            header.textContent = `Section ${section.label}`;
+                            paperSurface.appendChild(header);
+                        }
+                        renderQuestionList(section.questions, paperSurface, true);
+                    });
+                } else if (paper.questions) {
+                    renderQuestionList(paper.questions, paperSurface, true);
+                }
+            }
+
+            container.appendChild(paperSurface);
+            parent.appendChild(container);
+        }
+
+        function renderQuestionList(questions, parent, isTopLevel) {
+            questions.forEach((q, index) => {
+                renderQuestionNode(q, parent, isTopLevel, index === 0);
+            });
+        }
+
+        function renderQuestionNode(node, parent, isTopLevel, isFirst) {
+            const wrapper = document.createElement('div');
+            wrapper.id = `q-${node.id}`;
+            // Largest spacing unit for top level
+            wrapper.className = isTopLevel 
+                ? `${isFirst ? '' : 'mt-16'} flex flex-col` 
+                : "mt-6 ml-0 md:ml-4 flex flex-col"; // Minimal indentation via margin for children
+
+            // 1. Question Body
+            const bodyWrapper = document.createElement('div');
+            bodyWrapper.className = "mb-4";
+            
+            // Identifier + Prompt
+            const identifier = document.createElement('span');
+            identifier.className = "font-bold text-primary mr-3 select-none";
+            identifier.textContent = node.id;
+            
+            const promptContent = document.createElement('div');
+            promptContent.className = "markdown-body inline text-primary text-lg leading-relaxed";
+            promptContent.innerHTML = md ? md.render(node.question) : node.question;
+            // Inject identifier at start of prompt visually
+            promptContent.prepend(identifier);
+            
+            bodyWrapper.appendChild(promptContent);
+            wrapper.appendChild(bodyWrapper);
+
+            // 2. Solution Block (Optional)
+            if (node.solutionBlock) {
+                const sb = node.solutionBlock;
+                const solutionWrapper = document.createElement('div');
+                solutionWrapper.className = "mt-3 pl-4 md:pl-0"; // Slight visual offset on mobile for clarity
+
+                // A. Answer (Optional)
+                if (sb.answer) {
+                    const answerDiv = document.createElement('div');
+                    answerDiv.className = "mb-3 text-base";
+                    const label = document.createElement('span');
+                    label.className = "font-bold text-secondary mr-2 text-sm uppercase tracking-wide";
+                    label.textContent = "Answer";
+                    
+                    const val = document.createElement('div');
+                    val.className = "markdown-body inline text-primary font-medium";
+                    val.innerHTML = md ? md.render(sb.answer) : sb.answer;
+                    
+                    answerDiv.appendChild(label);
+                    answerDiv.appendChild(val);
+                    solutionWrapper.appendChild(answerDiv);
+                }
+
+                // B. Solution Details (Optional)
+                if (sb.solutionDetails) {
+                    const isExpanded = state.expandedWorkings.has(node.id);
+                    const details = sb.solutionDetails;
+
+                    // Disclosure Control
+                    const toggle = document.createElement('button');
+                    toggle.className = "text-accent font-medium text-sm flex items-center hover:opacity-80 focus:outline-none transition-colors mb-2";
+                    toggle.innerHTML = `
+                        <span class="mr-1">${isExpanded ? "Hide working" : "Show working"}</span>
+                        <svg class="w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    `;
+                    toggle.onclick = () => {
+                        if (isExpanded) state.expandedWorkings.delete(node.id);
+                        else state.expandedWorkings.add(node.id);
+                        render(); // Re-render to update state
+                    };
+                    solutionWrapper.appendChild(toggle);
+
+                    // Details Region
+                    if (isExpanded) {
+                        const region = document.createElement('div');
+                        // Wash background (ColorLab: accent_only allows very subtle wash, defined in vars)
+                        region.className = "bg-wash rounded-sm p-4 mt-2 border-l-2 border-hairline text-base text-primary animate-[fadeIn_0.2s_ease-out]";
+                        
+                        // Keep in mind
+                        if (details.keepInMind) {
+                            const kim = document.createElement('div');
+                            kim.className = "mb-4";
+                            const lbl = document.createElement('h4');
+                            lbl.className = "font-bold text-xs text-secondary uppercase tracking-wide mb-1 flex items-center";
+                            lbl.innerHTML = `<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Keep in mind`;
+                            const body = document.createElement('div');
+                            body.className = "markdown-body text-secondary text-sm";
+                            body.innerHTML = md ? md.render(details.keepInMind) : details.keepInMind;
+                            kim.appendChild(lbl);
+                            kim.appendChild(body);
+                            region.appendChild(kim);
+                        }
+
+                        // Formulas used
+                        if (details.formulasUsed) {
+                            const form = document.createElement('div');
+                            form.className = "mb-4";
+                            const lbl = document.createElement('h4');
+                            lbl.className = "font-bold text-xs text-secondary uppercase tracking-wide mb-1";
+                            lbl.textContent = "Formulas used";
+                            const body = document.createElement('div');
+                            body.className = "markdown-body text-secondary text-sm";
+                            body.innerHTML = md ? md.render(details.formulasUsed) : details.formulasUsed;
+                            form.appendChild(lbl);
+                            form.appendChild(body);
+                            region.appendChild(form);
+                        }
+
+                        // Working (Primary)
+                        if (details.working) {
+                            const work = document.createElement('div');
+                            work.className = "mb-4";
+                            const lbl = document.createElement('h4');
+                            lbl.className = "font-bold text-xs text-secondary uppercase tracking-wide mb-1";
+                            lbl.textContent = "Working";
+                            const body = document.createElement('div');
+                            body.className = "markdown-body";
+                            body.innerHTML = md ? md.render(details.working) : details.working;
+                            work.appendChild(lbl);
+                            work.appendChild(body);
+                            region.appendChild(work);
+                        }
+
+                        // Alternative working
+                        if (details.alternativeWorking && Array.isArray(details.alternativeWorking)) {
+                            details.alternativeWorking.forEach(alt => {
+                                const altDiv = document.createElement('div');
+                                altDiv.className = "mt-6 pt-4 border-t border-hairline";
+                                const lbl = document.createElement('h4');
+                                lbl.className = "font-bold text-xs text-secondary uppercase tracking-wide mb-1";
+                                lbl.textContent = "Alternative working";
+                                const body = document.createElement('div');
+                                body.className = "markdown-body";
+                                body.innerHTML = md ? md.render(alt) : alt;
+                                altDiv.appendChild(lbl);
+                                altDiv.appendChild(body);
+                                region.appendChild(altDiv);
+                            });
+                        }
+
+                        solutionWrapper.appendChild(region);
+                    }
+                }
+                
+                wrapper.appendChild(solutionWrapper);
+            }
+
+            // 3. Children (Recursive)
+            if (node.children && node.children.length > 0) {
+                const childContainer = document.createElement('div');
+                childContainer.className = "mt-4 border-l border-hairline/50 pl-4"; // Minimal structural indent guide
+                renderQuestionList(node.children, childContainer, false);
+                wrapper.appendChild(childContainer);
+            }
+
+            parent.appendChild(wrapper);
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>

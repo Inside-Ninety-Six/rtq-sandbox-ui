@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AD","indexWithinVariant":"220","totalWithinVariant":"440","hueFamily":"","intensityMode":"","primaryHueFamily":"purple","secondaryHueFamily":"red","dualIntensityMode":"dual_deep_theme","timestamp":"2026-01-10T12:02:38.319Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AD&quot;,&quot;indexWithinVariant&quot;:&quot;220&quot;,&quot;totalWithinVariant&quot;:&quot;440&quot;,&quot;hueFamily&quot;:&quot;&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;purple&quot;,&quot;secondaryHueFamily&quot;:&quot;red&quot;,&quot;dualIntensityMode&quot;:&quot;dual_deep_theme&quot;,&quot;timestamp&quot;:&quot;2026-01-10T12:02:38.319Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Stage 6 Baseline)</title>
+
+    <!-- 1. Libraries (SRI Disabled per Stage 6.0.7b) -->
+    <!-- Tailwind CSS (via CDN for prototype execution) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Markdown-it -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- 2. ColorLab D Configuration (Dual Deep Theme: Blue/Amber) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        // ColorLab D - Mode 4: dual_deep_theme
+                        // Primary Hue: Blue (approx H 260)
+                        // Secondary Hue: Amber (approx H 85)
+                        
+                        // Surfaces (Chromatic, Primary Hue Derived)
+                        'page-bg': 'oklch(0.94 0.08 260)',   // L~0.94, C~0.08
+                        'frame-bg': 'oklch(0.92 0.08 260)',  // L~0.92, C~0.08
+                        'paper-bg': 'oklch(0.98 0.06 260)',  // L~0.98, C~0.06 (High L for readability)
+                        
+                        // Washes (Primary Hue Derived)
+                        'solution-wash': 'oklch(0.95 0.07 260)',
+
+                        // Text (Near Neutral)
+                        'text-primary': 'oklch(0.20 0.015 260)',
+                        'text-secondary': 'oklch(0.35 0.02 260)',
+                        'text-quiet': 'oklch(0.50 0.02 260)',
+
+                        // Accents (Dual Hue)
+                        'accent-primary': 'oklch(0.55 0.20 260)',   // Blue link/focus
+                        'accent-secondary': 'oklch(0.65 0.16 85)',  // Amber supplementary
+                        
+                        // Borders/Dividers
+                        'divider': 'oklch(0.85 0.02 260)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 3. Global CSS & KaTeX Constraints */
+        body {
+            background-color: theme('colors.page-bg'); /* Tailwind theme access not available in CSS blocks directly without processing, using style injection below or var mapping if needed. Tailwind CDN handles class mapping. */
+            background-color: oklch(0.94 0.08 260); /* Hardcoded fallback/match */
+            color: oklch(0.20 0.015 260);
+            overflow-y: scroll; /* Force scrollbar to avoid layout shift */
+        }
+
+        /* Scrollbar hiding for Nav (Firefox) */
+        .no-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        /* Scrollbar hiding for Nav (Webkit) */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* KaTeX Containment Invariant (Stage 6.0.8) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding-bottom: 4px; /* Space for scrollbar if needed */
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Table styles (Stage 5.8.5) */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1em;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid oklch(0.85 0.02 260);
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+        }
+
+        /* Focus Styles (Stage 5.5.2) */
+        :focus-visible {
+            outline: 2px solid oklch(0.55 0.20 260);
+            outline-offset: 2px;
+        }
+
+        /* Drawer Transition */
+        .drawer-enter { transform: translateX(-100%); }
+        .drawer-active { transform: translateX(0); }
+        .drawer-transition { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col items-center">
+
+    <!-- 4. Top Controls Region -->
+    <div class="w-full max-w-[1200px] px-4 md:px-6 py-4 flex items-center justify-between shrink-0 z-20">
+        <!-- Paper Selector -->
+        <div class="flex items-center gap-3">
+            <label for="paper-select" class="text-sm font-medium text-text-secondary">Paper</label>
+            <select id="paper-select" class="bg-paper-bg border border-divider rounded px-3 py-1.5 text-sm text-text-primary focus:border-accent-primary focus:ring-0 cursor-pointer">
+                <option value="" disabled selected>Loading papers...</option>
+            </select>
+        </div>
+
+        <!-- Mobile Jump To Trigger (Visible < md) -->
+        <button id="jump-to-trigger" class="md:hidden text-sm font-medium text-accent-primary hover:underline flex items-center gap-1">
+            Jump to
+            <span class="sr-only">Open navigation</span>
+        </button>
+    </div>
+
+    <!-- 5. DocumentFrameShell -->
+    <div class="w-full max-w-[1200px] flex-1 flex flex-col md:flex-row gap-0 md:gap-8 px-0 md:px-6 mb-12">
+        
+        <!-- Desktop Navigation Rail (Sticky) -->
+        <aside class="hidden md:block w-48 shrink-0 sticky top-4 h-[calc(100vh-2rem)] overflow-y-auto no-scrollbar pt-2 pb-12">
+            <nav id="desktop-nav" class="flex flex-col gap-1" aria-label="Paper navigation">
+                <!-- Nav items injected here -->
+            </nav>
+        </aside>
+
+        <!-- Paper Document Column -->
+        <main id="paper-region" class="flex-1 w-full min-w-0 bg-frame-bg md:bg-transparent">
+            <!-- Paper Surface -->
+            <div class="bg-paper-bg rounded-none md:rounded-lg shadow-none md:shadow-sm min-h-[500px] p-4 md:p-8 lg:p-12">
+                <div id="paper-content" class="flex flex-col gap-8 md:gap-12">
+                    <div class="text-center text-text-secondary py-12">Select a paper to begin.</div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- 6. Mobile Navigation Drawer -->
+    <div id="mobile-drawer-backdrop" class="fixed inset-0 bg-black/20 z-40 hidden" aria-hidden="true"></div>
+    <div id="mobile-drawer" class="fixed inset-y-0 left-0 w-64 bg-paper-bg z-50 transform -translate-x-full drawer-transition shadow-lg flex flex-col" aria-hidden="true">
+        <div class="p-4 border-b border-divider flex items-center justify-between">
+            <h2 class="text-sm font-bold text-text-primary">Jump to</h2>
+            <button id="drawer-close" class="text-text-secondary hover:text-text-primary p-2">
+                <span class="sr-only">Close</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <nav id="mobile-nav" class="flex-1 overflow-y-auto p-4 flex flex-col gap-1">
+            <!-- Nav items injected here -->
+        </nav>
+    </div>
+
+    <!-- 7. Runtime Logic -->
+    <script>
+        // --- CONSTANTS (Canonical) ---
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // --- STATE ---
+        let rawPayload = null;
+        let activePaperKey = null;
+        let activePaperData = null;
+        let markdownRenderer = null;
+
+        // --- MARKDOWN INIT ---
+        function initMarkdown() {
+            if (window.markdownit) {
+                // Strict configuration per Stage 6 requirements
+                const md = window.markdownit({
+                    html: true,       // Enable inline SVG/HTML
+                    linkify: true,
+                    breaks: false     // MUST be false to prevent <br> in math blocks
+                });
+                // Disable escape rule to preserve TeX backslashes
+                md.inline.ruler.disable(['escape']);
+                markdownRenderer = md;
+            } else {
+                console.error("Markdown-it failed to load.");
+            }
+        }
+
+        // --- DOM REFERENCES ---
+        const els = {
+            paperSelect: document.getElementById('paper-select'),
+            paperContent: document.getElementById('paper-content'),
+            desktopNav: document.getElementById('desktop-nav'),
+            mobileNav: document.getElementById('mobile-nav'),
+            jumpToTrigger: document.getElementById('jump-to-trigger'),
+            mobileDrawer: document.getElementById('mobile-drawer'),
+            drawerBackdrop: document.getElementById('mobile-drawer-backdrop'),
+            drawerClose: document.getElementById('drawer-close')
+        };
+
+        // --- DATA LOADING ---
+        async function loadPayload() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error("Payload not found");
+                rawPayload = await response.json();
+                populateSelector();
+            } catch (err) {
+                console.error(err);
+                renderErrorState();
+            }
+        }
+
+        function renderErrorState() {
+            els.paperContent.innerHTML = `<div class="text-center text-red-700 font-bold py-12">PAPERS PAYLOAD MISSING</div>`;
+            els.paperSelect.innerHTML = `<option disabled selected>Error loading papers</option>`;
+        }
+
+        function populateSelector() {
+            if (!rawPayload || !rawPayload.papers) return;
+            els.paperSelect.innerHTML = rawPayload.papers.map(p => 
+                `<option value="${p.key}">${p.label || p.key}</option>`
+            ).join('');
+            
+            // Auto-select first paper
+            if (rawPayload.papers.length > 0) {
+                loadPaper(rawPayload.papers[0].key);
+            }
+            
+            els.paperSelect.addEventListener('change', (e) => loadPaper(e.target.value));
+        }
+
+        // --- CORE RENDERING ---
+        function loadPaper(key) {
+            activePaperKey = key;
+            activePaperData = rawPayload.papers.find(p => p.key === key);
+            
+            if (!activePaperData) return;
+
+            // 1. Render Navigation
+            renderNavigation();
+
+            // 2. Render Content
+            renderContent();
+
+            // 3. Post-Render: KaTeX
+            if (window.renderMathInElement) {
+                renderMathInElement(els.paperContent, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false},
+                        {left: '\\[', right: '\\]', display: true}
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        // --- NAVIGATION RENDER ---
+        function renderNavigation() {
+            const itemsHTML = generateNavItemsHTML(activePaperData);
+            els.desktopNav.innerHTML = itemsHTML;
+            els.mobileNav.innerHTML = itemsHTML; // Identical structure per requirement
+            
+            // Attach Scroll Listeners for Nav
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetId = btn.getAttribute('href').substring(1);
+                    const targetEl = document.getElementById(targetId);
+                    if (targetEl) {
+                        // Close drawer if open
+                        closeDrawer();
+                        // Smooth scroll
+                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+        }
+
+        function generateNavItemsHTML(paper) {
+            // Check if sectioned
+            if (paper.sections && paper.sections.length > 0) {
+                return paper.sections.map(section => {
+                    // Render section label if present
+                    const headerHTML = section.label && section.label.trim().length > 0
+                        ? `<div class="text-xs font-bold text-text-quiet uppercase tracking-wider mt-4 mb-2 select-none px-2">${section.label}</div>`
+                        : `<div class="mt-4"></div>`; // Spacing only if label empty
+                    
+                    const itemsHTML = section.questions.map(q => renderNavItem(q)).join('');
+                    return headerHTML + itemsHTML;
+                }).join('');
+            } else if (paper.questions) {
+                return `<div class="mt-2"></div>` + paper.questions.map(q => renderNavItem(q)).join('');
+            }
+            return '';
+        }
+
+        function renderNavItem(node, depth = 0) {
+            let html = '';
+            
+            // Render current node
+            // Style: Flat list, hierarchy via type scale/quietness only. No indentation.
+            // Depth 0: Base size. Depth > 0: Smaller/lighter.
+            const fontSizeClass = depth === 0 ? 'text-sm font-medium' : 'text-xs font-normal';
+            const colorClass = depth === 0 ? 'text-text-secondary' : 'text-text-quiet';
+            
+            // ID for linking
+            const linkId = `q-${node.id}`;
+            
+            html += `
+                <a href="#${linkId}" class="nav-item block py-1 px-2 ${fontSizeClass} ${colorClass} hover:text-accent-primary hover:bg-black/5 rounded transition-colors truncate text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary">
+                    ${node.id}
+                </a>
+            `;
+
+            // Recursion
+            if (node.children && node.children.length > 0) {
+                html += node.children.map(child => renderNavItem(child, depth + 1)).join('');
+            }
+            
+            return html;
+        }
+
+        // --- CONTENT RENDER ---
+        function renderContent() {
+            const defaults = activePaperData.defaults || {};
+            const expandAll = defaults.expandedAll !== false; // Default true unless explicitly false
+
+            let contentHTML = '';
+
+            if (activePaperData.sections) {
+                contentHTML = activePaperData.sections.map(section => {
+                    const header = section.label ? `<h2 class="text-lg font-bold text-text-secondary mb-6 mt-8 border-b border-divider pb-2">${section.label}</h2>` : '';
+                    const questions = section.questions.map(q => renderQuestionNode(q, 0, expandAll)).join('');
+                    return `<section class="mb-12">${header}${questions}</section>`;
+                }).join('');
+            } else if (activePaperData.questions) {
+                contentHTML = activePaperData.questions.map(q => renderQuestionNode(q, 0, expandAll)).join('');
+            }
+
+            els.paperContent.innerHTML = contentHTML;
+
+            // Attach Disclosure Listeners
+            document.querySelectorAll('.disclosure-trigger').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const regionId = btn.getAttribute('aria-controls');
+                    const region = document.getElementById(regionId);
+                    const labelSpan = btn.querySelector('.disclosure-label');
+                    const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+
+                    if (isExpanded) {
+                        btn.setAttribute('aria-expanded', 'false');
+                        region.hidden = true;
+                        labelSpan.textContent = 'Show working';
+                    } else {
+                        btn.setAttribute('aria-expanded', 'true');
+                        region.hidden = false;
+                        labelSpan.textContent = 'Hide working';
+                    }
+                });
+            });
+        }
+
+        function renderQuestionNode(node, depth, defaultExpanded) {
+            const uniqueId = `q-${node.id}`; // Anchor ID
+            
+            // 1. Question Body
+            const renderedQuestion = markdownRenderer ? markdownRenderer.render(node.question || '') : (node.question || '');
+            
+            // 2. Solution Block Logic
+            let solutionBlockHTML = '';
+            const sb = node.solutionBlock;
+            
+            if (sb) {
+                // Answer
+                let answerHTML = '';
+                if (sb.answer) {
+                    const renderedAnswer = markdownRenderer ? markdownRenderer.render(sb.answer) : sb.answer;
+                    answerHTML = `
+                        <div class="mt-4 mb-2">
+                            <span class="text-sm font-bold text-text-secondary block mb-1">Answer</span>
+                            <div class="text-text-primary">${renderedAnswer}</div>
+                        </div>
+                    `;
+                }
+
+                // Solution Details
+                let detailsHTML = '';
+                if (sb.solutionDetails) {
+                    const sdId = `sd-${uniqueId}`;
+                    // Components
+                    const keepInMind = sb.solutionDetails.keepInMind ? renderSubBlock('Keep in mind', sb.solutionDetails.keepInMind, 'text-text-primary') : '';
+                    const formulas = sb.solutionDetails.formulasUsed ? renderSubBlock('Formulas used', sb.solutionDetails.formulasUsed, 'text-text-secondary text-sm') : '';
+                    const working = sb.solutionDetails.working ? renderSubBlock('Working', sb.solutionDetails.working, 'text-text-primary') : '';
+                    
+                    let altWorking = '';
+                    if (sb.solutionDetails.alternativeWorking && Array.isArray(sb.solutionDetails.alternativeWorking)) {
+                        altWorking = sb.solutionDetails.alternativeWorking.map(aw => renderSubBlock('Alternative working', aw, 'text-text-primary mt-6 pt-6 border-t border-divider')).join('');
+                    }
+
+                    // Disclosure Control
+                    const isExpanded = defaultExpanded;
+                    const displayStyle = isExpanded ? '' : 'hidden';
+                    const buttonText = isExpanded ? 'Hide working' : 'Show working';
+
+                    detailsHTML = `
+                        <div class="mt-4">
+                            <button class="disclosure-trigger text-sm font-medium text-accent-primary hover:underline flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded px-1 -ml-1" 
+                                aria-expanded="${isExpanded}" aria-controls="${sdId}">
+                                <span class="disclosure-label">${buttonText}</span>
+                            </button>
+                            
+                            <div id="${sdId}" class="mt-3 bg-solution-wash rounded-sm p-4 border-l-2 border-accent-secondary/30" ${displayStyle}>
+                                ${keepInMind}
+                                ${formulas}
+                                ${working}
+                                ${altWorking}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                solutionBlockHTML = answerHTML + detailsHTML;
+            }
+
+            // 3. Children
+            let childrenHTML = '';
+            if (node.children && node.children.length > 0) {
+                childrenHTML = `
+                    <div class="mt-6 ml-0 md:ml-4 flex flex-col gap-6 border-l border-divider pl-4">
+                        ${node.children.map(child => renderQuestionNode(child, depth + 1, defaultExpanded)).join('')}
+                    </div>
+                `;
+            }
+
+            // Top-level separation (Depth 0) is strong. Nested is tighter.
+            const containerClass = depth === 0 ? 'py-8 border-b border-divider/50 last:border-0' : 'py-2';
+            const identifierClass = 'text-text-secondary font-bold mr-2 select-none';
+
+            return `
+                <div id="${uniqueId}" class="${containerClass}">
+                    <div class="flex flex-col">
+                        <div class="text-lg text-text-primary leading-relaxed">
+                            <span class="${identifierClass}">${node.id}</span>
+                            <div class="inline-block align-top">${renderedQuestion}</div>
+                        </div>
+                        ${solutionBlockHTML}
+                        ${childrenHTML}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSubBlock(label, markdown, bodyClasses) {
+            const content = markdownRenderer ? markdownRenderer.render(markdown) : markdown;
+            // Label bold
+            return `
+                <div class="mb-4 last:mb-0">
+                    <div class="text-xs font-bold text-text-quiet uppercase tracking-wide mb-1">${label}</div>
+                    <div class="${bodyClasses}">${content}</div>
+                </div>
+            `;
+        }
+
+        // --- DRAWER INTERACTION ---
+        function openDrawer() {
+            els.mobileDrawer.classList.remove('-translate-x-full');
+            els.mobileDrawer.classList.add('drawer-active'); // ensure overrides
+            els.drawerBackdrop.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDrawer() {
+            els.mobileDrawer.classList.add('-translate-x-full');
+            els.mobileDrawer.classList.remove('drawer-active');
+            els.drawerBackdrop.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        els.jumpToTrigger.addEventListener('click', openDrawer);
+        els.drawerClose.addEventListener('click', closeDrawer);
+        els.drawerBackdrop.addEventListener('click', closeDrawer);
+
+        // --- INITIALIZATION ---
+        initMarkdown();
+        loadPayload();
+
+    </script>
+</body>
+</html>

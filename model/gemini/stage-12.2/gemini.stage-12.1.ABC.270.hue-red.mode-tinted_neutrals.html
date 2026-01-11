@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"270","totalWithinVariant":"320","hueFamily":"red","intensityMode":"tinted_neutrals","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-09T22:50:50.434Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;270&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;red&quot;,&quot;intensityMode&quot;:&quot;tinted_neutrals&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-09T22:50:50.434Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+
+    <!-- 
+      STAGE 6 ADD-ON: Library Loading (SRI Disabled)
+      - KaTeX CSS/JS
+      - Markdown-it
+    -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <style>
+        /* 
+           COLORLAB B & C IMPLEMENTATION
+           Force Hue: Red (approx 28deg)
+           Intensity Mode: tinted_neutrals (Light Only)
+           
+           OKLCH Constraints (Tinted Neutrals):
+           - Core surfaces (page/frame/paper): C [0.015 .. 0.035]
+           - Wash surfaces: C [0.025 .. 0.045]
+           - Text: primary C <= 0.010, secondary C <= 0.012
+           - Accent: C [0.10 .. 0.16]
+        */
+        :root {
+            /* Palette Definition - Red Hue (28) */
+            --hue: 28;
+
+            /* Core Surfaces */
+            --col-page-bg: oklch(0.98 0.018 var(--hue));   /* C=0.018 */
+            --col-frame-bg: oklch(0.96 0.020 var(--hue));  /* C=0.020 */
+            --col-paper-bg: oklch(0.99 0.015 var(--hue));  /* C=0.015 */
+            
+            /* Wash Surfaces */
+            --col-wash-bg: oklch(0.96 0.030 var(--hue));   /* C=0.030 */
+            
+            /* Text */
+            --col-text-primary: oklch(0.20 0.008 var(--hue));   /* C=0.008 */
+            --col-text-secondary: oklch(0.45 0.010 var(--hue)); /* C=0.010 */
+            
+            /* Accent & UI */
+            --col-accent: oklch(0.58 0.14 var(--hue));     /* C=0.14 */
+            --col-accent-subtle: oklch(0.58 0.14 var(--hue) / 0.1);
+            --col-border: oklch(0.88 0.02 var(--hue));
+            --col-divider: oklch(0.92 0.015 var(--hue));
+
+            /* Spacing Scale */
+            --sp-xs: 4px;
+            --sp-sm: 8px;
+            --sp-md: 16px;
+            --sp-lg: 24px;
+            --sp-xl: 32px;
+            --sp-xxl: 48px;
+
+            /* Typography */
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* 
+           RESET & BASE 
+        */
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+            background-color: var(--col-page-bg);
+            color: var(--col-text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 
+           LAYOUT SHELL 
+        */
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: var(--col-frame-bg); /* Shared frame surface */
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .top-controls {
+            padding: var(--sp-md) var(--sp-lg);
+            border-bottom: 1px solid var(--col-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            background-color: var(--col-frame-bg);
+            z-index: 20;
+        }
+
+        .main-frame {
+            display: grid;
+            grid-template-columns: 240px 1fr; /* Nav | Paper */
+            flex: 1;
+            align-items: start;
+        }
+
+        /* 
+           NAVIGATION (Desktop) 
+        */
+        .nav-rail {
+            position: sticky;
+            top: 73px; /* Offset for top controls height approx */
+            height: calc(100vh - 73px);
+            overflow-y: auto;
+            padding: var(--sp-md) var(--sp-sm) var(--sp-xl) var(--sp-lg);
+            border-right: 1px solid var(--col-divider); /* Optional Hairline */
+            font-size: 0.9rem;
+            /* Scrollbar hiding */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .nav-rail::-webkit-scrollbar { display: none; }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-section-label {
+            margin-top: var(--sp-md);
+            margin-bottom: var(--sp-xs);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--col-text-secondary);
+            padding-left: var(--sp-sm);
+        }
+
+        .nav-item {
+            display: block;
+            padding: 4px var(--sp-sm);
+            color: var(--col-text-secondary);
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: color 0.1s, background-color 0.1s;
+        }
+        .nav-item:hover {
+            color: var(--col-text-primary);
+            background-color: rgba(0,0,0,0.03);
+        }
+        .nav-item.active {
+            color: var(--col-accent);
+            font-weight: 700;
+        }
+
+        /* 
+           PAPER CONTENT 
+        */
+        .paper-column {
+            padding: var(--sp-lg) var(--sp-xl) var(--sp-xxl);
+            background-color: var(--col-paper-bg);
+            min-height: 100%;
+        }
+
+        .section-header-block {
+            margin-top: var(--sp-xl);
+            margin-bottom: var(--sp-lg);
+            padding-bottom: var(--sp-sm);
+            border-bottom: 1px solid var(--col-border);
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--col-text-primary);
+        }
+
+        /* 
+           QUESTION NODE 
+        */
+        .question-node {
+            margin-bottom: var(--sp-xl); /* Top level spacing */
+            position: relative;
+        }
+        
+        /* Nesting Spacing Logic */
+        .children-container {
+            margin-top: var(--sp-md);
+            /* Indentation adapts by viewport */
+            padding-left: var(--sp-lg); 
+        }
+
+        .child-node {
+            margin-bottom: var(--sp-md);
+        }
+
+        .question-body {
+            display: flex;
+            gap: var(--sp-sm);
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: var(--col-text-primary);
+            margin-bottom: var(--sp-sm);
+        }
+        
+        .q-id {
+            font-weight: 600;
+            flex-shrink: 0;
+            min-width: 1.5em;
+            color: var(--col-text-secondary);
+        }
+
+        .q-prompt {
+            flex: 1;
+        }
+
+        /* 
+           SOLUTION BLOCK 
+        */
+        .solution-block {
+            margin-left: 2.5em; /* Align with text start approximately */
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-sm);
+        }
+
+        /* ANSWER */
+        .answer-region {
+            display: flex;
+            gap: var(--sp-sm);
+            align-items: baseline;
+            margin-bottom: var(--sp-xs);
+        }
+        .answer-label {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--col-text-secondary);
+            text-transform: uppercase;
+        }
+        .answer-content {
+            font-weight: 500;
+        }
+
+        /* DISCLOSURE CONTROL */
+        .disclosure-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            margin: 0;
+            font-family: inherit;
+            font-size: 0.95rem;
+            color: var(--col-accent);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+            width: fit-content;
+        }
+        .disclosure-btn:hover {
+            text-decoration: underline;
+        }
+        .chevron {
+            transition: transform 0.2s ease;
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+        .disclosure-btn[aria-expanded="true"] .chevron {
+            transform: rotate(180deg);
+        }
+
+        /* SOLUTION DETAILS */
+        .solution-details {
+            margin-top: var(--sp-xs);
+            background-color: var(--col-wash-bg); /* Surface differentiation */
+            padding: var(--sp-md);
+            border-radius: 4px; /* Slight softening, strictly internal */
+            display: none; /* Hidden by default state in CSS, managed by JS */
+            flex-direction: column;
+            gap: var(--sp-md);
+        }
+        .solution-details.expanded {
+            display: flex;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Subsections */
+        .sd-subsection {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-xs);
+        }
+        .sd-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--col-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sd-body {
+            font-size: 0.95rem;
+            color: var(--col-text-primary); /* High contrast legibility */
+        }
+        
+        /* Specific Styles per subsection type */
+        .sd-keep-in-mind .sd-label { color: var(--col-accent); }
+        .sd-formulas-used .sd-body { font-family: "Courier New", monospace; font-size: 0.9rem; }
+        
+        /* Working Internal Grammar */
+        .sd-working .sd-body, .sd-alt-working .sd-body {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-sm);
+        }
+
+        .alt-working-separator {
+            border-top: 1px dashed var(--col-border);
+            margin-top: var(--sp-sm);
+            padding-top: var(--sp-md);
+        }
+
+        /* 
+           KATEX CONTAINMENT (Locked)
+        */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            margin: 0.5em 0;
+            /* Scrollbar hiding for neatness */
+            scrollbar-width: thin;
+            scrollbar-color: var(--col-border) transparent;
+        }
+        /* Inline Katex - No Background */
+        .katex { font-size: 1.1em; } 
+
+        /* Tables */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.95rem;
+            margin: var(--sp-sm) 0;
+        }
+        th, td {
+            border: 1px solid var(--col-border);
+            padding: var(--sp-sm);
+            text-align: left;
+        }
+        th { font-weight: 600; background-color: rgba(0,0,0,0.02); }
+
+        /* 
+           MOBILE / RESPONSIVE 
+        */
+        .jump-to-btn { display: none; }
+        .mobile-drawer-overlay { display: none; }
+
+        @media (max-width: 768px) {
+            .main-frame {
+                grid-template-columns: 1fr;
+            }
+            .nav-rail {
+                display: none; /* Hide sticky rail on mobile */
+            }
+            .paper-column {
+                padding: var(--sp-md);
+            }
+            .question-body {
+                font-size: 1rem;
+            }
+            .solution-block {
+                margin-left: 0;
+                padding-left: var(--sp-sm);
+                border-left: 2px solid var(--col-border); /* Subtle indentation cue on mobile */
+            }
+            .children-container {
+                padding-left: var(--sp-md);
+            }
+            
+            /* Mobile Nav Trigger */
+            .jump-to-btn {
+                display: block;
+                background: none;
+                border: 1px solid var(--col-border);
+                padding: 6px 12px;
+                border-radius: 4px;
+                color: var(--col-text-primary);
+                font-weight: 600;
+                font-size: 0.9rem;
+            }
+
+            /* Drawer */
+            .mobile-drawer-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 50;
+                opacity: 0;
+                transition: opacity 0.2s;
+            }
+            .mobile-drawer-overlay.open {
+                display: block;
+                opacity: 1;
+            }
+            .mobile-drawer {
+                position: absolute;
+                top: 0; bottom: 0; left: 0;
+                width: 80%;
+                max-width: 300px;
+                background: var(--col-frame-bg);
+                transform: translateX(-100%);
+                transition: transform 0.2s ease-out;
+                display: flex;
+                flex-direction: column;
+            }
+            .mobile-drawer-overlay.open .mobile-drawer {
+                transform: translateX(0);
+            }
+            .drawer-header {
+                padding: var(--sp-md);
+                border-bottom: 1px solid var(--col-border);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-weight: 700;
+            }
+            .drawer-close {
+                background: none;
+                border: none;
+                font-size: 1.5rem;
+                line-height: 1;
+                padding: 0 var(--sp-sm);
+                cursor: pointer;
+            }
+            .drawer-content {
+                flex: 1;
+                overflow-y: auto;
+                padding: var(--sp-md);
+            }
+        }
+
+        /* Utility */
+        .hidden { display: none !important; }
+        .error-message {
+            padding: var(--sp-xl);
+            text-align: center;
+            color: var(--col-text-secondary);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        /* Selector */
+        select.paper-selector {
+            padding: 8px 12px;
+            font-size: 0.95rem;
+            border: 1px solid var(--col-border);
+            border-radius: 4px;
+            background-color: var(--col-paper-bg);
+            color: var(--col-text-primary);
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    
+    <!-- TOP CONTROLS -->
+    <div class="top-controls">
+        <select id="paperSelector" class="paper-selector" aria-label="Select Paper">
+            <option value="" disabled selected>Loading papers...</option>
+        </select>
+        <button id="jumpToBtn" class="jump-to-btn">Jump to</button>
+    </div>
+
+    <!-- MAIN FRAME -->
+    <div class="main-frame">
+        
+        <!-- DESKTOP NAV RAIL -->
+        <nav class="nav-rail" id="desktopNav" aria-label="Paper Navigation">
+            <!-- Populated via JS -->
+        </nav>
+
+        <!-- PAPER COLUMN -->
+        <main class="paper-column" id="paperContent">
+            <!-- Populated via JS -->
+        </main>
+
+    </div>
+</div>
+
+<!-- MOBILE DRAWER -->
+<div id="drawerOverlay" class="mobile-drawer-overlay">
+    <div class="mobile-drawer">
+        <div class="drawer-header">
+            <span>Jump to</span>
+            <button id="drawerClose" class="drawer-close">&times;</button>
+        </div>
+        <div class="drawer-content" id="mobileNavContent">
+            <!-- Cloned Nav -->
+        </div>
+    </div>
+</div>
+
+<script>
+    /* 
+       STAGE 0: CONSTANTS
+       Canonical Payload Path
+    */
+    const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+    
+    // Markdown-it Config
+    const md = window.markdownit ? window.markdownit({
+        html: true,
+        linkify: true,
+        breaks: false // Invariant: Must be false for KaTeX
+    }) : null;
+
+    if (md) {
+        md.inline.ruler.disable(['escape']);
+    }
+
+    // State
+    let papersData = [];
+    let currentPaper = null;
+
+    // DOM Elements
+    const elSelector = document.getElementById('paperSelector');
+    const elPaperContent = document.getElementById('paperContent');
+    const elDesktopNav = document.getElementById('desktopNav');
+    const elMobileNav = document.getElementById('mobileNavContent');
+    const elJumpTo = document.getElementById('jumpToBtn');
+    const elDrawerOverlay = document.getElementById('drawerOverlay');
+    const elDrawerClose = document.getElementById('drawerClose');
+
+    // Init
+    async function init() {
+        try {
+            const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+            if (!response.ok) throw new Error("Fetch failed");
+            const data = await response.json();
+            
+            if (!data.papers || !Array.isArray(data.papers)) throw new Error("Invalid schema");
+            
+            papersData = data.papers;
+            populateSelector();
+            
+            // Default to first paper
+            if (papersData.length > 0) {
+                loadPaper(papersData[0].key);
+            }
+        } catch (e) {
+            console.error(e);
+            renderError();
+        }
+    }
+
+    function renderError() {
+        elPaperContent.innerHTML = `<div class="error-message">PAPERS PAYLOAD MISSING</div>`;
+        elSelector.innerHTML = `<option>Error</option>`;
+        elSelector.disabled = true;
+    }
+
+    function populateSelector() {
+        elSelector.innerHTML = '';
+        papersData.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.key;
+            opt.textContent = p.label || p.key;
+            elSelector.appendChild(opt);
+        });
+    }
+
+    elSelector.addEventListener('change', (e) => {
+        loadPaper(e.target.value);
+    });
+
+    function loadPaper(key) {
+        const paper = papersData.find(p => p.key === key);
+        if (!paper) return;
+        currentPaper = paper;
+
+        // Clear view
+        elPaperContent.innerHTML = '';
+        elDesktopNav.innerHTML = '';
+        elMobileNav.innerHTML = '';
+        
+        // 1. Render Paper Content
+        // Handle Sectioned vs Flat
+        const sections = paper.sections || [{ label: "", questions: paper.questions || [] }];
+        
+        let flatNavItems = []; // For nav generation
+
+        sections.forEach((section, idx) => {
+            // Render Section Header in Paper (if exists and is not empty placeholder)
+            if (section.label && section.label.trim() !== "") {
+                const secHeader = document.createElement('div');
+                secHeader.className = 'section-header-block';
+                secHeader.textContent = section.label;
+                elPaperContent.appendChild(secHeader);
+            }
+
+            // Render Questions
+            const qList = document.createElement('div');
+            qList.className = 'question-list';
+            
+            section.questions.forEach(q => {
+                qList.appendChild(createQuestionNode(q, 0)); // 0 = top level
+                
+                // Collect Nav Items (Flattener)
+                collectNavItems(q, flatNavItems, section.label);
+            });
+            elPaperContent.appendChild(qList);
+        });
+
+        // 2. Render Navigation
+        renderNavigation(flatNavItems);
+
+        // 3. KaTeX Auto Render
+        renderMathInElement(elPaperContent, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false
+        });
+
+        // 4. Update ScrollSpy
+        setupScrollSpy();
+    }
+
+    // Recursive Question Node Creation
+    function createQuestionNode(q, depth) {
+        const node = document.createElement('div');
+        node.className = `question-node ${depth > 0 ? 'child-node' : ''}`;
+        node.id = `q-${sanitizeId(q.id)}`;
+
+        // Question Body
+        const qBody = document.createElement('div');
+        qBody.className = 'question-body';
+        qBody.innerHTML = `
+            <div class="q-id">${q.id}</div>
+            <div class="q-prompt">${renderMarkdown(q.question)}</div>
+        `;
+        node.appendChild(qBody);
+
+        // Solution Block (Optional)
+        if (q.solutionBlock) {
+            const sb = document.createElement('div');
+            sb.className = 'solution-block';
+            
+            // Answer (Optional)
+            if (q.solutionBlock.answer) {
+                const ans = document.createElement('div');
+                ans.className = 'answer-region';
+                ans.innerHTML = `
+                    <div class="answer-label">Answer</div>
+                    <div class="answer-content">${renderMarkdown(q.solutionBlock.answer)}</div>
+                `;
+                sb.appendChild(ans);
+            }
+
+            // Solution Details (Optional)
+            if (q.solutionBlock.solutionDetails) {
+                const sdData = q.solutionBlock.solutionDetails;
+                
+                // Toggle Control
+                const toggle = document.createElement('button');
+                toggle.className = 'disclosure-btn';
+                toggle.setAttribute('aria-expanded', 'false'); // Default collapsed state tracker
+                // SVG Chevron
+                const chev = `<svg class="chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>`;
+                toggle.innerHTML = `Show working ${chev}`;
+                
+                // Solution Details Container
+                const detailsContainer = document.createElement('div');
+                detailsContainer.className = 'solution-details';
+                
+                // Defaults Logic: expand if paper default says so, unless explicit override?
+                // Brief says: "Solution Details are expanded by default when present." unless paper.defaults.expandedAll=false
+                const shouldExpand = currentPaper.defaults?.expandedAll !== false;
+                
+                if (shouldExpand) {
+                    detailsContainer.classList.add('expanded');
+                    toggle.setAttribute('aria-expanded', 'true');
+                    toggle.innerHTML = `Hide working ${chev}`;
+                }
+
+                toggle.onclick = () => {
+                    const isExpanded = detailsContainer.classList.contains('expanded');
+                    if (isExpanded) {
+                        detailsContainer.classList.remove('expanded');
+                        toggle.setAttribute('aria-expanded', 'false');
+                        toggle.innerHTML = `Show working ${chev}`;
+                    } else {
+                        detailsContainer.classList.add('expanded');
+                        toggle.setAttribute('aria-expanded', 'true');
+                        toggle.innerHTML = `Hide working ${chev}`;
+                    }
+                };
+                
+                sb.appendChild(toggle);
+
+                // Build SD Content
+                // Order: Keep in mind -> Formulas -> Working -> Alt Working
+                if (sdData.keepInMind) {
+                    detailsContainer.appendChild(createSDSubsection('Keep in mind', sdData.keepInMind, 'sd-keep-in-mind'));
+                }
+                if (sdData.formulasUsed) {
+                    detailsContainer.appendChild(createSDSubsection('Formulas used', sdData.formulasUsed, 'sd-formulas-used'));
+                }
+                if (sdData.working) {
+                    detailsContainer.appendChild(createSDSubsection('Working', sdData.working, 'sd-working'));
+                }
+                if (sdData.alternativeWorking && Array.isArray(sdData.alternativeWorking)) {
+                    sdData.alternativeWorking.forEach((alt, idx) => {
+                        const div = createSDSubsection('Alternative working', alt, 'sd-alt-working');
+                        div.classList.add('alt-working-separator');
+                        detailsContainer.appendChild(div);
+                    });
+                }
+                
+                sb.appendChild(detailsContainer);
+            }
+            node.appendChild(sb);
+        }
+
+        // Children
+        if (q.children && q.children.length > 0) {
+            const childContainer = document.createElement('div');
+            childContainer.className = 'children-container';
+            q.children.forEach(child => {
+                childContainer.appendChild(createQuestionNode(child, depth + 1));
+                // Nav items are collected in the loop above via recursion side-effect? 
+                // No, createQuestionNode returns DOM. Nav collection must be separate or pass a collector.
+                // We handle nav collection in the main loop recursively.
+            });
+            node.appendChild(childContainer);
+        }
+
+        return node;
+    }
+
+    function createSDSubsection(label, markdown, cssClass) {
+        const div = document.createElement('div');
+        div.className = `sd-subsection ${cssClass}`;
+        div.innerHTML = `
+            <div class="sd-label">${label}</div>
+            <div class="sd-body">${renderMarkdown(markdown)}</div>
+        `;
+        return div;
+    }
+
+    // Helper for recursion in nav collection
+    function collectNavItems(q, list, sectionLabel) {
+        list.push({ id: q.id, targetId: `q-${sanitizeId(q.id)}`, section: sectionLabel });
+        if (q.children) {
+            q.children.forEach(c => collectNavItems(c, list, sectionLabel));
+        }
+    }
+
+    function renderNavigation(items) {
+        // Build list
+        const ul = document.createElement('ul');
+        ul.className = 'nav-list';
+        
+        let lastSection = null;
+
+        items.forEach(item => {
+            // Section Label Insertion
+            if (item.section && item.section !== lastSection && item.section.trim() !== "") {
+                const liSec = document.createElement('li');
+                liSec.className = 'nav-section-label';
+                liSec.textContent = item.section;
+                ul.appendChild(liSec);
+                lastSection = item.section;
+            } else if (item.section === "") {
+                // If section is empty, just reset tracker so if next item has section it renders
+                lastSection = ""; 
+            }
+
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.className = 'nav-item';
+            a.href = `#${item.targetId}`;
+            a.textContent = item.id;
+            // Hierarchy via type scale? 
+            // In a flat list, we don't indent. 
+            // Sub-questions are naturally distinguishable by ID length typically, 
+            // but brief says "Hierarchy via type scale/quietness".
+            // We can detect depth by ID length or just keep it flat as requested "visually flat".
+            
+            a.onclick = (e) => {
+                e.preventDefault();
+                document.getElementById(item.targetId).scrollIntoView({behavior: 'smooth', block: 'start'});
+                closeDrawer();
+            };
+
+            li.appendChild(a);
+            ul.appendChild(li);
+        });
+
+        elDesktopNav.appendChild(ul);
+        elMobileNav.innerHTML = elDesktopNav.innerHTML; // Clone for mobile
+        
+        // Re-attach events for mobile clone
+        const mobileLinks = elMobileNav.querySelectorAll('a');
+        mobileLinks.forEach(a => {
+            a.onclick = (e) => {
+                e.preventDefault();
+                const targetId = a.getAttribute('href').substring(1);
+                document.getElementById(targetId).scrollIntoView({behavior: 'smooth', block: 'start'});
+                closeDrawer();
+            }
+        });
+    }
+
+    function renderMarkdown(text) {
+        if (!text) return "";
+        if (!md) return text; // Fallback
+        return md.render(text);
+    }
+
+    function sanitizeId(id) {
+        return id.replace(/[^a-zA-Z0-9-_]/g, '_');
+    }
+
+    // Mobile Drawer Logic
+    elJumpTo.onclick = () => {
+        elDrawerOverlay.classList.add('open');
+    };
+    elDrawerClose.onclick = closeDrawer;
+    elDrawerOverlay.onclick = (e) => {
+        if (e.target === elDrawerOverlay) closeDrawer();
+    };
+    function closeDrawer() {
+        elDrawerOverlay.classList.remove('open');
+    }
+
+    // ScrollSpy
+    function setupScrollSpy() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    // Update Active State
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                    const activeLinks = document.querySelectorAll(`a[href="#${id}"]`);
+                    activeLinks.forEach(l => {
+                        l.classList.add('active');
+                        // Scroll nav into view if needed
+                        if(l.closest('.nav-rail')) {
+                            l.scrollIntoView({block: 'nearest'});
+                        }
+                    });
+                }
+            });
+        }, { rootMargin: '-20% 0px -60% 0px' }); // Biased to top
+
+        document.querySelectorAll('.question-node').forEach(n => observer.observe(n));
+    }
+
+    // Run
+    init();
+
+</script>
+</body>
+</html>

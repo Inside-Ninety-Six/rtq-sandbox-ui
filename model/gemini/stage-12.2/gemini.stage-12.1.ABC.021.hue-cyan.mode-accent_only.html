@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"21","totalWithinVariant":"320","hueFamily":"cyan","intensityMode":"accent_only","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-09T10:55:43.956Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;21&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;cyan&quot;,&quot;intensityMode&quot;:&quot;accent_only&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-09T10:55:43.956Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ – Maths Paper Solution Viewer</title>
+    
+    <!-- STAGE 6 BASELINE: CDNs without integrity (SRI disabled) per spec -->
+    <!-- Tailwind CSS (Script for prototyping) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Markdown-it -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+    
+    <!-- KaTeX CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    
+    <!-- KaTeX JS -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+
+    <style>
+        /* 
+           STAGE 6 ADD-ON: COLORLAB IMPLEMENTATION 
+           Hue: Cyan (Add-on B)
+           Mode: Accent Only (Add-on C)
+           Constraint: Light Mode Only
+           Constraint: Surfaces C <= 0.015, Text C <= 0.010, Accent C [0.08..0.14]
+        */
+        :root {
+            /* Base Palette - Cyan family (approx Hue 200) */
+            --cl-hue: 200;
+
+            /* Surfaces */
+            --bg-page: oklch(0.985 0.005 var(--cl-hue));    /* C <= 0.015 */
+            --bg-frame: oklch(0.985 0.005 var(--cl-hue));   /* Shared base context */
+            --bg-paper: oklch(1.0 0 0);                     /* Pure white or very low chroma */
+            --bg-wash: oklch(0.99 0.005 var(--cl-hue));     /* Very subtle wash */
+            
+            /* Text */
+            --text-primary: oklch(0.20 0.010 var(--cl-hue));   /* C <= 0.010 */
+            --text-secondary: oklch(0.45 0.010 var(--cl-hue)); /* C <= 0.010 */
+            --text-tertiary: oklch(0.60 0.010 var(--cl-hue));
+
+            /* Interactive / Accent */
+            --accent-primary: oklch(0.55 0.13 var(--cl-hue));  /* C [0.08..0.14] */
+            --border-hairline: oklch(0.92 0.01 var(--cl-hue));
+            
+            /* Focus */
+            --focus-ring: var(--accent-primary);
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            overflow-y: scroll; /* Force scrollbar stability */
+        }
+
+        /* Focus Styles (Stage 5.5.2) */
+        :focus-visible {
+            outline: 2px solid var(--focus-ring);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* Layout Utilities */
+        .shell-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 1rem; /* SPC__FRAME_INNER_GUTTERS */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Controls Alignment */
+        .top-controls {
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background-color: var(--bg-page); /* Mask scroll */
+        }
+
+        /* Desktop Column Layout */
+        .content-columns {
+            display: grid;
+            grid-template-columns: 240px 1fr; /* Nav Rail | Paper */
+            gap: 3rem; /* SPC__NAV_TO_PAPER_COLUMN_GAP_SPACING */
+            position: relative;
+            flex-grow: 1;
+            align-items: start;
+        }
+
+        /* Navigation Rail (Sticky) */
+        .nav-rail {
+            position: sticky;
+            top: 5rem; /* Offset for top controls */
+            max-height: calc(100vh - 6rem);
+            overflow-y: auto;
+            /* Scrollbar hiding techniques */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+        .nav-rail::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+
+        /* Paper Region */
+        .paper-region {
+            background-color: var(--bg-paper); /* Optional surface diff */
+            padding-bottom: 5rem;
+            min-height: 600px;
+        }
+
+        /* Typography & Rhythm */
+        .q-node {
+            margin-bottom: 4rem; /* SPC__TOP_LEVEL_INTER_QUESTION_SPACING */
+        }
+        .q-node-child {
+            margin-top: 1.5rem;
+            margin-left: 0; /* Flat visually, hierarchy via type scale */
+        }
+
+        /* KaTeX Containment Invariant (Locked) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            /* Scrollbar styling for math */
+            scrollbar-width: thin;
+        }
+        
+        /* Inline math - transparent background forced */
+        .katex {
+            background-color: transparent !important;
+        }
+
+        /* Markdown Table Minimalist */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid var(--border-hairline);
+            padding: 0.5em 0.75em;
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Navigation Item States */
+        .nav-item {
+            color: var(--text-secondary);
+            font-feature-settings: "tnum";
+            font-variant-numeric: tabular-nums;
+            transition: color 0.15s ease;
+            text-decoration: none;
+            display: block;
+            padding: 0.125rem 0;
+        }
+        .nav-item:hover {
+            color: var(--text-primary);
+            text-decoration: underline;
+            text-decoration-color: var(--border-hairline);
+        }
+        .nav-item.active {
+            color: var(--accent-primary); /* Accent allowed for Nav Current (Stage 6 override) */
+            font-weight: 600;
+        }
+
+        /* Solution Details & Disclosure */
+        .disclosure-btn {
+            appearance: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--accent-primary);
+            font-weight: 500;
+            font-size: 0.9375rem;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5ch;
+            margin-top: 0.75rem;
+        }
+        .disclosure-btn:hover {
+            text-decoration: underline;
+        }
+
+        .solution-details-region {
+            /* Optional wash surface */
+            background-color: var(--bg-wash); 
+            border-left: 1px solid var(--border-hairline); /* Quiet demarcation */
+            padding-left: 1rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 1023px) {
+            .content-columns {
+                display: block; /* Stack */
+            }
+            .nav-rail {
+                display: none; /* Replaced by drawer */
+            }
+            .paper-region {
+                width: 100%;
+            }
+        }
+        
+        /* Drawer */
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.2);
+            z-index: 50;
+        }
+        .drawer-panel {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 280px;
+            background: var(--bg-page);
+            z-index: 51;
+            padding: 1.5rem;
+            overflow-y: auto;
+            border-right: 1px solid var(--border-hairline);
+            transform: translateX(-100%);
+            transition: transform 0.2s ease-out;
+        }
+        .drawer-open .drawer-panel {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body x-data="paperViewer()">
+
+    <!-- DOCUMENT FRAME SHELL -->
+    <div class="shell-container">
+
+        <!-- TOP CONTROLS REGION -->
+        <div class="top-controls flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <!-- Mobile Jump Trigger -->
+                <button 
+                    @click="toggleDrawer()"
+                    class="lg:hidden text-[var(--accent-primary)] font-medium focus:outline-none"
+                    aria-label="Jump to question">
+                    Jump to
+                </button>
+
+                <!-- Paper Selector -->
+                <div class="relative">
+                    <select 
+                        x-model="selectedPaperKey" 
+                        @change="loadPaper(selectedPaperKey)"
+                        class="appearance-none bg-transparent border border-[var(--border-hairline)] rounded py-1 pl-3 pr-8 text-sm font-medium text-[var(--text-primary)] focus:border-[var(--focus-ring)] focus:ring-1 focus:ring-[var(--focus-ring)] cursor-pointer">
+                        <template x-for="p in papers" :key="p.key">
+                            <option :value="p.key" x-text="p.label"></option>
+                        </template>
+                    </select>
+                    <!-- Custom chevron -->
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[var(--text-secondary)]">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-xs text-[var(--text-tertiary)] hidden sm:block">
+                RTQ Prototype v11.2.6
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT COLUMNS -->
+        <div class="content-columns">
+
+            <!-- NAVIGATION RAIL (DESKTOP) -->
+            <nav class="nav-rail hidden lg:block" aria-label="Paper navigation">
+                <template x-if="activePaper">
+                    <div class="flex flex-col gap-4 pb-12">
+                        <!-- Nav Logic: Check if sections exist -->
+                        <template x-if="activePaper.sections">
+                            <template x-for="section in activePaper.sections" :key="section.label">
+                                <div class="nav-section">
+                                    <!-- Section Label (Signpost only) -->
+                                    <template x-if="section.label && section.label.trim() !== ''">
+                                        <div class="text-xs font-bold text-[var(--text-tertiary)] mb-2 mt-4 uppercase tracking-wider" x-text="section.label"></div>
+                                    </template>
+                                    <!-- Questions -->
+                                    <div class="flex flex-col">
+                                        <template x-for="q in section.questions" :key="q.id">
+                                            <a :href="'#q-' + q.id"
+                                               class="nav-item text-sm"
+                                               :class="{ 'text-xs pl-0': isChild(q.id) }"
+                                               @click.prevent="scrollToQuestion(q.id)"
+                                               x-text="q.id">
+                                            </a>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </template>
+
+                        <!-- Logic: Flat paper -->
+                        <template x-if="!activePaper.sections && activePaper.questions">
+                            <div class="flex flex-col">
+                                <template x-for="q in flattenQuestions(activePaper.questions)" :key="q.id">
+                                    <a :href="'#q-' + q.id"
+                                       class="nav-item text-sm"
+                                       :class="{ 'text-xs pl-0 opacity-90': q.depth > 0 }"
+                                       @click.prevent="scrollToQuestion(q.id)"
+                                       x-text="q.id">
+                                    </a>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </nav>
+
+            <!-- PAPER REGION -->
+            <main class="paper-region">
+                
+                <!-- LOADING / ERROR STATES -->
+                <div x-show="loading" class="text-[var(--text-secondary)] py-8 animate-pulse">
+                    Loading paper content...
+                </div>
+
+                <div x-show="error" class="py-12 px-4 border border-dashed border-[var(--border-hairline)] text-center">
+                    <div class="text-lg font-bold text-[var(--text-primary)] mb-2">PAPERS PAYLOAD MISSING</div>
+                    <div class="text-sm text-[var(--text-secondary)]">Ensure RTQ_PAPERS_PAYLOAD_PATH resolves correctly.</div>
+                </div>
+
+                <!-- CONTENT RENDERER -->
+                <template x-if="!loading && !error && activePaper">
+                    <div>
+                        <!-- Sectioned Paper Renderer -->
+                        <template x-if="activePaper.sections">
+                            <div>
+                                <template x-for="section in activePaper.sections" :key="section.label">
+                                    <div class="section-block mb-12">
+                                        <!-- Header -->
+                                        <template x-if="section.label && section.label.trim() !== ''">
+                                            <div class="border-b border-[var(--border-hairline)] mb-8 pb-2">
+                                                <span class="text-xl font-bold text-[var(--text-primary)]" x-text="section.label"></span>
+                                            </div>
+                                        </template>
+                                        <!-- Questions List -->
+                                        <template x-for="q in section.questions" :key="q.id">
+                                            <div class="q-wrapper" x-html="renderQuestionNode(q, 0)"></div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- Flat Paper Renderer -->
+                        <template x-if="!activePaper.sections && activePaper.questions">
+                            <div>
+                                <template x-for="q in activePaper.questions" :key="q.id">
+                                    <div class="q-wrapper" x-html="renderQuestionNode(q, 0)"></div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- SPACER for bottom scroll -->
+                <div class="h-32"></div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- MOBILE DRAWER -->
+    <div x-show="drawerOpen" class="lg:hidden" style="display: none;">
+        <div class="drawer-backdrop" @click="drawerOpen = false" x-transition.opacity></div>
+        <div class="drawer-panel" :class="{ 'translate-x-0': drawerOpen, '-translate-x-full': !drawerOpen }">
+            <div class="flex justify-between items-center mb-6 pb-4 border-b border-[var(--border-hairline)]">
+                <h2 class="font-bold text-lg text-[var(--text-primary)]">Jump to</h2>
+                <button @click="drawerOpen = false" class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- Drawer Nav Content (Mirror of Desktop) -->
+            <div class="flex flex-col gap-1">
+                <template x-if="activePaper && activePaper.sections">
+                    <template x-for="section in activePaper.sections" :key="section.label">
+                        <div class="mb-4">
+                            <template x-if="section.label && section.label.trim() !== ''">
+                                <div class="text-xs font-bold text-[var(--text-tertiary)] mb-2 mt-2 uppercase" x-text="section.label"></div>
+                            </template>
+                            <template x-for="q in section.questions" :key="q.id">
+                                <a :href="'#q-' + q.id" class="block py-2 text-base text-[var(--text-secondary)] border-b border-dashed border-[var(--border-hairline)]" @click="scrollToQuestion(q.id); drawerOpen = false;" x-text="q.id"></a>
+                            </template>
+                        </div>
+                    </template>
+                </template>
+                <template x-if="activePaper && !activePaper.sections">
+                    <template x-for="q in flattenQuestions(activePaper.questions)" :key="q.id">
+                        <a :href="'#q-' + q.id" class="block py-2 text-base text-[var(--text-secondary)] border-b border-dashed border-[var(--border-hairline)]" @click="scrollToQuestion(q.id); drawerOpen = false;" x-text="q.id"></a>
+                    </template>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- RUNTIME SCRIPT -->
+    <script>
+        // STAGE 0: CANONICAL CONSTANT
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+
+        // Markdown-it Setup (Stage 6.0.12)
+        const md = window.markdownit ? window.markdownit({
+            html: true,  // Allow inline SVG passthrough
+            linkify: true,
+            breaks: false // CRITICAL: Prevents <br> inside Math delimiters
+        }) : null;
+        
+        if (md) {
+            md.inline.ruler.disable(['escape']); // Preserve TeX backslashes
+        }
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('paperViewer', () => ({
+                loading: true,
+                error: false,
+                papers: [],
+                selectedPaperKey: '',
+                activePaper: null,
+                drawerOpen: false,
+
+                async init() {
+                    try {
+                        const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                        if (!response.ok) throw new Error("Payload missing");
+                        const data = await response.json();
+                        this.papers = data.papers;
+                        
+                        if (this.papers.length > 0) {
+                            this.loadPaper(this.papers[0].key);
+                        } else {
+                            this.loading = false;
+                            this.error = true;
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        this.loading = false;
+                        this.error = true;
+                    }
+                },
+
+                loadPaper(key) {
+                    this.selectedPaperKey = key;
+                    this.activePaper = this.papers.find(p => p.key === key);
+                    this.loading = false;
+                    this.drawerOpen = false;
+                    
+                    // Reset scroll
+                    window.scrollTo(0, 0);
+
+                    // Re-run KaTeX after render
+                    this.$nextTick(() => {
+                        this.renderMath();
+                    });
+                },
+
+                renderMath() {
+                    renderMathInElement(document.body, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false
+                    });
+                },
+
+                scrollToQuestion(id) {
+                    const el = document.getElementById('q-' + id);
+                    if (el) {
+                        // Offset for top controls
+                        const y = el.getBoundingClientRect().top + window.scrollY - 100;
+                        window.scrollTo({top: y, behavior: 'smooth'});
+                    }
+                },
+
+                toggleDrawer() {
+                    this.drawerOpen = !this.drawerOpen;
+                },
+
+                isChild(id) {
+                    // Rudimentary depth check for Nav visualization only
+                    // Real depth is handled recursively in renderQuestionNode
+                    return false; 
+                },
+
+                // Helper to flatten questions for Nav (recurses children)
+                flattenQuestions(questions, depth = 0) {
+                    let flat = [];
+                    if (!questions) return flat;
+                    
+                    questions.forEach(q => {
+                        flat.push({ id: q.id, depth: depth });
+                        if (q.children && q.children.length > 0) {
+                            flat = flat.concat(this.flattenQuestions(q.children, depth + 1));
+                        }
+                    });
+                    return flat;
+                },
+
+                // Recursive HTML generator for Question Nodes
+                // Uses x-data scope for disclosure state
+                renderQuestionNode(node, depth) {
+                    const defaults = this.activePaper.defaults || {};
+                    const expandDefault = (defaults.expandedAll !== false);
+                    
+                    // Render Markdown Contents
+                    const qHtml = md ? md.render(node.question || '') : node.question;
+                    
+                    let solutionBlockHtml = '';
+                    
+                    // Check if solution block exists
+                    if (node.solutionBlock) {
+                        const sb = node.solutionBlock;
+                        const hasAnswer = !!sb.answer;
+                        const hasDetails = !!sb.solutionDetails;
+                        
+                        let answerHtml = '';
+                        if (hasAnswer) {
+                            const ansBody = md ? md.render(sb.answer) : sb.answer;
+                            answerHtml = `
+                                <div class="mt-4 mb-2">
+                                    <div class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1">Answer</div>
+                                    <div class="text-[var(--text-primary)] leading-relaxed">${ansBody}</div>
+                                </div>
+                            `;
+                        }
+
+                        let detailsHtml = '';
+                        if (hasDetails) {
+                            // Extract parts
+                            const sd = sb.solutionDetails;
+                            const kim = sd.keepInMind ? (md ? md.render(sd.keepInMind) : sd.keepInMind) : null;
+                            const form = sd.formulasUsed ? (md ? md.render(sd.formulasUsed) : sd.formulasUsed) : null;
+                            const work = sd.working ? (md ? md.render(sd.working) : sd.working) : null;
+                            const alts = sd.alternativeWorking || [];
+
+                            // Build internal blocks
+                            let kimBlock = kim ? `
+                                <div class="mb-4">
+                                    <div class="text-xs font-bold text-[var(--text-secondary)] mb-1">Keep in mind</div>
+                                    <div class="text-sm text-[var(--text-secondary)]">${kim}</div>
+                                </div>` : '';
+                                
+                            let formBlock = form ? `
+                                <div class="mb-4">
+                                    <div class="text-xs font-bold text-[var(--text-secondary)] mb-1">Formulas used</div>
+                                    <div class="text-sm text-[var(--text-secondary)] font-mono text-xs">${form}</div>
+                                </div>` : '';
+                                
+                            let workBlock = work ? `
+                                <div class="mb-4">
+                                    <div class="text-xs font-bold text-[var(--text-secondary)] mb-1">Working</div>
+                                    <div class="text-[var(--text-primary)] leading-relaxed space-y-2">${work}</div>
+                                </div>` : '';
+                                
+                            let altsBlock = '';
+                            if (alts.length > 0) {
+                                alts.forEach((alt, idx) => {
+                                    const altBody = md ? md.render(alt) : alt;
+                                    altsBlock += `
+                                        <div class="mt-6 pt-4 border-t border-dashed border-[var(--border-hairline)]">
+                                            <div class="text-xs font-bold text-[var(--text-secondary)] mb-1">Alternative working</div>
+                                            <div class="text-[var(--text-primary)] leading-relaxed space-y-2">${altBody}</div>
+                                        </div>
+                                    `;
+                                });
+                            }
+
+                            // Wrap in Alpine x-show
+                            detailsHtml = `
+                                <div x-data="{ open: ${expandDefault} }">
+                                    <button @click="open = !open" class="disclosure-btn">
+                                        <span x-text="open ? 'Hide working' : 'Show working'"></span>
+                                        <svg class="w-4 h-4 transition-transform" :class="{'rotate-180': open}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+                                    <div x-show="open" x-collapse class="solution-details-region">
+                                        ${kimBlock}
+                                        ${formBlock}
+                                        ${workBlock}
+                                        ${altsBlock}
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        if (hasAnswer || hasDetails) {
+                            solutionBlockHtml = `
+                                <div class="mt-2 pl-0">
+                                    ${answerHtml}
+                                    ${detailsHtml}
+                                </div>
+                            `;
+                        }
+                    }
+
+                    // Children
+                    let childrenHtml = '';
+                    if (node.children && node.children.length > 0) {
+                        childrenHtml = `<div class="mt-4">
+                            ${node.children.map(c => this.renderQuestionNode(c, depth + 1)).join('')}
+                        </div>`;
+                    }
+
+                    // Separation classes based on depth
+                    const wrapperClass = depth === 0 ? 'q-node' : 'q-node-child pl-4 md:pl-8 border-l border-transparent';
+                    
+                    // Question Identifier style
+                    const idStyle = depth === 0 
+                        ? 'text-lg font-bold text-[var(--text-secondary)] min-w-[2rem] mr-2 mb-1 inline-block' 
+                        : 'text-sm font-semibold text-[var(--text-tertiary)] min-w-[1.5rem] mr-2 inline-block';
+
+                    return `
+                        <div id="q-${node.id}" class="${wrapperClass}">
+                            <!-- Question Body -->
+                            <div class="flex flex-col sm:flex-row sm:items-baseline">
+                                <div class="${idStyle}">${node.id}</div>
+                                <div class="flex-1 text-[var(--text-primary)] text-lg leading-relaxed">
+                                    ${qHtml}
+                                </div>
+                            </div>
+                            
+                            <!-- Solution Block (indented to match text start) -->
+                            <div class="sm:pl-10 mt-1">
+                                ${solutionBlockHtml}
+                                ${childrenHtml}
+                            </div>
+                        </div>
+                    `;
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

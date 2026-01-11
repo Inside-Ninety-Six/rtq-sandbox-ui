@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AD","indexWithinVariant":"398","totalWithinVariant":"440","hueFamily":"","intensityMode":"","primaryHueFamily":"blue","secondaryHueFamily":"amber","dualIntensityMode":"dual_tinted_neutrals","timestamp":"2026-01-11T00:17:30.615Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AD&quot;,&quot;indexWithinVariant&quot;:&quot;398&quot;,&quot;totalWithinVariant&quot;:&quot;440&quot;,&quot;hueFamily&quot;:&quot;&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;blue&quot;,&quot;secondaryHueFamily&quot;:&quot;amber&quot;,&quot;dualIntensityMode&quot;:&quot;dual_tinted_neutrals&quot;,&quot;timestamp&quot;:&quot;2026-01-11T00:17:30.615Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+
+    <!-- 
+        STAGE 6 BASELINE IMPLEMENTATION 
+        - Loads from canonical payload path.
+        - ColorLab D (Mode 2: Dual Tinted Neutrals) applied.
+        - Markdown-it + KaTeX (No SRI/Integrity).
+    -->
+
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <style>
+        /* 
+         * COLORLAB D - MODE 2: dual_tinted_neutrals
+         * Hue Families: Primary (Blue ~264), Secondary (Amber ~85)
+         * Light Mode Only.
+         */
+        :root {
+            /* Base Hues */
+            --hue-primary: 264;
+            --hue-secondary: 85;
+
+            /* Surfaces (Derived from Primary, Mode 2 Band: C in 0.015..0.035) */
+            --c-surface-page: oklch(0.97 0.02 var(--hue-primary));
+            --c-surface-frame: oklch(0.97 0.02 var(--hue-primary));
+            --c-surface-paper: oklch(0.99 0.015 var(--hue-primary));
+            
+            /* Wash (Derived from Primary, Mode 2 Band: C in 0.025..0.045) */
+            --c-surface-wash: oklch(0.96 0.03 var(--hue-primary));
+
+            /* Text (Near Neutral, Mode 2 Band: C <= 0.012) */
+            --c-text-primary: oklch(0.20 0.01 var(--hue-primary));
+            --c-text-secondary: oklch(0.45 0.012 var(--hue-primary));
+
+            /* Accents (Mode 2 Band: Pri C 0.10..0.16, Sec C 0.08..0.14) */
+            --c-accent-primary: oklch(0.55 0.14 var(--hue-primary));
+            --c-accent-secondary: oklch(0.75 0.12 var(--hue-secondary));
+
+            /* Lines */
+            --c-hairline: oklch(0.90 0.02 var(--hue-primary));
+            --c-focus-ring: var(--c-accent-primary);
+
+            /* Typography */
+            --font-stack: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'Menlo', 'Monaco', 'Courier New', monospace;
+
+            /* Spacing */
+            --sp-xs: 0.25rem;
+            --sp-sm: 0.5rem;
+            --sp-md: 1rem;
+            --sp-lg: 2rem;
+            --sp-xl: 4rem;
+
+            /* Layout */
+            --nav-width: 240px;
+            --max-content-width: 800px;
+        }
+
+        /* RESET & BASE */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-stack);
+            background-color: var(--c-surface-page);
+            color: var(--c-text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button {
+            font-family: inherit;
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 0;
+            color: inherit;
+        }
+
+        /* SHELL */
+        .shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: var(--c-surface-frame);
+        }
+
+        /* TOP CONTROLS */
+        .top-controls {
+            padding: var(--sp-md);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--c-hairline);
+            background-color: var(--c-surface-frame);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .paper-selector {
+            font-size: 1rem;
+            padding: var(--sp-sm);
+            border: 1px solid var(--c-hairline);
+            border-radius: 4px;
+            background-color: var(--c-surface-paper);
+            color: var(--c-text-primary);
+        }
+
+        .jump-to-btn {
+            display: none; /* Desktop default */
+            font-weight: 500;
+            color: var(--c-accent-primary);
+            align-items: center;
+            gap: var(--sp-xs);
+        }
+
+        /* DESKTOP COLUMNS */
+        .content-frame {
+            display: flex;
+            flex: 1;
+        }
+
+        /* NAVIGATION RAIL (Desktop) */
+        .nav-rail {
+            width: var(--nav-width);
+            flex-shrink: 0;
+            position: sticky;
+            top: 60px; /* Offset for top controls */
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+            padding: var(--sp-md);
+            /* Hide scrollbar visually */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            border-right: 1px solid transparent; /* Structure placeholder */
+        }
+        .nav-rail::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* PAPER CONTENT */
+        .paper-column {
+            flex: 1;
+            padding: var(--sp-lg);
+            padding-bottom: var(--sp-xl);
+            background-color: var(--c-surface-paper); /* Distinct paper surface */
+        }
+
+        /* NAVIGATION LIST GRAMMAR */
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--c-text-secondary);
+            margin-top: var(--sp-md);
+            margin-bottom: var(--sp-xs);
+            padding-left: var(--sp-sm);
+            font-weight: 600;
+        }
+
+        .nav-item {
+            display: block;
+            text-decoration: none;
+            padding: 4px var(--sp-sm);
+            color: var(--c-text-secondary);
+            font-size: 0.9rem;
+            border-radius: 4px;
+            transition: color 0.1s ease, font-weight 0.1s ease;
+            text-align: left;
+        }
+
+        .nav-item:hover {
+            color: var(--c-text-primary);
+            background-color: rgba(0,0,0,0.03); /* Extremely subtle hover */
+        }
+
+        .nav-item.active {
+            color: var(--c-accent-primary);
+            font-weight: 700;
+        }
+
+        /* Hierarchy via type scale (Stage 5.4.5) - Flat list, no indent */
+        .nav-item[data-depth="0"] { font-size: 0.95rem; }
+        .nav-item[data-depth="1"] { font-size: 0.85rem; }
+        .nav-item[data-depth="2"] { font-size: 0.80rem; }
+
+        /* PAPER CONTENT GRAMMAR */
+        .section-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            margin-top: var(--sp-xl);
+            margin-bottom: var(--sp-lg);
+            padding-bottom: var(--sp-sm);
+            border-bottom: 1px solid var(--c-hairline);
+        }
+
+        .question-node {
+            display: flex;
+            flex-direction: column;
+            /* Top level separation */
+            margin-bottom: var(--sp-xl); 
+        }
+
+        .question-node[data-is-child="true"] {
+            margin-bottom: var(--sp-md); /* Tighter for children */
+            margin-top: var(--sp-md);
+            padding-left: var(--sp-md); /* Minimal indentation for children */
+            border-left: 2px solid transparent; /* For alignment */
+        }
+
+        /* QUESTION BODY */
+        .question-body {
+            display: flex;
+            gap: var(--sp-sm);
+            color: var(--c-text-primary);
+        }
+        
+        .question-id {
+            font-weight: 700;
+            min-width: 1.5em;
+            flex-shrink: 0;
+        }
+
+        .question-prompt {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        /* Markdown Content Styles */
+        .md-content p { margin-top: 0; margin-bottom: 0.75em; }
+        .md-content p:last-child { margin-bottom: 0; }
+        .md-content ul, .md-content ol { margin: 0 0 0.75em 1.25em; padding: 0; }
+        
+        /* Tables (Quiet) */
+        .md-content table {
+            border-collapse: collapse;
+            margin-bottom: 0.75em;
+            width: 100%;
+            font-size: 0.95em;
+        }
+        .md-content th, .md-content td {
+            border: 1px solid var(--c-hairline);
+            padding: 4px 8px;
+            text-align: left;
+        }
+        .md-content th {
+            font-weight: 600;
+            background-color: rgba(0,0,0,0.02);
+        }
+
+        /* SOLUTION BLOCK */
+        .solution-block {
+            margin-top: var(--sp-md);
+            padding-left: 2em; /* Align roughly under text */
+        }
+
+        /* ANSWER */
+        .answer-region {
+            margin-bottom: var(--sp-sm);
+            font-size: 1rem;
+            color: var(--c-text-primary);
+        }
+        .answer-label {
+            font-weight: 700;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            color: var(--c-text-secondary);
+            margin-right: var(--sp-sm);
+        }
+
+        /* SOLUTION DETAILS TOGGLE */
+        .sd-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+            color: var(--c-accent-primary);
+            font-weight: 500;
+            margin-bottom: var(--sp-sm);
+            transition: opacity 0.2s;
+        }
+        .sd-toggle:hover {
+            text-decoration: underline;
+            opacity: 0.8;
+        }
+
+        /* SOLUTION DETAILS REGION */
+        .solution-details {
+            background-color: var(--c-surface-wash);
+            padding: var(--sp-md);
+            border-radius: 4px; /* Permitted subtle radius */
+            margin-top: var(--sp-xs);
+            display: none; /* Collapsed by default via class */
+        }
+        .solution-details.expanded {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .sd-subsection {
+            margin-bottom: var(--sp-md);
+        }
+        .sd-subsection:last-child {
+            margin-bottom: 0;
+        }
+
+        .sd-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            text-transform: uppercase;
+            margin-bottom: var(--sp-xs);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Keep in mind icon */
+        .icon-kim {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        /* Internal separators */
+        .divider {
+            height: 1px;
+            background-color: var(--c-hairline);
+            margin: var(--sp-md) 0;
+            border: none;
+        }
+
+        /* Working Internal Logic */
+        .working-body {
+            color: var(--c-text-primary);
+            font-size: 0.95rem;
+        }
+
+        /* KaTeX Containment (Stage 6.0.8) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            /* Scrollbar hiding */
+            scrollbar-width: thin;
+        }
+
+        /* MOBILE DRAWER */
+        .drawer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.2);
+            z-index: 100;
+            display: none;
+        }
+        .drawer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 85%;
+            max-width: 320px;
+            height: 100%;
+            background-color: var(--c-surface-frame);
+            z-index: 101;
+            transform: translateX(-100%);
+            transition: transform 0.25s ease-out;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+        }
+        .drawer.open {
+            transform: translateX(0);
+        }
+        .drawer-header {
+            padding: var(--sp-md);
+            border-bottom: 1px solid var(--c-hairline);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .drawer-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .drawer-close {
+            font-size: 1.5rem;
+            line-height: 1;
+            padding: var(--sp-sm);
+        }
+        .drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--sp-md);
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .nav-rail {
+                display: none;
+            }
+            .jump-to-btn {
+                display: flex;
+            }
+            .paper-column {
+                padding: var(--sp-md);
+            }
+            .solution-block {
+                padding-left: 0; /* Align left on mobile */
+                margin-top: var(--sp-sm);
+                padding-top: var(--sp-sm);
+                border-top: 1px solid transparent; /* Placeholder */
+            }
+        }
+
+        /* Focus styles */
+        :focus-visible {
+            outline: 2px solid var(--c-focus-ring);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* Error Message */
+        .error-message {
+            padding: var(--sp-xl);
+            text-align: center;
+            font-weight: 700;
+            color: var(--c-text-secondary);
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="shell">
+    <!-- Top Controls -->
+    <header class="top-controls">
+        <select id="paperSelector" class="paper-selector" aria-label="Select Paper">
+            <option>Loading...</option>
+        </select>
+        <button id="jumpToBtn" class="jump-to-btn">
+            <span>Jump to</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+    </header>
+
+    <!-- Content Frame -->
+    <div class="content-frame">
+        <!-- Desktop Nav Rail -->
+        <aside class="nav-rail">
+            <nav id="desktopNav" class="nav-list" aria-label="Paper Navigation"></nav>
+        </aside>
+
+        <!-- Paper Column -->
+        <main id="paperContent" class="paper-column">
+            <!-- Content Injected Here -->
+        </main>
+    </div>
+
+    <!-- Mobile Drawer -->
+    <div id="drawerOverlay" class="drawer-overlay"></div>
+    <div id="drawer" class="drawer" aria-hidden="true">
+        <div class="drawer-header">
+            <span class="drawer-title">Jump to</span>
+            <button id="drawerClose" class="drawer-close" aria-label="Close navigation">&times;</button>
+        </div>
+        <div class="drawer-content">
+            <nav id="mobileNav" class="nav-list"></nav>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- STAGE 0: CONSTANTS ---
+    const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+    const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+    // --- UTILS ---
+    const $ = (selector) => document.querySelector(selector);
+    const createEl = (tag, className = "", text = "") => {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        if (text) el.textContent = text;
+        return el;
+    };
+
+    // --- MARKDOWN CONFIG (Stage 6) ---
+    const md = window.markdownit ? window.markdownit({
+        html: true,
+        linkify: true,
+        breaks: false // Critical: prevents <br> in math
+    }) : null;
+
+    if (md) {
+        md.inline.ruler.disable(['escape']); // Preserve TeX backslashes
+    }
+
+    // --- STATE ---
+    let state = {
+        papers: [],
+        activePaperKey: null,
+        activePaper: null
+    };
+
+    // --- RENDERING ---
+
+    function renderMarkdown(text) {
+        if (!text) return "";
+        if (!md) return text;
+        return md.render(text);
+    }
+
+    function renderKaTeX(container) {
+        if (window.renderMathInElement) {
+            renderMathInElement(container, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+    }
+
+    function buildNav(container, paper) {
+        container.innerHTML = "";
+        
+        let flattenedItems = [];
+
+        // Helper to flatten
+        function traverse(nodes, depth) {
+            nodes.forEach(node => {
+                flattenedItems.push({ 
+                    type: 'item', 
+                    id: node.id, 
+                    depth: depth,
+                    nodeId: `q-${node.id}`
+                });
+                if (node.children && node.children.length > 0) {
+                    traverse(node.children, depth + 1);
+                }
+            });
+        }
+
+        if (paper.sections) {
+            paper.sections.forEach(section => {
+                if (section.label && section.label.trim().length > 0) {
+                    flattenedItems.push({ type: 'section', label: section.label });
+                }
+                traverse(section.questions, 0);
+            });
+        } else if (paper.questions) {
+            traverse(paper.questions, 0);
+        }
+
+        flattenedItems.forEach(item => {
+            if (item.type === 'section') {
+                const el = createEl('li', 'nav-section-label', item.label);
+                container.appendChild(el);
+            } else {
+                const el = createEl('a', 'nav-item', item.id);
+                el.href = `#${item.nodeId}`;
+                el.dataset.depth = Math.min(item.depth, 2); // Cap visual depth classes
+                el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    scrollToQuestion(item.nodeId);
+                    closeDrawer();
+                });
+                container.appendChild(el);
+            }
+        });
+
+        // Setup ScrollSpy
+        setupScrollSpy();
+    }
+
+    function scrollToQuestion(id) {
+        const target = document.getElementById(id);
+        if (target) {
+            const offset = 80; // Top controls + padding
+            const bodyRect = document.body.getBoundingClientRect().top;
+            const elementRect = target.getBoundingClientRect().top;
+            const elementPosition = elementRect - bodyRect;
+            const offsetPosition = elementPosition - offset;
+
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
+    }
+
+    function setupScrollSpy() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    updateActiveNav(id);
+                }
+            });
+        }, { rootMargin: '-20% 0px -60% 0px' });
+
+        document.querySelectorAll('.question-node').forEach(node => {
+            observer.observe(node);
+        });
+    }
+
+    function updateActiveNav(nodeId) {
+        const navId = nodeId.replace('q-', '');
+        document.querySelectorAll('.nav-item').forEach(el => {
+            if (el.textContent === navId) el.classList.add('active');
+            else el.classList.remove('active');
+        });
+    }
+
+    function renderPaperContent(paper) {
+        const container = $('#paperContent');
+        container.innerHTML = "";
+
+        if (paper.sections) {
+            paper.sections.forEach(section => {
+                if (section.label && section.label.trim()) {
+                    const header = createEl('div', 'section-header', section.label);
+                    container.appendChild(header);
+                }
+                section.questions.forEach(q => {
+                    container.appendChild(renderQuestionNode(q, 0, paper.defaults));
+                });
+            });
+        } else if (paper.questions) {
+            paper.questions.forEach(q => {
+                container.appendChild(renderQuestionNode(q, 0, paper.defaults));
+            });
+        }
+
+        // Post-render KaTeX
+        renderKaTeX(container);
+    }
+
+    function renderQuestionNode(node, depth, defaults) {
+        const wrapper = createEl('div', 'question-node');
+        wrapper.id = `q-${node.id}`;
+        if (depth > 0) wrapper.dataset.isChild = "true";
+
+        // 1. Question Body
+        const bodyEl = createEl('div', 'question-body');
+        
+        const idEl = createEl('div', 'question-id', node.id);
+        bodyEl.appendChild(idEl);
+
+        const promptEl = createEl('div', 'question-prompt md-content');
+        promptEl.innerHTML = renderMarkdown(node.question);
+        bodyEl.appendChild(promptEl);
+        
+        wrapper.appendChild(bodyEl);
+
+        // 2. Solution Block (Optional)
+        if (node.solutionBlock) {
+            const sb = node.solutionBlock;
+            const blockEl = createEl('div', 'solution-block');
+
+            // Answer
+            if (sb.answer) {
+                const ansEl = createEl('div', 'answer-region');
+                const label = createEl('span', 'answer-label', 'Answer');
+                const val = createEl('span', 'md-content');
+                val.innerHTML = renderMarkdown(sb.answer);
+                ansEl.appendChild(label);
+                ansEl.appendChild(val);
+                blockEl.appendChild(ansEl);
+            }
+
+            // Solution Details
+            if (sb.solutionDetails) {
+                const sd = sb.solutionDetails;
+                const isExpanded = defaults && defaults.expandedAll !== false;
+
+                // Toggle
+                const toggle = createEl('button', 'sd-toggle', isExpanded ? 'Hide working' : 'Show working');
+                // Icon
+                const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                icon.setAttribute("width", "16");
+                icon.setAttribute("height", "16");
+                icon.setAttribute("viewBox", "0 0 24 24");
+                icon.setAttribute("fill", "none");
+                icon.setAttribute("stroke", "currentColor");
+                icon.setAttribute("stroke-width", "2");
+                icon.innerHTML = `<polyline points="6 9 12 15 18 9"></polyline>`;
+                icon.style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+                icon.style.transition = 'transform 0.2s';
+                toggle.appendChild(icon);
+
+                blockEl.appendChild(toggle);
+
+                // Details Region
+                const detailsRegion = createEl('div', 'solution-details');
+                if (isExpanded) detailsRegion.classList.add('expanded');
+
+                // Helper for subsections
+                const renderSubsection = (label, content, iconType) => {
+                    if (!content) return null;
+                    const subDiv = createEl('div', 'sd-subsection');
+                    
+                    const labelDiv = createEl('div', 'sd-label');
+                    if (iconType === 'kim') {
+                         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                         svg.classList.add('icon-kim');
+                         svg.setAttribute("viewBox", "0 0 24 24");
+                         svg.innerHTML = `<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>`;
+                         labelDiv.appendChild(svg);
+                    }
+                    const text = createEl('span', '', label);
+                    labelDiv.appendChild(text);
+                    subDiv.appendChild(labelDiv);
+
+                    const contentDiv = createEl('div', 'working-body md-content');
+                    contentDiv.innerHTML = renderMarkdown(content);
+                    subDiv.appendChild(contentDiv);
+
+                    return subDiv;
+                };
+
+                // Keep in mind
+                if (sd.keepInMind) {
+                    const el = renderSubsection('Keep in mind', sd.keepInMind, 'kim');
+                    if (el) detailsRegion.appendChild(el);
+                }
+                
+                // Divider if needed
+                if (sd.keepInMind && sd.formulasUsed) {
+                    detailsRegion.appendChild(createEl('hr', 'divider'));
+                }
+
+                // Formulas
+                if (sd.formulasUsed) {
+                    const el = renderSubsection('Formulas used', sd.formulasUsed);
+                    if (el) detailsRegion.appendChild(el);
+                }
+
+                // Divider if needed
+                if ((sd.keepInMind || sd.formulasUsed) && sd.working) {
+                    detailsRegion.appendChild(createEl('hr', 'divider'));
+                }
+
+                // Working
+                if (sd.working) {
+                    const el = renderSubsection('Working', sd.working);
+                    if (el) detailsRegion.appendChild(el);
+                }
+
+                // Alt Working
+                if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                    sd.alternativeWorking.forEach(alt => {
+                        detailsRegion.appendChild(createEl('hr', 'divider'));
+                        const el = renderSubsection('Alternative working', alt);
+                        if (el) detailsRegion.appendChild(el);
+                    });
+                }
+
+                blockEl.appendChild(detailsRegion);
+
+                // Toggle Interaction
+                toggle.onclick = () => {
+                    const expanded = detailsRegion.classList.contains('expanded');
+                    if (expanded) {
+                        detailsRegion.classList.remove('expanded');
+                        toggle.firstChild.textContent = 'Show working'; // firstChild is text node
+                        icon.style.transform = 'rotate(0deg)';
+                    } else {
+                        detailsRegion.classList.add('expanded');
+                        toggle.firstChild.textContent = 'Hide working';
+                        icon.style.transform = 'rotate(180deg)';
+                    }
+                };
+            }
+
+            wrapper.appendChild(blockEl);
+        }
+
+        // 3. Children (Recursive)
+        if (node.children && node.children.length > 0) {
+            node.children.forEach(child => {
+                wrapper.appendChild(renderQuestionNode(child, depth + 1, defaults));
+            });
+        }
+
+        return wrapper;
+    }
+
+    // --- APP INIT ---
+    async function init() {
+        try {
+            const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+            if (!response.ok) throw new Error("Payload not found");
+            const payload = await response.json();
+            
+            state.papers = payload.papers || [];
+            
+            if (state.papers.length === 0) {
+                $('#paperContent').innerHTML = "<div class='error-message'>NO PAPERS FOUND</div>";
+                return;
+            }
+
+            // Populate Selector
+            const selector = $('#paperSelector');
+            selector.innerHTML = "";
+            state.papers.forEach(p => {
+                const opt = createEl('option', '', p.label);
+                opt.value = p.key;
+                selector.appendChild(opt);
+            });
+
+            selector.onchange = (e) => loadPaper(e.target.value);
+
+            // Load first paper
+            loadPaper(state.papers[0].key);
+
+        } catch (e) {
+            console.error(e);
+            $('#paperContent').innerHTML = "<div class='error-message'>PAPERS PAYLOAD MISSING</div>";
+        }
+    }
+
+    function loadPaper(key) {
+        state.activePaperKey = key;
+        state.activePaper = state.papers.find(p => p.key === key);
+        
+        if (!state.activePaper) return;
+
+        renderPaperContent(state.activePaper);
+        buildNav($('#desktopNav'), state.activePaper);
+        buildNav($('#mobileNav'), state.activePaper); // Build for mobile too
+        
+        window.scrollTo(0,0);
+    }
+
+    // --- MOBILE DRAWER LOGIC ---
+    const drawer = $('#drawer');
+    const overlay = $('#drawerOverlay');
+    const jumpBtn = $('#jumpToBtn');
+    const closeBtn = $('#drawerClose');
+
+    function openDrawer() {
+        drawer.classList.add('open');
+        overlay.style.display = 'block';
+        drawer.setAttribute('aria-hidden', 'false');
+    }
+    function closeDrawer() {
+        drawer.classList.remove('open');
+        overlay.style.display = 'none';
+        drawer.setAttribute('aria-hidden', 'true');
+    }
+
+    jumpBtn.onclick = openDrawer;
+    closeBtn.onclick = closeDrawer;
+    overlay.onclick = closeDrawer;
+
+    // Run
+    init();
+
+</script>
+</body>
+</html>

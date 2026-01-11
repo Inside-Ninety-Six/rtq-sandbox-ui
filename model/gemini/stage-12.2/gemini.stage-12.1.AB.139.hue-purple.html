@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AB","indexWithinVariant":"139","totalWithinVariant":"200","hueFamily":"purple","intensityMode":"","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-08T19:33:54.735Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AB&quot;,&quot;indexWithinVariant&quot;:&quot;139&quot;,&quot;totalWithinVariant&quot;:&quot;200&quot;,&quot;hueFamily&quot;:&quot;purple&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-08T19:33:54.735Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Viewer - Prototype</title>
+
+    <!-- 1. Libraries (No SRI, per Stage 6 instructions) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <!-- 2. Config & Styles -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Manual toggle only (disabled per Light Mode Only rule)
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        // COLORLAB B: Forced Hue Family = PURPLE
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            200: '#ddd6fe',
+                            300: '#c4b5fd',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Baseline Reset & Typography */
+        body {
+            background-color: #f8fafc; /* Slate-50 */
+            color: #0f172a; /* Slate-900 */
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Scrollbar Hiding for Navigation */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* KaTeX Containment Invariant */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-top: 0.25em;
+            padding-bottom: 0.25em;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Table Styles (Minimal/Structural per Stage 5.8) */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1rem;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid #e2e8f0; /* Slate-200 */
+            padding: 0.5rem;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            font-weight: 600;
+            background-color: transparent; 
+        }
+
+        /* Focus Styles (Stage 5.5.2) */
+        :focus-visible {
+            outline: 2px solid #7c3aed; /* Brand-600 */
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ============================================================================
+        // STAGE 0: CONSTANTS (Canonical)
+        // ============================================================================
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // ============================================================================
+        // MARKDOWN & KaTeX SETUP (Stage 6 Baseline)
+        // ============================================================================
+        // Initialize markdown-it with required configuration
+        const md = window.markdownit ? window.markdownit({
+            html: true,     // Allow inline SVG/HTML
+            linkify: true,
+            breaks: false   // CRITICAL: Must be false for KaTeX
+        }) : null;
+
+        if (md) {
+            // Disable escaping to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // ============================================================================
+        // UTILS
+        // ============================================================================
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+        const { ChevronDown, ChevronRight, Menu, X, Check } = lucide;
+
+        // Custom Hook: Markdown Render
+        const useMarkdown = (content) => {
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                if (!containerRef.current || !content || !md) return;
+
+                // 1. Render Markdown to HTML
+                const rawHtml = md.render(content);
+                containerRef.current.innerHTML = rawHtml;
+
+                // 2. Render KaTeX
+                if (window.renderMathInElement) {
+                    window.renderMathInElement(containerRef.current, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false,
+                        output: 'html', // Use HTML output for accessibility
+                        strict: false
+                    });
+                }
+            }, [content]);
+
+            return containerRef;
+        };
+
+        // Custom Hook: Scroll Spy for Navigation
+        const useScrollSpy = (itemIds) => {
+            const [activeId, setActiveId] = useState('');
+
+            useEffect(() => {
+                const observers = [];
+                const callback = (entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            setActiveId(entry.target.id);
+                        }
+                    });
+                };
+
+                const observer = new IntersectionObserver(callback, {
+                    rootMargin: '-20% 0px -60% 0px' 
+                });
+
+                itemIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) observer.observe(el);
+                });
+
+                return () => observer.disconnect();
+            }, [itemIds]);
+
+            return activeId;
+        };
+
+        // ============================================================================
+        // COMPONENTS
+        // ============================================================================
+
+        // --- 1. Navigation Components ---
+
+        const NavItem = ({ id, label, isActive, onClick }) => {
+            // Stage 5.4.3 / 6.0.2: Weight only (or subtle accent marker per ColorLab override)
+            // ColorLab B: Active uses brand color, no background fill.
+            const activeClasses = isActive 
+                ? "font-semibold text-brand-700 border-l-2 border-brand-600 pl-[calc(1rem-2px)]" 
+                : "font-normal text-slate-500 hover:text-slate-800 border-l-2 border-transparent pl-[calc(1rem-2px)]";
+
+            return (
+                <button
+                    onClick={onClick}
+                    className={`block w-full text-left py-1 text-sm transition-colors ${activeClasses}`}
+                    aria-current={isActive ? 'true' : undefined}
+                >
+                    {label}
+                </button>
+            );
+        };
+
+        const NavSectionLabel = ({ label }) => (
+            <div className="mt-6 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider select-none">
+                {label}
+            </div>
+        );
+
+        const NavigationList = ({ items, activeId, onItemClick }) => {
+            return (
+                <nav className="space-y-0.5" aria-label="Question navigation">
+                    {items.map((item, index) => {
+                        if (item.type === 'section') {
+                            return <NavSectionLabel key={`sec-${index}`} label={item.label} />;
+                        }
+                        return (
+                            <NavItem
+                                key={item.id}
+                                id={item.id} // ID not used on DOM element here, just ref
+                                label={item.id}
+                                isActive={activeId === `q-${item.id}`}
+                                onClick={() => onItemClick(item.id)}
+                            />
+                        );
+                    })}
+                </nav>
+            );
+        };
+
+        // --- 2. Content Components ---
+
+        // Helper to flatten children for logic but keep recursion for render
+        const flattenIds = (nodes, acc = []) => {
+            nodes.forEach(node => {
+                acc.push({ type: 'question', id: node.id });
+                if (node.children) flattenIds(node.children, acc);
+            });
+            return acc;
+        };
+
+        const SolutionDetailsRegion = ({ details, isExpanded }) => {
+            if (!isExpanded) return null;
+
+            // Internal Clarity: Ensure subsections don't merge (Stage 4.6.b)
+            // Visual Grammar: Minimal separators, no frames.
+            
+            // Sub-components for Keep In Mind, Formulas, Working, Alt Working
+            // Note: ColorLab B implies using neutral styling for content structures, 
+            // only specific semantic labels might carry subtle color if permitted, 
+            // but strict rules say hierarchy via typography/spacing first. 
+            // We'll stick to Slate for text to ensure legibility.
+
+            const hasKeepInMind = !!details.keepInMind;
+            const hasFormulas = !!details.formulasUsed;
+            const hasWorking = !!details.working;
+            const hasAltWorking = details.alternativeWorking && details.alternativeWorking.length > 0;
+
+            // Render Ref Hooks
+            const keepInMindRef = useMarkdown(details.keepInMind);
+            const formulasRef = useMarkdown(details.formulasUsed);
+            const workingRef = useMarkdown(details.working);
+
+            return (
+                <div className="mt-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                    
+                    {/* Keep In Mind */}
+                    {hasKeepInMind && (
+                        <div className="mb-6">
+                            <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                Keep in mind
+                            </h4>
+                            <div 
+                                ref={keepInMindRef} 
+                                className="text-sm text-slate-600 leading-relaxed prose prose-slate max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0"
+                            />
+                        </div>
+                    )}
+
+                    {/* Formulas Used */}
+                    {hasFormulas && (
+                        <div className="mb-6">
+                            <h4 className="text-sm font-bold text-slate-700 mb-2">Formulas used</h4>
+                            <div 
+                                ref={formulasRef} 
+                                className="text-sm text-slate-600 leading-relaxed prose prose-slate max-w-none prose-p:my-1"
+                            />
+                        </div>
+                    )}
+
+                    {/* Working (Primary) */}
+                    {hasWorking && (
+                        <div className="mb-6">
+                            <h4 className="text-sm font-bold text-slate-700 mb-2">Working</h4>
+                            <div 
+                                ref={workingRef} 
+                                className="text-base text-slate-700 leading-relaxed prose prose-slate max-w-none prose-p:my-2 prose-headings:font-semibold prose-headings:text-slate-800"
+                            />
+                        </div>
+                    )}
+
+                    {/* Alternative Working */}
+                    {hasAltWorking && details.alternativeWorking.map((alt, idx) => {
+                        const altRef = useMarkdown(alt);
+                        return (
+                            <div key={idx} className="mt-8 pt-6 border-t border-slate-200">
+                                <h4 className="text-sm font-bold text-slate-700 mb-2">Alternative working</h4>
+                                <div 
+                                    ref={altRef} 
+                                    className="text-base text-slate-700 leading-relaxed prose prose-slate max-w-none prose-p:my-2"
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        const QuestionNode = ({ node, depth = 0, expandedMap, toggleNode }) => {
+            const questionRef = useMarkdown(node.question);
+            const answerRef = useMarkdown(node.solutionBlock?.answer);
+
+            const hasSolutionBlock = !!node.solutionBlock;
+            const hasAnswer = hasSolutionBlock && !!node.solutionBlock.answer;
+            const hasDetails = hasSolutionBlock && !!node.solutionBlock.solutionDetails;
+
+            const isExpanded = expandedMap[node.id];
+
+            // Separation logic: Top level gets more space
+            const topLevelClass = depth === 0 ? "mb-16" : "mb-8";
+            
+            // Indentation logic for children (Stage 3)
+            // No visual indentation for logic, but visual nesting via padding is allowed for readability
+            const indentClass = depth > 0 ? "ml-0 md:ml-6 border-l-2 border-transparent pl-0" : "";
+
+            return (
+                <div id={`q-${node.id}`} className={`relative group ${topLevelClass} ${indentClass}`}>
+                    
+                    {/* Question Body */}
+                    <div className="flex gap-4 items-baseline">
+                        <span className="text-slate-500 font-medium text-sm w-12 shrink-0 text-right select-none translate-y-0.5">
+                            {node.id}
+                        </span>
+                        <div className="grow">
+                            <div 
+                                ref={questionRef} 
+                                className="text-lg text-slate-900 leading-relaxed prose prose-slate max-w-none prose-p:my-2 prose-img:my-4 prose-img:rounded-sm"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Solution Block */}
+                    {hasSolutionBlock && (
+                        <div className="mt-4 ml-16 pl-0">
+                            
+                            {/* Answer (Visible by default if present) */}
+                            {hasAnswer && (
+                                <div className="mb-4">
+                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">
+                                        Answer
+                                    </h5>
+                                    <div 
+                                        ref={answerRef} 
+                                        className="text-base font-medium text-slate-800 prose prose-slate max-w-none prose-p:my-0"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Solution Details Toggle */}
+                            {hasDetails && (
+                                <div>
+                                    <button
+                                        onClick={() => toggleNode(node.id)}
+                                        className="group/toggle flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors focus:outline-none"
+                                        aria-expanded={isExpanded}
+                                        aria-controls={`details-${node.id}`}
+                                    >
+                                        <span className="select-none">
+                                            {isExpanded ? "Hide working" : "Show working"}
+                                        </span>
+                                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                    </button>
+
+                                    {/* Expanded Region */}
+                                    <div id={`details-${node.id}`}>
+                                        <SolutionDetailsRegion 
+                                            details={node.solutionBlock.solutionDetails} 
+                                            isExpanded={isExpanded} 
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Children */}
+                    {node.children && node.children.length > 0 && (
+                        <div className="mt-8">
+                            {node.children.map(child => (
+                                <QuestionNode 
+                                    key={child.id} 
+                                    node={child} 
+                                    depth={depth + 1} 
+                                    expandedMap={expandedMap}
+                                    toggleNode={toggleNode}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const SectionBlock = ({ label, questions, expandedMap, toggleNode }) => {
+            return (
+                <div className="mb-12">
+                    {/* Section Header (Optional) */}
+                    {label && (
+                        <div className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm py-2 mb-8 border-b border-slate-200">
+                            <h2 className="text-xl font-bold text-slate-800 px-4 md:px-0">Section {label}</h2>
+                        </div>
+                    )}
+                    
+                    {/* Questions List */}
+                    <div>
+                        {questions.map(q => (
+                            <QuestionNode 
+                                key={q.id} 
+                                node={q} 
+                                expandedMap={expandedMap} 
+                                toggleNode={toggleNode}
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 3. Shell & App ---
+
+        const App = () => {
+            const [payload, setPayload] = useState(null);
+            const [error, setError] = useState(false);
+            const [currentPaperKey, setCurrentPaperKey] = useState(null);
+            const [expandedMap, setExpandedMap] = useState({});
+            const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+            // Fetch Payload
+            useEffect(() => {
+                fetch(RTQ_PAPERS_PAYLOAD_PATH)
+                    .then(res => {
+                        if (!res.ok) throw new Error("Failed to load");
+                        return res.json();
+                    })
+                    .then(data => {
+                        setPayload(data);
+                        if (data.papers && data.papers.length > 0) {
+                            setCurrentPaperKey(data.papers[0].key);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        setError(true);
+                    });
+            }, []);
+
+            // Current Paper Data
+            const currentPaper = useMemo(() => {
+                if (!payload || !currentPaperKey) return null;
+                return payload.papers.find(p => p.key === currentPaperKey);
+            }, [payload, currentPaperKey]);
+
+            // Default Expansion Logic
+            useEffect(() => {
+                if (!currentPaper) return;
+                
+                const defaults = currentPaper.defaults || {};
+                const expandAll = defaults.expandedAll !== false; // Default true unless false
+                
+                const newMap = {};
+                
+                const traverse = (nodes) => {
+                    nodes.forEach(node => {
+                        if (node.solutionBlock?.solutionDetails) {
+                            newMap[node.id] = expandAll;
+                        }
+                        if (node.children) traverse(node.children);
+                    });
+                };
+
+                if (currentPaper.sections) {
+                    currentPaper.sections.forEach(sec => traverse(sec.questions));
+                } else if (currentPaper.questions) {
+                    traverse(currentPaper.questions);
+                }
+
+                setExpandedMap(newMap);
+            }, [currentPaper]);
+
+            const toggleNode = (id) => {
+                setExpandedMap(prev => ({ ...prev, [id]: !prev[id] }));
+            };
+
+            const scrollToQuestion = (id) => {
+                const el = document.getElementById(`q-${id}`);
+                if (el) {
+                    // Smooth scroll with offset for sticky header/top controls if needed
+                    const y = el.getBoundingClientRect().top + window.scrollY - 24; 
+                    window.scrollTo({ top: y, behavior: 'smooth' });
+                    setMobileNavOpen(false);
+                    // Focus for accessibility
+                    el.focus({ preventScroll: true });
+                }
+            };
+
+            // Build Navigation Items
+            const navItems = useMemo(() => {
+                if (!currentPaper) return [];
+                const items = [];
+                
+                if (currentPaper.sections) {
+                    currentPaper.sections.forEach(sec => {
+                        if (sec.label && sec.label.trim() !== "") {
+                            items.push({ type: 'section', label: sec.label });
+                        }
+                        sec.questions.forEach(q => {
+                            items.push({ type: 'question', id: q.id });
+                            if (q.children) {
+                                const flattened = flattenIds(q.children);
+                                flattened.forEach(child => items.push(child));
+                            }
+                        });
+                    });
+                } else if (currentPaper.questions) {
+                    currentPaper.questions.forEach(q => {
+                        items.push({ type: 'question', id: q.id });
+                        if (q.children) {
+                            const flattened = flattenIds(q.children);
+                            flattened.forEach(child => items.push(child));
+                        }
+                    });
+                }
+                return items;
+            }, [currentPaper]);
+
+            // Scroll Spy
+            const activeId = useScrollSpy(navItems.filter(i => i.type === 'question').map(i => `q-${i.id}`));
+
+            // Render
+            if (error) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
+                        PAPERS PAYLOAD MISSING
+                    </div>
+                );
+            }
+
+            if (!payload || !currentPaper) return null; // Loading state (white screen fine per spec)
+
+            return (
+                <div className="min-h-screen flex flex-col font-sans text-slate-900 bg-slate-50">
+                    
+                    {/* Top Controls Region */}
+                    <div className="w-full bg-white border-b border-slate-200 sticky top-0 z-40">
+                        <div className="max-w-7xl mx-auto px-4 lg:px-8 h-14 flex items-center justify-between">
+                            
+                            {/* Paper Selector */}
+                            <div className="flex items-center gap-3">
+                                <label htmlFor="paper-select" className="text-sm font-medium text-slate-500">
+                                    Paper:
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        id="paper-select"
+                                        value={currentPaperKey}
+                                        onChange={(e) => setCurrentPaperKey(e.target.value)}
+                                        className="appearance-none bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-md py-1.5 pl-3 pr-8 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer"
+                                    >
+                                        {payload.papers.map(p => (
+                                            <option key={p.key} value={p.key}>{p.label}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                                </div>
+                            </div>
+
+                            {/* Mobile Jump To Trigger */}
+                            <button
+                                className="lg:hidden flex items-center gap-2 text-sm font-medium text-brand-600"
+                                onClick={() => setMobileNavOpen(true)}
+                            >
+                                Jump to <Menu size={18} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* DocumentFrameShell */}
+                    <div className="grow max-w-7xl mx-auto w-full grid lg:grid-cols-[220px_1fr] gap-0 lg:gap-12 px-4 lg:px-8 pt-8">
+                        
+                        {/* Desktop Navigation Rail */}
+                        <aside className="hidden lg:block relative">
+                            <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto no-scrollbar pb-8">
+                                <NavigationList 
+                                    items={navItems} 
+                                    activeId={activeId} 
+                                    onItemClick={scrollToQuestion} 
+                                />
+                            </div>
+                        </aside>
+
+                        {/* Paper Content Column */}
+                        <main className="pb-32 min-w-0">
+                            <div className="bg-white rounded-none shadow-sm border border-slate-100 p-6 md:p-12 min-h-[60vh]">
+                                
+                                {/* Sectioned Paper Render */}
+                                {currentPaper.sections ? (
+                                    currentPaper.sections.map((sec, idx) => (
+                                        <SectionBlock 
+                                            key={idx}
+                                            label={sec.label}
+                                            questions={sec.questions}
+                                            expandedMap={expandedMap}
+                                            toggleNode={toggleNode}
+                                        />
+                                    ))
+                                ) : (
+                                    /* Flat Paper Render */
+                                    <div className="mt-4">
+                                        {currentPaper.questions.map(q => (
+                                            <QuestionNode 
+                                                key={q.id} 
+                                                node={q} 
+                                                expandedMap={expandedMap} 
+                                                toggleNode={toggleNode}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
+                            </div>
+                        </main>
+                    </div>
+
+                    {/* Mobile Navigation Drawer */}
+                    {mobileNavOpen && (
+                        <div className="fixed inset-0 z-50 flex justify-end lg:hidden" role="dialog" aria-modal="true">
+                            {/* Backdrop */}
+                            <div 
+                                className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity"
+                                onClick={() => setMobileNavOpen(false)}
+                            />
+                            
+                            {/* Drawer Content */}
+                            <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+                                <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                                    <span className="font-semibold text-slate-800">Jump to</span>
+                                    <button 
+                                        onClick={() => setMobileNavOpen(false)}
+                                        className="text-slate-500 hover:text-slate-800 p-1"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    <NavigationList 
+                                        items={navItems} 
+                                        activeId={activeId} 
+                                        onItemClick={scrollToQuestion} 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

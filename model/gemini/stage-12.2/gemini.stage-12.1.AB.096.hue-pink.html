@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AB","indexWithinVariant":"96","totalWithinVariant":"200","hueFamily":"pink","intensityMode":"","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-08T17:44:25.856Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AB&quot;,&quot;indexWithinVariant&quot;:&quot;96&quot;,&quot;totalWithinVariant&quot;:&quot;200&quot;,&quot;hueFamily&quot;:&quot;pink&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-08T17:44:25.856Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Stage 6 Baseline)</title>
+
+    <!-- Tailwind CSS (via CDN for prototyping) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // ColorLab B: Force Pink family as the interactive/accent hue
+                        accent: {
+                            50: '#fdf2f8',
+                            100: '#fce7f3',
+                            200: '#fbcfe8',
+                            300: '#f9a8d4',
+                            400: '#f472b6',
+                            500: '#ec4899',
+                            600: '#db2777',
+                            700: '#be185d',
+                            800: '#9d174d',
+                            900: '#831843',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+
+    <!-- KaTeX (SRI disabled per Stage 6 instructions) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Base typography & reset overrides */
+        body {
+            @apply text-slate-900 bg-white antialiased;
+        }
+
+        /* Scrollbar hiding for navigation */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* KaTeX Containment Invariant */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+            padding-top: 0.25em;
+            padding-bottom: 0.25em;
+        }
+        /* Ensure inline katex has no background */
+        .katex {
+            background-color: transparent !important;
+        }
+
+        /* Markdown Table Styling (Minimal/Structural) */
+        table {
+            @apply w-full text-left border-collapse my-4;
+        }
+        th, td {
+            @apply border border-slate-200 p-2 align-top text-sm;
+        }
+        th {
+            @apply font-semibold bg-slate-50;
+        }
+
+        /* Focus styles for accessibility */
+        :focus-visible {
+            @apply outline-none ring-2 ring-accent-500 ring-offset-2;
+        }
+
+        /* Hide print elements */
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- STAGE 0: CONSTANTS (AUTHORITATIVE) ---
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // --- ColorLab Config (Derived from instructions/add-on) ---
+        // Defaults to 'pink' per prompt instructions
+        const RTQ_COLORLAB_FORCE_HUE_FAMILY = "pink"; 
+
+        // --- Markdown Renderer Configuration (Authoritative) ---
+        const md = window.markdownit
+            ? window.markdownit({
+                html: true,     // allow inline SVG passthrough
+                linkify: true,
+                breaks: false,  // MUST stay false: prevents <br> inside math delimiters
+            })
+            : null;
+
+        if (md) {
+            // Disable escape rule to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // --- Components ---
+
+        // 1. Icon Components (Lucide wrapper)
+        const Icon = ({ name, size = 16, className = "" }) => {
+            React.useEffect(() => {
+                lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} width={size} height={size} className={className}></i>;
+        };
+
+        // 2. KaTeX Rendering Wrapper
+        const KaTeXContent = ({ content, className = "" }) => {
+            const containerRef = React.useRef(null);
+
+            React.useEffect(() => {
+                if (containerRef.current && window.renderMathInElement) {
+                    window.renderMathInElement(containerRef.current, {
+                        delimiters: [
+                            { left: "$$", right: "$$", display: true },
+                            { left: "$", right: "$", display: false }
+                        ],
+                        throwOnError: false,
+                        trust: true // Trust HTML in math
+                    });
+                }
+            }, [content]);
+
+            if (!content) return null;
+
+            // Render Markdown first
+            const htmlContent = md ? md.render(content) : content;
+
+            return (
+                <div 
+                    ref={containerRef}
+                    className={`prose prose-slate max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 ${className}`}
+                    dangerouslySetInnerHTML={{ __html: htmlContent }}
+                />
+            );
+        };
+
+        // 3. Navigation Components
+        const NavigationItem = ({ id, activeId, onClick, depth = 0 }) => {
+            const isActive = activeId === id;
+            
+            // Hierarchy via type scale/quietness (Stage 5.4.5)
+            // Depth 0: Normal
+            // Depth > 0: Slightly smaller/lighter, but SAME left alignment
+            const baseClasses = "block w-full text-left py-1.5 px-3 transition-colors duration-200 cursor-pointer text-sm";
+            const depthClasses = depth > 0 ? "text-slate-600 font-normal" : "text-slate-700 font-medium";
+            const activeClasses = isActive 
+                ? "text-accent-700 font-bold" // Active: weight + accent color (text only)
+                : "hover:text-slate-900 hover:underline hover:decoration-slate-300 hover:underline-offset-4";
+
+            return (
+                <button 
+                    onClick={() => onClick(id)}
+                    className={`${baseClasses} ${isActive ? activeClasses : depthClasses}`}
+                    aria-current={isActive ? "location" : undefined}
+                >
+                    {id}
+                </button>
+            );
+        };
+
+        const NavigationSection = ({ label, children }) => (
+            <div className="mb-4">
+                {label && (
+                    <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">
+                        {label}
+                    </div>
+                )}
+                <div>{children}</div>
+            </div>
+        );
+
+        const NavigationList = ({ items, activeId, onNavigate }) => {
+            // Flatten the structure for rendering, handling sections
+            // Expecting items to be either QuestionNodes or Sections based on payload type
+            return (
+                <nav className="flex flex-col pb-10">
+                    {items.map((item, idx) => {
+                        if (item.isSection) {
+                            return (
+                                <NavigationSection key={idx} label={item.label}>
+                                    {item.questions.map(q => (
+                                        <RecursiveNavNode key={q.id} node={q} activeId={activeId} onNavigate={onNavigate} />
+                                    ))}
+                                </NavigationSection>
+                            );
+                        } else {
+                            // Flat list or top-level questions
+                            return <RecursiveNavNode key={item.id || idx} node={item} activeId={activeId} onNavigate={onNavigate} />;
+                        }
+                    })}
+                </nav>
+            );
+        };
+
+        // Helper to flatten children for the nav list while keeping track of logical depth for styling
+        const RecursiveNavNode = ({ node, activeId, onNavigate, depth = 0 }) => {
+            const children = node.children || [];
+            return (
+                <>
+                    <NavigationItem 
+                        id={node.id} 
+                        activeId={activeId} 
+                        onClick={onNavigate} 
+                        depth={depth} 
+                    />
+                    {children.map(child => (
+                        <RecursiveNavNode 
+                            key={child.id} 
+                            node={child} 
+                            activeId={activeId} 
+                            onNavigate={onNavigate} 
+                            depth={depth + 1} 
+                        />
+                    ))}
+                </>
+            );
+        };
+
+        // 4. Solution Details Subsections
+        const SolutionSubsection = ({ label, content, iconName = null, isKeepInMind = false }) => {
+            if (!content) return null;
+            
+            // Stage 5.9 Styling
+            // Keep in mind: slightly more prominent body, bulleted list usually
+            // Formulas used: quiet
+            
+            return (
+                <div className={`mt-4 ${isKeepInMind ? "mb-4" : "mb-2"}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                        {iconName && <Icon name={iconName} size={14} className="text-slate-500" />}
+                        <span className={`text-xs font-bold uppercase tracking-wide ${isKeepInMind ? "text-slate-700" : "text-slate-500"}`}>
+                            {label}
+                        </span>
+                    </div>
+                    <div className={`text-sm ${isKeepInMind ? "text-slate-800" : "text-slate-600"}`}>
+                        <KaTeXContent content={content} />
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. Solution Block Component
+        const SolutionBlock = ({ data, defaultExpanded }) => {
+            // data = solutionBlock object from payload
+            if (!data) return null;
+
+            const { answer, solutionDetails } = data;
+            const hasSolutionDetails = !!solutionDetails;
+            
+            // State for expansion
+            const [isExpanded, setIsExpanded] = React.useState(defaultExpanded && hasSolutionDetails);
+
+            // If neither exist, render nothing (shouldn't happen if parent check is good)
+            if (!answer && !hasSolutionDetails) return null;
+
+            return (
+                <div className="mt-4">
+                    {/* Answer Region */}
+                    {answer && (
+                        <div className="mb-3">
+                            <span className="text-sm font-bold text-slate-700 block mb-1">Answer</span>
+                            <div className="text-slate-900 font-medium">
+                                <KaTeXContent content={answer} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Solution Details Region */}
+                    {hasSolutionDetails && (
+                        <div className="mt-4">
+                            {/* Disclosure Control */}
+                            <button 
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                className="group flex items-center gap-2 text-sm font-medium text-accent-600 hover:text-accent-800 transition-colors focus-visible:rounded"
+                                aria-expanded={isExpanded}
+                            >
+                                <span>{isExpanded ? "Hide working" : "Show working"}</span>
+                                <Icon 
+                                    name="chevron-down" 
+                                    className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} 
+                                />
+                            </button>
+
+                            {/* Expanded Content */}
+                            {isExpanded && (
+                                <div className="mt-4 pl-0 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    {/* Optional: Visual separator or wash could go here if density required, 
+                                        but whitespace is primary. Keeping it clean per Stage 5. */}
+                                    
+                                    {/* Order: Keep in mind -> Formulas -> Working -> Alternative */}
+                                    
+                                    <SolutionSubsection 
+                                        label="Keep in mind" 
+                                        content={solutionDetails.keepInMind} 
+                                        isKeepInMind={true}
+                                        iconName="lightbulb"
+                                    />
+
+                                    <SolutionSubsection 
+                                        label="Formulas used" 
+                                        content={solutionDetails.formulasUsed} 
+                                    />
+
+                                    {/* Primary Working */}
+                                    {solutionDetails.working && (
+                                        <div className="mt-4">
+                                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                                                Working
+                                            </div>
+                                            <div className="text-sm text-slate-800 leading-relaxed">
+                                                <KaTeXContent content={solutionDetails.working} />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Alternative Workings */}
+                                    {solutionDetails.alternativeWorking && solutionDetails.alternativeWorking.map((alt, idx) => (
+                                        <div key={idx} className="mt-6 pt-4 border-t border-slate-100">
+                                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                                                Alternative working
+                                            </div>
+                                            <div className="text-sm text-slate-800 leading-relaxed">
+                                                <KaTeXContent content={alt} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // 6. Question Node Component (Recursive)
+        const QuestionNode = ({ node, paperDefaults, depth = 0 }) => {
+            const { id, question, solutionBlock, children } = node;
+            const hasSolutionBlock = !!solutionBlock;
+            
+            // Logic for default expansion state based on paper defaults
+            const isExpandedDefault = paperDefaults?.expandedAll !== false;
+
+            return (
+                <div 
+                    id={`question-${id}`} 
+                    className={`
+                        relative scroll-mt-24
+                        ${depth === 0 ? 'mb-12' : 'mb-6 mt-4 ml-0 md:ml-4'} 
+                    `}
+                >
+                    {/* Question Body */}
+                    <div className="group">
+                        <div className="flex items-baseline gap-3">
+                            <span className="flex-none text-slate-500 font-medium text-sm select-none">{id}</span>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-slate-900 text-base leading-relaxed">
+                                    <KaTeXContent content={question} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Solution Block (offset to align with content, not ID) */}
+                    {hasSolutionBlock && (
+                        <div className="pl-[calc(2em+0.75rem)] mt-3">
+                            <SolutionBlock 
+                                data={solutionBlock} 
+                                defaultExpanded={isExpandedDefault} 
+                            />
+                        </div>
+                    )}
+
+                    {/* Children Questions */}
+                    {children && children.length > 0 && (
+                        <div className="pl-[calc(0.5em)] border-l-2 border-transparent"> 
+                            {children.map((child) => (
+                                <QuestionNode 
+                                    key={child.id} 
+                                    node={child} 
+                                    paperDefaults={paperDefaults} 
+                                    depth={depth + 1} 
+                                />
+                            ))}
+                        </div>
+                    )}
+                    
+                    {/* Divider for top-level questions only */}
+                    {depth === 0 && (
+                        <div className="mt-12 border-b border-slate-100 w-full" aria-hidden="true"></div>
+                    )}
+                </div>
+            );
+        };
+
+        // 7. Section Block (for sectioned papers)
+        const SectionBlock = ({ section, paperDefaults }) => {
+            return (
+                <div className="mb-16">
+                    {section.label && (
+                        <div className="mb-8 pb-2 border-b-2 border-slate-100">
+                            <h2 className="text-xl font-semibold text-slate-800">{section.label}</h2>
+                        </div>
+                    )}
+                    <div>
+                        {section.questions.map(q => (
+                            <QuestionNode key={q.id} node={q} paperDefaults={paperDefaults} depth={0} />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // 8. Main Application Shell
+        const App = () => {
+            const [payload, setPayload] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const [error, setError] = React.useState(false);
+            const [currentPaperKey, setCurrentPaperKey] = React.useState(null);
+            const [activeNavId, setActiveNavId] = React.useState(null);
+            const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+
+            // Fetch Payload
+            React.useEffect(() => {
+                fetch(RTQ_PAPERS_PAYLOAD_PATH)
+                    .then(res => {
+                        if (!res.ok) throw new Error("Failed to load");
+                        return res.json();
+                    })
+                    .then(data => {
+                        setPayload(data);
+                        if (data.papers && data.papers.length > 0) {
+                            setCurrentPaperKey(data.papers[0].key);
+                        }
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        setError(true);
+                        setLoading(false);
+                    });
+            }, []);
+
+            // Scroll Spy for Navigation Active State
+            React.useEffect(() => {
+                const handleScroll = () => {
+                    if (!payload || !currentPaperKey) return;
+                    
+                    // Collect all question IDs currently on screen
+                    const ids = [];
+                    // This is a simplified spy. In a real app we'd map the tree.
+                    // For now, let's just query DOM elements starting with 'question-'
+                    const elements = document.querySelectorAll('[id^="question-"]');
+                    
+                    let currentId = null;
+                    
+                    for (const el of elements) {
+                        const rect = el.getBoundingClientRect();
+                        // If top of element is near the top 1/3 of viewport
+                        if (rect.top < window.innerHeight / 3) {
+                            currentId = el.id.replace('question-', '');
+                        } else {
+                            break; // Stop checking once we hit elements further down
+                        }
+                    }
+                    
+                    if (currentId && currentId !== activeNavId) {
+                        setActiveNavId(currentId);
+                    }
+                };
+
+                window.addEventListener('scroll', handleScroll, { passive: true });
+                return () => window.removeEventListener('scroll', handleScroll);
+            }, [payload, currentPaperKey, activeNavId]);
+
+            const handlePaperChange = (key) => {
+                setCurrentPaperKey(key);
+                window.scrollTo({ top: 0, behavior: 'instant' });
+                setActiveNavId(null);
+                setMobileNavOpen(false);
+            };
+
+            const scrollToQuestion = (id) => {
+                setMobileNavOpen(false);
+                const el = document.getElementById(`question-${id}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                    setActiveNavId(id);
+                }
+            };
+
+            if (loading) return <div className="flex items-center justify-center h-screen text-slate-400">Loading payload...</div>;
+            if (error || !payload) return (
+                <div className="flex items-center justify-center h-screen font-mono text-red-600 bg-slate-50">
+                    PAPERS PAYLOAD MISSING
+                </div>
+            );
+
+            const currentPaper = payload.papers.find(p => p.key === currentPaperKey);
+            
+            // Prepare nav items structure based on paper type (flat vs sectioned)
+            let navStructure = [];
+            if (currentPaper.sections) {
+                navStructure = currentPaper.sections.map(s => ({
+                    isSection: true,
+                    label: s.label,
+                    questions: s.questions
+                }));
+            } else {
+                navStructure = currentPaper.questions;
+            }
+
+            return (
+                <div className="min-h-screen bg-white">
+                    {/* Top Controls Region (Aligned with shell) */}
+                    <div className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100">
+                        <div className="max-w-6xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between">
+                            {/* Paper Selector */}
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm font-semibold text-slate-500 hidden sm:inline">Paper:</span>
+                                <select 
+                                    className="bg-slate-50 border-none text-sm font-medium text-slate-800 rounded py-1 px-3 focus:ring-2 focus:ring-accent-500 cursor-pointer"
+                                    value={currentPaperKey}
+                                    onChange={(e) => handlePaperChange(e.target.value)}
+                                >
+                                    {payload.papers.map(p => (
+                                        <option key={p.key} value={p.key}>{p.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Mobile Nav Trigger */}
+                            <button 
+                                className="md:hidden p-2 text-slate-600 hover:text-accent-600"
+                                onClick={() => setMobileNavOpen(true)}
+                                aria-label="Jump to question"
+                            >
+                                <span className="text-sm font-semibold mr-2">Jump to</span>
+                                <Icon name="menu" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* DocumentFrameShell */}
+                    <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 flex items-start gap-8 relative">
+                        
+                        {/* Desktop Navigation Rail */}
+                        <aside className="hidden md:block w-48 shrink-0 sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto scrollbar-hide">
+                            <NavigationList 
+                                items={navStructure} 
+                                activeId={activeNavId} 
+                                onNavigate={scrollToQuestion} 
+                            />
+                        </aside>
+
+                        {/* Paper Document Column */}
+                        <main className="flex-1 min-w-0 pb-32">
+                            {/* Render Questions */}
+                            {currentPaper.sections ? (
+                                currentPaper.sections.map((section, idx) => (
+                                    <SectionBlock 
+                                        key={idx} 
+                                        section={section} 
+                                        paperDefaults={currentPaper.defaults} 
+                                    />
+                                ))
+                            ) : (
+                                currentPaper.questions.map(q => (
+                                    <QuestionNode 
+                                        key={q.id} 
+                                        node={q} 
+                                        paperDefaults={currentPaper.defaults} 
+                                        depth={0}
+                                    />
+                                ))
+                            )}
+                        </main>
+                    </div>
+
+                    {/* Mobile Navigation Drawer */}
+                    {mobileNavOpen && (
+                        <div className="fixed inset-0 z-50 flex justify-end md:hidden" role="dialog" aria-modal="true">
+                            {/* Scrim */}
+                            <div 
+                                className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm"
+                                onClick={() => setMobileNavOpen(false)}
+                            ></div>
+                            
+                            {/* Drawer Content */}
+                            <div className="relative w-64 bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+                                <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                                    <span className="font-semibold text-slate-800">Jump to</span>
+                                    <button 
+                                        onClick={() => setMobileNavOpen(false)}
+                                        className="p-1 text-slate-400 hover:text-slate-600"
+                                    >
+                                        <Icon name="x" />
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-2">
+                                    <NavigationList 
+                                        items={navStructure} 
+                                        activeId={activeNavId} 
+                                        onNavigate={scrollToQuestion} 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

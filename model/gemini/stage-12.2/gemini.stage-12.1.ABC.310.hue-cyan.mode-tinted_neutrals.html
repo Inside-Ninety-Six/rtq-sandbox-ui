@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"ABC","indexWithinVariant":"310","totalWithinVariant":"320","hueFamily":"cyan","intensityMode":"tinted_neutrals","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-10T00:58:33.075Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;ABC&quot;,&quot;indexWithinVariant&quot;:&quot;310&quot;,&quot;totalWithinVariant&quot;:&quot;320&quot;,&quot;hueFamily&quot;:&quot;cyan&quot;,&quot;intensityMode&quot;:&quot;tinted_neutrals&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-10T00:58:33.075Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer (Stage 6 Baseline)</title>
+
+    <!-- 
+      STAGE 0: CONSTANTS 
+      Authoritative definitions for runtime payloads.
+    -->
+    <script>
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+    </script>
+
+    <!-- Dependencies: KaTeX & Markdown-it (No SRI per Stage 6 instructions) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+
+    <style>
+        /* 
+           COLORLAB CONFIGURATION (Add-on B & C)
+           Hue: Cyan (Add-on B Default) -> H = 195
+           Mode: Tinted Neutrals (Add-on C Default) -> Light Mode Only
+           
+           OKLCH constraint check:
+           - Page/Frame/Paper surfaces: C in [0.015 .. 0.035]
+           - Wash surfaces: C in [0.025 .. 0.045]
+           - Text Primary: C <= 0.010
+           - Text Secondary: C <= 0.012
+           - Accent: C in [0.10 .. 0.16]
+        */
+        :root {
+            /* HUE FAMILY: CYAN (195) */
+            --hue: 195;
+
+            /* SURFACES */
+            --color-page-bg: oklch(0.97 0.02 var(--hue));   /* C=0.02 */
+            --color-frame-bg: oklch(0.98 0.015 var(--hue)); /* C=0.015 */
+            --color-paper-bg: oklch(0.99 0.015 var(--hue)); /* C=0.015 */
+            
+            /* WASHES */
+            --color-sd-wash: oklch(0.96 0.03 var(--hue));   /* C=0.03 */
+            --color-info-wash: oklch(0.965 0.025 var(--hue)); /* C=0.025 */
+
+            /* TEXT - Calm, readable, not faded */
+            --color-text-primary: oklch(0.20 0.01 var(--hue));   /* C=0.01 */
+            --color-text-secondary: oklch(0.45 0.012 var(--hue)); /* C=0.012 */
+            --color-text-tertiary: oklch(0.60 0.01 var(--hue));
+
+            /* ACCENTS & INTERACTION (Non-semantic, functional only) */
+            --color-accent: oklch(0.55 0.14 var(--hue)); /* C=0.14 */
+            --color-accent-hover: oklch(0.50 0.15 var(--hue));
+            
+            /* SEPARATORS */
+            --color-hairline: oklch(0.90 0.02 var(--hue));
+
+            /* SPACING SYSTEM (Rhythm) */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 2rem;
+            --space-xl: 4rem; /* Top level question separation */
+
+            /* TYPOGRAPHY */
+            --font-stack: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* RESET & BASE */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-stack);
+            background-color: var(--color-page-bg);
+            color: var(--color-text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden; /* No page horizontal scroll */
+        }
+
+        /* LAYOUT SHELL */
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            max-width: 1280px;
+            margin: 0 auto;
+            background-color: var(--color-frame-bg);
+        }
+
+        /* TOP CONTROLS */
+        .top-controls {
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--color-hairline);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--color-frame-bg);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .paper-select {
+            padding: var(--space-sm);
+            font-family: inherit;
+            font-size: 0.95rem;
+            border: 1px solid var(--color-hairline);
+            border-radius: 4px;
+            background-color: var(--color-paper-bg);
+            color: var(--color-text-primary);
+        }
+
+        .mobile-jump-trigger {
+            display: none; /* Desktop default */
+            background: none;
+            border: none;
+            color: var(--color-accent);
+            font-weight: 600;
+            cursor: pointer;
+            padding: var(--space-sm);
+        }
+
+        /* DOCUMENT FRAME (Desktop: 2 cols) */
+        .document-frame {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
+
+        /* NAVIGATION RAIL */
+        .nav-rail {
+            width: 200px;
+            flex-shrink: 0;
+            padding: var(--space-lg) var(--space-md);
+            /* Sticky behavior */
+            position: sticky;
+            top: 60px; /* Below top controls */
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+            /* Scrollbar hiding */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            border-right: 1px solid var(--color-hairline); /* Optional divider */
+        }
+        .nav-rail::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-section-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--color-text-tertiary);
+            margin-top: var(--space-md);
+            margin-bottom: var(--space-xs);
+            padding-left: var(--space-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            pointer-events: none;
+        }
+
+        .nav-item {
+            display: block;
+            padding: var(--space-xs) var(--space-sm);
+            text-decoration: none;
+            color: var(--color-text-secondary);
+            font-size: 0.9rem;
+            border-radius: 4px;
+            transition: color 0.2s, background-color 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            color: var(--color-accent);
+            background-color: var(--color-info-wash);
+        }
+
+        .nav-item.active {
+            font-weight: 700;
+            color: var(--color-accent);
+        }
+
+        /* Indentation cues via type scale only (per instructions) */
+        .nav-item[data-depth="1"] { font-size: 0.85rem; color: var(--color-text-tertiary); }
+        .nav-item[data-depth="2"] { font-size: 0.8rem; color: var(--color-text-tertiary); }
+
+        /* PAPER CONTENT REGION */
+        .paper-content {
+            flex: 1;
+            padding: var(--space-lg) var(--space-xl);
+            background-color: var(--color-paper-bg);
+            /* Ensure containment */
+            min-width: 0; 
+        }
+
+        /* SECTIONS & HEADERS */
+        .section-header-block {
+            margin-bottom: var(--space-lg);
+            border-bottom: 1px solid var(--color-hairline);
+            padding-bottom: var(--space-sm);
+        }
+        .section-title {
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--color-text-primary);
+        }
+
+        /* QUESTION NODES */
+        .question-node {
+            display: flex;
+            flex-direction: column;
+            /* Top level separation */
+            margin-bottom: var(--space-xl);
+            scroll-margin-top: 100px; /* Offset for sticky header */
+        }
+        
+        .question-node[data-depth="0"] { margin-bottom: var(--space-xl); }
+        .question-node[data-depth="1"] { margin-bottom: var(--space-lg); margin-top: var(--space-md); }
+        .question-node[data-depth="2"] { margin-bottom: var(--space-md); margin-top: var(--space-sm); }
+
+        .question-body {
+            display: flex;
+            gap: var(--space-md);
+            font-size: 1.05rem;
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-md);
+        }
+
+        .q-id {
+            font-weight: 600;
+            min-width: 2rem;
+            color: var(--color-text-secondary);
+        }
+
+        .q-prompt {
+            flex: 1;
+            overflow-wrap: break-word;
+        }
+
+        /* SOLUTION BLOCK */
+        .solution-block {
+            margin-left: 3rem; /* Visual subordination via indentation/alignment */
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        /* ANSWER */
+        .answer-region {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+        .answer-label {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--color-text-secondary);
+        }
+        .answer-content {
+            font-weight: 500;
+        }
+
+        /* SOLUTION DETAILS TOGGLE */
+        .disclosure-control {
+            align-self: flex-start;
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--color-accent);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            margin-bottom: var(--space-sm);
+        }
+        .disclosure-control:hover {
+            color: var(--color-accent-hover);
+            text-decoration: underline;
+        }
+        .chevron {
+            transition: transform 0.2s;
+            fill: currentColor;
+            width: 1em;
+            height: 1em;
+        }
+        .disclosure-control[aria-expanded="true"] .chevron {
+            transform: rotate(180deg);
+        }
+
+        /* SOLUTION DETAILS REGION */
+        .solution-details {
+            display: none;
+            flex-direction: column;
+            gap: var(--space-md);
+            padding: var(--space-md);
+            background-color: var(--color-sd-wash);
+            border-radius: 4px; /* Subtle grouping */
+            font-size: 0.95rem;
+            border-left: 2px solid var(--color-hairline); /* Safety net cue */
+        }
+        .solution-details.expanded {
+            display: flex;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* SUBSECTIONS */
+        .sd-subsection {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xs);
+        }
+        .sd-label {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .keep-in-mind-body {
+            /* Keep in mind specific styling */
+            color: var(--color-text-secondary);
+        }
+
+        .formulas-body {
+            font-family: inherit;
+        }
+
+        .working-body, .alt-working-body {
+            /* Ensure pure math blocks don't get extra margins */
+        }
+
+        /* ALTERNATIVE WORKING SEPARATOR */
+        .alt-working-separator {
+            height: 1px;
+            background-color: var(--color-hairline);
+            margin: var(--space-sm) 0;
+        }
+
+        /* CHILDREN CONTAINER */
+        .children-container {
+            margin-left: 1.5rem; /* Structural indentation for nesting */
+            border-left: 1px solid transparent; /* Placeholder for alignment */
+        }
+
+        /* MARKDOWN & KATEX OVERRIDES */
+        /* Prevent math overflow */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0.5em 0;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+        /* Inline katex has no bg */
+        .katex { font-size: 1.1em; }
+
+        /* Tables */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: var(--space-sm) 0;
+        }
+        th, td {
+            border: 1px solid var(--color-hairline);
+            padding: var(--space-sm);
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+            background-color: rgba(0,0,0,0.02);
+        }
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        /* MOBILE DRAWER */
+        .nav-drawer-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 40;
+        }
+        .nav-drawer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 280px;
+            background: var(--color-frame-bg);
+            z-index: 50;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        .nav-drawer.open {
+            transform: translateX(0);
+        }
+        .drawer-header {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--color-hairline);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .drawer-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--color-text-secondary);
+        }
+        .drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-md);
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .nav-rail { display: none; } /* Hide rail on mobile */
+            .mobile-jump-trigger { display: block; } /* Show trigger */
+            .paper-content { padding: var(--space-md); }
+            .solution-block { margin-left: 0; margin-top: var(--space-sm); }
+            .children-container { margin-left: var(--space-sm); }
+        }
+
+        /* UTILS */
+        .hidden { display: none !important; }
+        .error-message {
+            padding: var(--space-xl);
+            text-align: center;
+            color: var(--color-text-secondary);
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-shell" id="app-shell">
+    <!-- Top Controls -->
+    <header class="top-controls">
+        <select id="paper-selector" class="paper-select" aria-label="Select Paper">
+            <option value="" disabled selected>Loading papers...</option>
+        </select>
+        <button id="jump-to-trigger" class="mobile-jump-trigger">Jump to...</button>
+    </header>
+
+    <div class="document-frame">
+        <!-- Desktop Nav Rail -->
+        <nav class="nav-rail" aria-label="Paper Navigation">
+            <div id="nav-list-container" class="nav-list">
+                <!-- Nav items generated here -->
+            </div>
+        </nav>
+
+        <!-- Main Paper Content -->
+        <main class="paper-content" id="paper-content">
+            <div id="content-loading">Loading payload...</div>
+        </main>
+    </div>
+</div>
+
+<!-- Mobile Drawer -->
+<div id="drawer-backdrop" class="nav-drawer-backdrop"></div>
+<div id="nav-drawer" class="nav-drawer" role="dialog" aria-modal="true" aria-label="Navigation">
+    <div class="drawer-header">
+        <span class="drawer-title" style="font-weight:700">Jump to</span>
+        <button id="drawer-close" class="drawer-close">&times;</button>
+    </div>
+    <div id="drawer-nav-container" class="drawer-content nav-list">
+        <!-- Cloned nav items -->
+    </div>
+</div>
+
+<script>
+    // --- RUNTIME STATE ---
+    let payload = null;
+    let currentPaper = null;
+    let activeObserver = null;
+
+    // --- MARKDOWN SETUP (Authoritative Config) ---
+    const md = window.markdownit ? window.markdownit({
+        html: true, // Allow inline SVG
+        linkify: true,
+        breaks: false // MUST be false to prevent <br> in math
+    }) : null;
+
+    if (md) {
+        // Disable escape rule to preserve TeX backslashes
+        md.inline.ruler.disable(['escape']);
+    }
+
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            console.log("Fetching payload from:", RTQ_PAPERS_PAYLOAD_PATH);
+            const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+            if (!response.ok) throw new Error("Fetch failed");
+            payload = await response.json();
+            
+            initPaperSelector();
+        } catch (e) {
+            console.error("Payload Error:", e);
+            document.getElementById('paper-content').innerHTML = `
+                <div class="error-message">PAPERS PAYLOAD MISSING</div>
+            `;
+        }
+        
+        setupInteractions();
+    });
+
+    function initPaperSelector() {
+        const selector = document.getElementById('paper-selector');
+        selector.innerHTML = '';
+        
+        if (!payload.papers || payload.papers.length === 0) return;
+
+        payload.papers.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.key;
+            opt.textContent = p.label || p.key;
+            selector.appendChild(opt);
+        });
+
+        selector.addEventListener('change', (e) => loadPaper(e.target.value));
+        
+        // Load first paper by default
+        loadPaper(payload.papers[0].key);
+    }
+
+    function loadPaper(paperKey) {
+        currentPaper = payload.papers.find(p => p.key === paperKey);
+        if (!currentPaper) return;
+
+        renderContent();
+        renderNavigation();
+        setupScrollSpy();
+    }
+
+    // --- CONTENT RENDERING ---
+    function renderContent() {
+        const container = document.getElementById('paper-content');
+        container.innerHTML = '';
+
+        if (currentPaper.sections) {
+            currentPaper.sections.forEach(section => {
+                if (section.label && section.label.trim() !== "") {
+                    const header = document.createElement('div');
+                    header.className = 'section-header-block';
+                    header.innerHTML = `<div class="section-title">${escapeHTML(section.label)}</div>`;
+                    container.appendChild(header);
+                }
+                section.questions.forEach(q => {
+                    container.appendChild(createQuestionNode(q, 0, currentPaper.defaults));
+                });
+            });
+        } else if (currentPaper.questions) {
+            currentPaper.questions.forEach(q => {
+                container.appendChild(createQuestionNode(q, 0, currentPaper.defaults));
+            });
+        }
+
+        // Post-process Math
+        renderMathInElement(container, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+        });
+    }
+
+    function createQuestionNode(node, depth, defaults) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'question-node';
+        wrapper.dataset.id = node.id;
+        wrapper.dataset.depth = depth;
+        wrapper.id = `q-${node.id}`; // Anchor
+
+        // 1. Question Body
+        const body = document.createElement('div');
+        body.className = 'question-body';
+        body.innerHTML = `
+            <div class="q-id">${escapeHTML(node.id)}</div>
+            <div class="q-prompt">${renderMD(node.question)}</div>
+        `;
+        wrapper.appendChild(body);
+
+        // 2. Solution Block (Optional)
+        if (node.solutionBlock) {
+            const sb = node.solutionBlock;
+            const block = document.createElement('div');
+            block.className = 'solution-block';
+
+            // Answer
+            if (sb.answer) {
+                const ansRegion = document.createElement('div');
+                ansRegion.className = 'answer-region';
+                ansRegion.innerHTML = `
+                    <div class="answer-label">Answer</div>
+                    <div class="answer-content">${renderMD(sb.answer)}</div>
+                `;
+                block.appendChild(ansRegion);
+            }
+
+            // Solution Details
+            if (sb.solutionDetails) {
+                const sd = sb.solutionDetails;
+                // Defaults logic
+                const isExpanded = defaults && defaults.expandedAll !== false;
+
+                // Toggle
+                const toggle = document.createElement('button');
+                toggle.className = 'disclosure-control';
+                toggle.setAttribute('aria-expanded', isExpanded);
+                toggle.setAttribute('aria-controls', `sd-${node.id}`);
+                toggle.innerHTML = `
+                    <span>${isExpanded ? 'Hide working' : 'Show working'}</span>
+                    <svg class="chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                `;
+                toggle.onclick = () => {
+                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', !expanded);
+                    toggle.querySelector('span').textContent = !expanded ? 'Hide working' : 'Show working';
+                    const region = block.querySelector('.solution-details');
+                    region.classList.toggle('expanded');
+                };
+                block.appendChild(toggle);
+
+                // Region
+                const details = document.createElement('div');
+                details.id = `sd-${node.id}`;
+                details.className = `solution-details ${isExpanded ? 'expanded' : ''}`;
+
+                // Order: Keep in mind, Formulas, Working, Alt Working
+                if (sd.keepInMind) {
+                    details.appendChild(createSDSubsection('Keep in mind', sd.keepInMind, 'keep-in-mind-body'));
+                }
+                if (sd.formulasUsed) {
+                    details.appendChild(createSDSubsection('Formulas used', sd.formulasUsed, 'formulas-body'));
+                }
+                if (sd.working) {
+                    details.appendChild(createSDSubsection('Working', sd.working, 'working-body'));
+                }
+                if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                    sd.alternativeWorking.forEach(alt => {
+                        const sep = document.createElement('div');
+                        sep.className = 'alt-working-separator';
+                        details.appendChild(sep);
+                        details.appendChild(createSDSubsection('Alternative working', alt, 'alt-working-body'));
+                    });
+                }
+                block.appendChild(details);
+            }
+            wrapper.appendChild(block);
+        }
+
+        // 3. Children
+        if (node.children && node.children.length > 0) {
+            const childContainer = document.createElement('div');
+            childContainer.className = 'children-container';
+            node.children.forEach(child => {
+                childContainer.appendChild(createQuestionNode(child, depth + 1, defaults));
+            });
+            wrapper.appendChild(childContainer);
+        }
+
+        return wrapper;
+    }
+
+    function createSDSubsection(label, markdown, bodyClass) {
+        const div = document.createElement('div');
+        div.className = 'sd-subsection';
+        div.innerHTML = `
+            <div class="sd-label">${escapeHTML(label)}</div>
+            <div class="${bodyClass}">${renderMD(markdown)}</div>
+        `;
+        return div;
+    }
+
+    // --- NAVIGATION RENDERING ---
+    function renderNavigation() {
+        const desktopList = document.getElementById('nav-list-container');
+        desktopList.innerHTML = '';
+        const drawerList = document.getElementById('drawer-nav-container');
+        drawerList.innerHTML = '';
+
+        const fragment = document.createDocumentFragment();
+
+        if (currentPaper.sections) {
+            currentPaper.sections.forEach(section => {
+                if (section.label && section.label.trim() !== "") {
+                    const lbl = document.createElement('div');
+                    lbl.className = 'nav-section-label';
+                    lbl.textContent = section.label;
+                    fragment.appendChild(lbl);
+                }
+                section.questions.forEach(q => appendNavItems(q, 0, fragment));
+            });
+        } else if (currentPaper.questions) {
+            currentPaper.questions.forEach(q => appendNavItems(q, 0, fragment));
+        }
+
+        desktopList.appendChild(fragment.cloneNode(true));
+        drawerList.appendChild(fragment);
+    }
+
+    function appendNavItems(node, depth, container) {
+        const item = document.createElement('a');
+        item.className = 'nav-item';
+        item.textContent = node.id;
+        item.dataset.target = `q-${node.id}`;
+        item.dataset.depth = Math.min(depth, 2); // Cap visual depth cues
+        
+        item.onclick = (e) => {
+            e.preventDefault();
+            const target = document.getElementById(`q-${node.id}`);
+            if (target) {
+                // Offset for header
+                const top = target.getBoundingClientRect().top + window.scrollY - 80;
+                window.scrollTo({ top: top, behavior: 'smooth' });
+                closeDrawer();
+            }
+        };
+
+        container.appendChild(item);
+
+        if (node.children) {
+            node.children.forEach(c => appendNavItems(c, depth + 1, container));
+        }
+    }
+
+    // --- INTERACTIONS ---
+    function setupInteractions() {
+        const trigger = document.getElementById('jump-to-trigger');
+        const drawer = document.getElementById('nav-drawer');
+        const backdrop = document.getElementById('drawer-backdrop');
+        const closeBtn = document.getElementById('drawer-close');
+
+        const open = () => {
+            drawer.classList.add('open');
+            backdrop.style.display = 'block';
+        };
+        const close = () => {
+            drawer.classList.remove('open');
+            backdrop.style.display = 'none';
+        };
+
+        trigger.onclick = open;
+        closeBtn.onclick = close;
+        backdrop.onclick = close;
+        window.closeDrawer = close;
+    }
+
+    // --- SCROLL SPY ---
+    function setupScrollSpy() {
+        if (activeObserver) activeObserver.disconnect();
+
+        const options = {
+            root: null,
+            rootMargin: '-10% 0px -80% 0px',
+            threshold: 0
+        };
+
+        activeObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    highlightNav(entry.target.dataset.id);
+                }
+            });
+        }, options);
+
+        document.querySelectorAll('.question-node').forEach(node => {
+            activeObserver.observe(node);
+        });
+    }
+
+    function highlightNav(id) {
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        // Desktop
+        const deskLink = document.querySelector(`#nav-list-container .nav-item[data-target="q-${id}"]`);
+        if (deskLink) {
+            deskLink.classList.add('active');
+            deskLink.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+        // Mobile
+        const mobLink = document.querySelector(`#drawer-nav-container .nav-item[data-target="q-${id}"]`);
+        if (mobLink) mobLink.classList.add('active');
+    }
+
+    // --- UTILS ---
+    function renderMD(text) {
+        if (!text) return '';
+        return md ? md.render(text) : text;
+    }
+
+    function escapeHTML(str) {
+        if (!str) return '';
+        return str.replace(/[&<>'"]/g, 
+            tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag]));
+    }
+</script>
+
+</body>
+</html>

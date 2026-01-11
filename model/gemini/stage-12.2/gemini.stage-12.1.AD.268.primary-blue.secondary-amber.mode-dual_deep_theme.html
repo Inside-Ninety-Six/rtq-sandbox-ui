@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AD","indexWithinVariant":"268","totalWithinVariant":"440","hueFamily":"","intensityMode":"","primaryHueFamily":"blue","secondaryHueFamily":"amber","dualIntensityMode":"dual_deep_theme","timestamp":"2026-01-10T14:35:52.723Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AD&quot;,&quot;indexWithinVariant&quot;:&quot;268&quot;,&quot;totalWithinVariant&quot;:&quot;440&quot;,&quot;hueFamily&quot;:&quot;&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;blue&quot;,&quot;secondaryHueFamily&quot;:&quot;amber&quot;,&quot;dualIntensityMode&quot;:&quot;dual_deep_theme&quot;,&quot;timestamp&quot;:&quot;2026-01-10T14:35:52.723Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Viewer</title>
+    
+    <!-- KaTeX CSS (No Integrity/SRI as per Stage 6 instructions) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    
+    <!-- Scripts: Markdown-it and KaTeX (No Integrity/SRI) -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        /* =========================================
+           RESET & BASE
+           ========================================= */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+        
+        html {
+            -webkit-text-size-adjust: 100%;
+            tab-size: 4;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.5;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--color-page-bg);
+            color: var(--color-text-primary);
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        /* =========================================
+           COLORLAB D - VARIABLES (Dynamic via JS)
+           ========================================= */
+        :root {
+            /* Initial values - overridden by JS based on Mode & Hues */
+            --color-page-bg: #ffffff;
+            --color-frame-bg: #f4f4f5;
+            --color-paper-bg: #ffffff;
+            
+            --color-text-primary: #18181b;
+            --color-text-secondary: #52525b;
+            --color-text-tertiary: #71717a;
+            
+            --color-accent-primary: #2563eb;
+            --color-accent-secondary: #d97706;
+            
+            --color-divider: #e4e4e7;
+            --color-focus-ring: var(--color-accent-primary);
+            
+            --color-wash-solution: #f8fafc; /* Subtle wash for solutions */
+        }
+
+        /* Focus Styles (Stage 5.5.2) */
+        :focus-visible {
+            outline: 2px solid var(--color-focus-ring);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* =========================================
+           LAYOUT ARCHITECTURE
+           ========================================= */
+        .layout-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            max-width: 1400px; /* DocumentFrameShell max width */
+            margin: 0 auto;
+            background-color: var(--color-frame-bg);
+            border-left: 1px solid var(--color-divider);
+            border-right: 1px solid var(--color-divider);
+        }
+
+        /* Top Controls */
+        .top-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background-color: var(--color-frame-bg); /* Aligned to frame */
+            border-bottom: 1px solid var(--color-divider);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .paper-selector {
+            padding: 0.5rem;
+            border: 1px solid var(--color-divider);
+            border-radius: 4px;
+            background-color: var(--color-paper-bg);
+            color: var(--color-text-primary);
+            font-size: 0.875rem;
+        }
+
+        .mobile-jump-trigger {
+            display: none; /* Desktop default */
+            font-size: 0.875rem;
+            color: var(--color-accent-primary);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        /* Main Content Grid */
+        .content-frame {
+            display: flex;
+            flex: 1;
+            align-items: flex-start;
+        }
+
+        /* Navigation Rail (Desktop) */
+        .nav-rail {
+            width: 240px;
+            position: sticky;
+            top: 70px; /* Height of top controls + buffer */
+            max-height: calc(100vh - 70px);
+            overflow-y: auto;
+            padding: 1.5rem 1rem 2rem 1.5rem;
+            flex-shrink: 0;
+            /* Scrollbar hiding logic */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE */
+        }
+        .nav-rail::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Paper Region */
+        .paper-region {
+            flex: 1;
+            padding: 0; /* Gutters handled by inner wrappers if needed, or gap */
+            background-color: var(--color-paper-bg); /* Surface differentiation */
+            min-height: 100%;
+            border-left: 1px solid var(--color-divider);
+        }
+
+        .paper-content-inner {
+            max-width: 800px; /* Readable line length constraint */
+            margin: 0 auto;
+            padding: 3rem 4rem 8rem 4rem; /* Top/Bottom padding for comfort */
+        }
+
+        /* =========================================
+           NAVIGATION STYLES
+           ========================================= */
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-section-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-tertiary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            padding-left: 0.5rem;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 0.25rem 0.5rem;
+            text-decoration: none;
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+            border-radius: 4px;
+            transition: color 0.15s, background-color 0.15s;
+            cursor: pointer;
+            border: 1px solid transparent; /* For high contrast mode visibility */
+        }
+
+        .nav-item:hover {
+            color: var(--color-text-primary);
+            background-color: rgba(0,0,0,0.03); /* Extremely subtle hover */
+            text-decoration: underline;
+            text-decoration-color: var(--color-divider);
+        }
+
+        .nav-item.active {
+            font-weight: 700;
+            color: var(--color-text-primary);
+            /* Optional: Secondary accent marker for nav active state per Stage 6 override */
+            border-left: 2px solid var(--color-accent-primary); 
+            padding-left: calc(0.5rem - 2px);
+        }
+
+        /* Nav Hierarchy (Visual only, no indentation) */
+        .nav-item[data-depth="0"] { font-size: 0.875rem; }
+        .nav-item[data-depth="1"] { font-size: 0.8125rem; color: var(--color-text-tertiary); }
+        .nav-item[data-depth="2"] { font-size: 0.75rem; color: var(--color-text-tertiary); }
+        .nav-item[data-depth="3"] { font-size: 0.75rem; color: var(--color-text-tertiary); }
+
+        /* =========================================
+           MOBILE DRAWER
+           ========================================= */
+        .drawer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.2);
+            z-index: 40;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .drawer-overlay.open {
+            display: block;
+            opacity: 1;
+        }
+
+        .drawer-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 280px;
+            background-color: var(--color-frame-bg);
+            z-index: 50;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+        .drawer-panel.open {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--color-divider);
+        }
+        .drawer-title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .drawer-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            line-height: 1;
+            cursor: pointer;
+            color: var(--color-text-secondary);
+        }
+        .drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        /* =========================================
+           PAPER CONTENT
+           ========================================= */
+        .section-header-block {
+            margin-top: 3rem;
+            margin-bottom: 2rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--color-divider);
+        }
+        .section-header-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+
+        /* Question Node */
+        .question-node {
+            margin-bottom: 2.5rem; /* SPC__TOP_LEVEL_INTER_QUESTION_SPACING */
+            position: relative;
+        }
+
+        .question-body {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--color-text-primary);
+            margin-bottom: 1rem;
+        }
+        .question-id {
+            font-weight: 600;
+            margin-right: 0.5rem;
+            color: var(--color-text-secondary); /* Secondary per hierarchy */
+        }
+        
+        /* Children handling */
+        .children-container {
+            margin-top: 1.5rem;
+            padding-left: 1rem; /* Adaptation for indentation */
+        }
+        @media (min-width: 768px) {
+            .children-container {
+                padding-left: 2rem;
+            }
+        }
+        .children-container .question-node {
+            margin-bottom: 1.5rem; /* Tighter spacing for children */
+        }
+
+        /* Solution Block */
+        .solution-block {
+            margin-top: 1rem; /* SPC__QUESTION_TO_SOLUTION_SPACING */
+        }
+
+        /* Answer */
+        .answer-region {
+            margin-bottom: 0.75rem;
+            color: var(--color-text-primary);
+            font-weight: 500;
+        }
+        .answer-label {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            margin-right: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        /* Disclosure Control */
+        .disclosure-control {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 0.875rem;
+            color: var(--color-accent-primary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        .disclosure-control:hover {
+            text-decoration: underline;
+        }
+        .disclosure-icon {
+            transition: transform 0.2s ease;
+        }
+        .disclosure-control[aria-expanded="true"] .disclosure-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Solution Details Region */
+        .solution-details-region {
+            margin-top: 0.5rem;
+            padding: 1rem;
+            background-color: var(--color-wash-solution); /* Allowed wash */
+            border-radius: 4px; /* Soft structure, strict constraint says no 'heavy' radius but small is ok */
+            display: none;
+        }
+        .solution-details-region.expanded {
+            display: block;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Subsections */
+        .sd-subsection {
+            margin-bottom: 1.25rem;
+        }
+        .sd-subsection:last-child {
+            margin-bottom: 0;
+        }
+
+        .sd-label {
+            font-size: 0.75rem;
+            font-weight: 700; /* Bold label allowed */
+            text-transform: uppercase;
+            color: var(--color-text-secondary);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .sd-body {
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: var(--color-text-secondary); /* Subordinate text */
+        }
+
+        /* Keep in Mind specific */
+        .sd-keep-in-mind .sd-body ul {
+            margin: 0;
+            padding-left: 1.25rem;
+        }
+        
+        /* Working specific */
+        .sd-working .sd-body {
+            color: var(--color-text-primary); /* Working slightly stronger than metadata */
+        }
+        
+        /* Alternative Working Separation */
+        .sd-alt-working {
+            margin-top: 1.5rem;
+            border-top: 1px dashed var(--color-divider); /* Permitted separator */
+            padding-top: 1rem;
+        }
+
+        /* =========================================
+           MARKDOWN & KATEX OVERRIDES
+           ========================================= */
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.875rem;
+        }
+        th, td {
+            border: 1px solid var(--color-divider);
+            padding: 0.5rem;
+            text-align: left;
+        }
+        th {
+            font-weight: 600;
+            background-color: rgba(0,0,0,0.02);
+        }
+
+        /* Math Containment Invariant */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            scrollbar-width: thin;
+        }
+        /* Inline math: transparent background mandatory */
+        .katex { 
+            background-color: transparent !important; 
+        }
+        
+        /* Images / SVG */
+        img, svg {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* Lists */
+        ul, ol {
+            padding-left: 1.5rem;
+        }
+
+        /* =========================================
+           RESPONSIVE
+           ========================================= */
+        @media (max-width: 768px) {
+            .nav-rail {
+                display: none;
+            }
+            .paper-region {
+                border-left: none;
+            }
+            .mobile-jump-trigger {
+                display: block;
+            }
+            .paper-content-inner {
+                padding: 2rem 1rem 6rem 1rem;
+            }
+            .top-controls {
+                padding: 0.75rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="layout-shell">
+        <header class="top-controls">
+            <!-- Paper Selector -->
+            <select id="paperSelector" class="paper-selector" aria-label="Select paper">
+                <option disabled selected>Loading papers...</option>
+            </select>
+
+            <!-- Mobile Jump Trigger -->
+            <button id="mobileJumpBtn" class="mobile-jump-trigger">
+                Jump to...
+            </button>
+        </header>
+
+        <div class="content-frame">
+            <!-- Desktop Navigation Rail -->
+            <nav id="navRail" class="nav-rail" aria-label="Paper navigation">
+                <!-- Injected via JS -->
+            </nav>
+
+            <!-- Paper Content Region -->
+            <main id="paperRegion" class="paper-region">
+                <div id="paperContent" class="paper-content-inner">
+                    <!-- Injected via JS -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Mobile Drawer -->
+    <div id="drawerOverlay" class="drawer-overlay"></div>
+    <div id="drawerPanel" class="drawer-panel">
+        <div class="drawer-header">
+            <span class="drawer-title">Jump to</span>
+            <button id="drawerClose" class="drawer-close" aria-label="Close navigation">&times;</button>
+        </div>
+        <div class="drawer-content">
+            <nav id="drawerNavList" class="nav-list">
+                <!-- Cloned from desktop nav via JS -->
+            </nav>
+        </div>
+    </div>
+
+    <script>
+        // =========================================
+        // STAGE 0: CONSTANTS (AUTHORITATIVE)
+        // =========================================
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // =========================================
+        // COLORLAB D - CONFIG & LOGIC
+        // =========================================
+        // Placeholders for build system / fallback logic
+        const rawHuePrimary = "{{RTQ_COLORLAB_DUAL_HUE_PRIMARY}}";
+        const rawHueSecondary = "{{RTQ_COLORLAB_DUAL_HUE_SECONDARY}}";
+        const forcedMode = "dual_deep_theme";
+
+        // Hue mapping table (approx hue angles)
+        const HUE_MAP = {
+            'red': 25,
+            'amber': 75,
+            'green': 142,
+            'teal': 175,
+            'cyan': 220,
+            'blue': 264,
+            'purple': 300,
+            'pink': 350
+        };
+
+        function resolveConfig() {
+            let p = rawHuePrimary;
+            let s = rawHueSecondary;
+
+            // Check if placeholders remain (simple check: contains curly braces)
+            if (p.includes('{{') || !p) p = 'blue';
+            if (s.includes('{{') || !s) s = 'amber';
+
+            // Check enum validity
+            if (!HUE_MAP[p]) p = 'blue';
+            if (!HUE_MAP[s]) s = 'amber';
+
+            // Collision check
+            if (p === s) {
+                s = (p === 'blue') ? 'amber' : 'blue';
+            }
+
+            return { primary: p, secondary: s };
+        }
+
+        function applyTheme() {
+            const config = resolveConfig();
+            const pHue = HUE_MAP[config.primary];
+            const sHue = HUE_MAP[config.secondary];
+
+            const root = document.documentElement;
+
+            // DUAL DEEP THEME (Mode 4) Implementation
+            // Page BG: L 0.95, C 0.08 (Primary derived)
+            root.style.setProperty('--color-page-bg', `oklch(0.95 0.08 ${pHue})`);
+            
+            // Frame BG: L 0.92, C 0.08 (Darker than page, same hue)
+            root.style.setProperty('--color-frame-bg', `oklch(0.92 0.08 ${pHue})`);
+            
+            // Paper BG: L 0.98, C 0.06 (Lighter, main focus)
+            root.style.setProperty('--color-paper-bg', `oklch(0.98 0.06 ${pHue})`);
+            
+            // Text: Neutral, low chroma
+            root.style.setProperty('--color-text-primary', `oklch(0.20 0.015 ${pHue})`);
+            root.style.setProperty('--color-text-secondary', `oklch(0.35 0.02 ${pHue})`);
+            root.style.setProperty('--color-text-tertiary', `oklch(0.50 0.02 ${pHue})`);
+            
+            // Accents
+            // Primary: L ~0.55, C ~0.20
+            root.style.setProperty('--color-accent-primary', `oklch(0.55 0.20 ${pHue})`);
+            // Secondary: L ~0.60, C ~0.16
+            root.style.setProperty('--color-accent-secondary', `oklch(0.60 0.16 ${sHue})`);
+            
+            // Divider: L 0.85, low chroma
+            root.style.setProperty('--color-divider', `oklch(0.85 0.02 ${pHue})`);
+            
+            // Focus
+            root.style.setProperty('--color-focus-ring', `oklch(0.55 0.20 ${pHue})`);
+            
+            // Solution Wash: L 0.96, C 0.04
+            root.style.setProperty('--color-wash-solution', `oklch(0.96 0.04 ${pHue})`);
+        }
+
+        // Apply immediately
+        applyTheme();
+
+        // =========================================
+        // STATE & APP LOGIC
+        // =========================================
+        let appState = {
+            papers: [],
+            currentPaper: null,
+            navItems: [] // Flat list of { id, displayId, depth, isSection }
+        };
+
+        // --- Markdown Renderer Config (Authoritative) ---
+        const md = window.markdownit
+            ? window.markdownit({
+                html: true,
+                linkify: true,
+                breaks: false, // Must be false for Math
+            })
+            : null;
+
+        if (md) {
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // --- Fetch & Init ---
+        async function init() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error("Fetch failed");
+                const payload = await response.json();
+                
+                appState.papers = payload.papers || [];
+                
+                renderPaperSelector();
+                
+                if (appState.papers.length > 0) {
+                    loadPaper(appState.papers[0].key);
+                } else {
+                    renderError("No papers found in payload.");
+                }
+            } catch (err) {
+                console.error(err);
+                renderError("PAPERS PAYLOAD MISSING");
+            }
+        }
+
+        function renderError(msg) {
+            document.getElementById('paperContent').innerHTML = `<div style="padding: 2rem; color: var(--color-text-secondary);">${msg}</div>`;
+        }
+
+        // --- Paper Selector ---
+        function renderPaperSelector() {
+            const selector = document.getElementById('paperSelector');
+            selector.innerHTML = '';
+            appState.papers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.key;
+                opt.textContent = p.label || p.key;
+                selector.appendChild(opt);
+            });
+            
+            selector.addEventListener('change', (e) => {
+                loadPaper(e.target.value);
+            });
+        }
+
+        function loadPaper(key) {
+            const paper = appState.papers.find(p => p.key === key);
+            if (!paper) return;
+            
+            appState.currentPaper = paper;
+            appState.navItems = []; // reset nav
+            
+            renderPaperContent(paper);
+            renderNavigation(paper);
+            
+            // Reset scroll
+            window.scrollTo(0, 0);
+        }
+
+        // --- Navigation Rendering ---
+        function renderNavigation(paper) {
+            const navRail = document.getElementById('navRail');
+            const drawerNavList = document.getElementById('drawerNavList');
+            
+            // Build Nav List structure
+            const navList = document.createElement('ul');
+            navList.className = 'nav-list';
+            
+            // Helper to generate nav items from questions
+            function processQuestions(questions, depth) {
+                questions.forEach(q => {
+                    const li = document.createElement('li');
+                    
+                    const a = document.createElement('a');
+                    a.className = 'nav-item';
+                    a.textContent = q.id;
+                    a.dataset.targetId = `q-${q.id}`;
+                    a.dataset.depth = Math.min(depth, 3); // Cap depth class
+                    
+                    a.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const target = document.getElementById(a.dataset.targetId);
+                        if (target) {
+                            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            closeDrawer();
+                        }
+                    });
+
+                    li.appendChild(a);
+                    navList.appendChild(li);
+                    
+                    if (q.children && q.children.length > 0) {
+                        processQuestions(q.children, depth + 1);
+                    }
+                });
+            }
+
+            if (paper.sections) {
+                paper.sections.forEach(sec => {
+                    if (sec.label && sec.label.trim().length > 0) {
+                        const liSec = document.createElement('li');
+                        liSec.className = 'nav-section-label';
+                        liSec.textContent = sec.label;
+                        navList.appendChild(liSec);
+                    }
+                    if (sec.questions) {
+                        processQuestions(sec.questions, 0);
+                    }
+                });
+            } else if (paper.questions) {
+                processQuestions(paper.questions, 0);
+            }
+
+            // Mount to Rail
+            navRail.innerHTML = '';
+            navRail.appendChild(navList);
+            
+            // Clone for Drawer
+            drawerNavList.innerHTML = '';
+            const clonedList = navList.cloneNode(true);
+            // Re-attach listeners for clone
+            clonedList.querySelectorAll('.nav-item').forEach(a => {
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const target = document.getElementById(a.dataset.targetId);
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        closeDrawer();
+                    }
+                });
+            });
+            drawerNavList.appendChild(clonedList);
+            
+            // Setup intersection observer for highlighting
+            setupScrollSpy();
+        }
+
+        // --- Content Rendering ---
+        function renderPaperContent(paper) {
+            const container = document.getElementById('paperContent');
+            container.innerHTML = '';
+
+            // Handle Sections or Flat
+            if (paper.sections) {
+                paper.sections.forEach(sec => {
+                    if (sec.label && sec.label.trim().length > 0) {
+                        const header = document.createElement('div');
+                        header.className = 'section-header-block';
+                        header.innerHTML = `<div class="section-header-text">${sec.label}</div>`;
+                        container.appendChild(header);
+                    }
+                    if (sec.questions) {
+                        sec.questions.forEach(q => {
+                            container.appendChild(createQuestionNode(q, 0, paper.defaults));
+                        });
+                    }
+                });
+            } else if (paper.questions) {
+                paper.questions.forEach(q => {
+                    container.appendChild(createQuestionNode(q, 0, paper.defaults));
+                });
+            }
+
+            // Post-render: KaTeX
+            renderMathInElement(container, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false}
+                ],
+                throwOnError: false
+            });
+        }
+
+        function createQuestionNode(q, depth, defaults) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'question-node';
+            wrapper.id = `q-${q.id}`;
+            wrapper.dataset.id = q.id; // for spy
+
+            // 1. Question Body
+            const bodyDiv = document.createElement('div');
+            bodyDiv.className = 'question-body';
+            const bodyHtml = md ? md.render(q.question || '') : (q.question || '');
+            // Inject ID into body visually
+            bodyDiv.innerHTML = `<span class="question-id">${q.id}</span> ${bodyHtml}`;
+            wrapper.appendChild(bodyDiv);
+
+            // 2. Solution Block (Optional)
+            if (q.solutionBlock) {
+                const sb = q.solutionBlock;
+                const sbDiv = document.createElement('div');
+                sbDiv.className = 'solution-block';
+
+                // Answer (if present)
+                if (sb.answer) {
+                    const ansDiv = document.createElement('div');
+                    ansDiv.className = 'answer-region';
+                    const ansHtml = md ? md.renderInline(sb.answer) : sb.answer;
+                    ansDiv.innerHTML = `<span class="answer-label">Answer</span>${ansHtml}`;
+                    sbDiv.appendChild(ansDiv);
+                }
+
+                // Solution Details (if present)
+                if (sb.solutionDetails) {
+                    const sd = sb.solutionDetails;
+                    
+                    // Toggle Control
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.className = 'disclosure-control';
+                    const expandedDefault = defaults && defaults.expandedAll !== undefined ? defaults.expandedAll : true;
+                    
+                    toggleBtn.setAttribute('aria-expanded', expandedDefault);
+                    toggleBtn.innerHTML = `<span>${expandedDefault ? 'Hide working' : 'Show working'}</span>
+                        <svg class="disclosure-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+                    
+                    const detailsDiv = document.createElement('div');
+                    detailsDiv.className = `solution-details-region ${expandedDefault ? 'expanded' : ''}`;
+
+                    toggleBtn.addEventListener('click', () => {
+                        const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+                        toggleBtn.setAttribute('aria-expanded', !isExpanded);
+                        toggleBtn.querySelector('span').textContent = !isExpanded ? 'Hide working' : 'Show working';
+                        detailsDiv.classList.toggle('expanded');
+                    });
+
+                    sbDiv.appendChild(toggleBtn);
+
+                    // Content: Keep in Mind
+                    if (sd.keepInMind) {
+                        const kim = document.createElement('div');
+                        kim.className = 'sd-subsection sd-keep-in-mind';
+                        kim.innerHTML = `<span class="sd-label">Keep in mind</span><div class="sd-body">${md ? md.render(sd.keepInMind) : sd.keepInMind}</div>`;
+                        detailsDiv.appendChild(kim);
+                    }
+
+                    // Content: Formulas
+                    if (sd.formulasUsed) {
+                        const form = document.createElement('div');
+                        form.className = 'sd-subsection sd-formulas';
+                        form.innerHTML = `<span class="sd-label">Formulas used</span><div class="sd-body">${md ? md.render(sd.formulasUsed) : sd.formulasUsed}</div>`;
+                        detailsDiv.appendChild(form);
+                    }
+
+                    // Content: Working
+                    if (sd.working) {
+                        const work = document.createElement('div');
+                        work.className = 'sd-subsection sd-working';
+                        work.innerHTML = `<span class="sd-label">Working</span><div class="sd-body">${md ? md.render(sd.working) : sd.working}</div>`;
+                        detailsDiv.appendChild(work);
+                    }
+
+                    // Content: Alternative Working
+                    if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                        sd.alternativeWorking.forEach((alt, idx) => {
+                            const altDiv = document.createElement('div');
+                            altDiv.className = 'sd-subsection sd-working sd-alt-working';
+                            altDiv.innerHTML = `<span class="sd-label">Alternative working</span><div class="sd-body">${md ? md.render(alt) : alt}</div>`;
+                            detailsDiv.appendChild(altDiv);
+                        });
+                    }
+
+                    sbDiv.appendChild(detailsDiv);
+                }
+                
+                wrapper.appendChild(sbDiv);
+            }
+
+            // 3. Children
+            if (q.children && q.children.length > 0) {
+                const childContainer = document.createElement('div');
+                childContainer.className = 'children-container';
+                q.children.forEach(child => {
+                    childContainer.appendChild(createQuestionNode(child, depth + 1, defaults));
+                });
+                wrapper.appendChild(childContainer);
+            }
+
+            return wrapper;
+        }
+
+        // --- Scroll Spy ---
+        function setupScrollSpy() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.dataset.id;
+                        document.querySelectorAll('.nav-item').forEach(nav => {
+                            nav.classList.toggle('active', nav.textContent === id);
+                        });
+                        // Also auto-scroll nav rail if needed (basic)
+                        const activeNav = document.querySelector('.nav-rail .nav-item.active');
+                        if (activeNav) {
+                            activeNav.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    }
+                });
+            }, { rootMargin: '-10% 0px -80% 0px' }); // Top 10% to bottom 80% active zone
+
+            document.querySelectorAll('.question-node').forEach(node => observer.observe(node));
+        }
+
+        // --- Mobile Drawer Logic ---
+        const drawerOverlay = document.getElementById('drawerOverlay');
+        const drawerPanel = document.getElementById('drawerPanel');
+        const jumpBtn = document.getElementById('mobileJumpBtn');
+        const closeBtn = document.getElementById('drawerClose');
+
+        function openDrawer() {
+            drawerOverlay.classList.add('open');
+            drawerPanel.classList.add('open');
+            document.body.style.overflow = 'hidden'; // Lock scroll
+        }
+
+        function closeDrawer() {
+            drawerOverlay.classList.remove('open');
+            drawerPanel.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        jumpBtn.addEventListener('click', openDrawer);
+        closeBtn.addEventListener('click', closeDrawer);
+        drawerOverlay.addEventListener('click', closeDrawer);
+
+        // --- Init ---
+        init();
+
+    </script>
+</body>
+</html>

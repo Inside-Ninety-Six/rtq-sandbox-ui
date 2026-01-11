@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AD","indexWithinVariant":"177","totalWithinVariant":"440","hueFamily":"","intensityMode":"","primaryHueFamily":"blue","secondaryHueFamily":"amber","dualIntensityMode":"dual_accent_only","timestamp":"2026-01-10T09:53:40.043Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AD&quot;,&quot;indexWithinVariant&quot;:&quot;177&quot;,&quot;totalWithinVariant&quot;:&quot;440&quot;,&quot;hueFamily&quot;:&quot;&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;blue&quot;,&quot;secondaryHueFamily&quot;:&quot;amber&quot;,&quot;dualIntensityMode&quot;:&quot;dual_accent_only&quot;,&quot;timestamp&quot;:&quot;2026-01-10T09:53:40.043Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- KaTeX CSS (No integrity, per instructions) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+    <!-- Fonts (Inter for neutral/modern sans) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Phosphor Icons (for minimal icons) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        /* =========================================
+           STAGE 0: CONSTANTS & COLORLAB D SETUP
+           ========================================= */
+
+        :root {
+            /* 
+               COLORLAB D: DUAL_ACCENT_ONLY (Mode 1)
+               Primary Hue: Blue (approx 260)
+               Secondary Hue: Amber (approx 80)
+            */
+
+            /* MODE 1: All surfaces C <= 0.015 */
+            --color-surface-page: oklch(0.98 0.005 260);
+            --color-surface-frame: oklch(1.0 0 0); /* Pure white or near white */
+            --color-surface-paper: oklch(1.0 0 0);
+            --color-surface-wash: oklch(0.97 0.01 260); /* Very subtle wash for expanded details */
+
+            /* MODE 1: Text C <= 0.010 */
+            --color-text-primary: oklch(0.20 0.01 260);
+            --color-text-secondary: oklch(0.45 0.01 260);
+            --color-text-tertiary: oklch(0.60 0.01 260); /* For quiet UI text */
+
+            /* MODE 1: Primary Accent C [0.08 .. 0.14] */
+            /* Used for links, focus, disclosure text */
+            --color-accent-primary: oklch(0.55 0.12 260);
+            
+            /* MODE 1: Secondary Accent C [0.06 .. 0.12] */
+            /* Single supplementary role */
+            --color-accent-secondary: oklch(0.65 0.10 80);
+
+            /* Lines / Borders */
+            --color-border-hairline: oklch(0.92 0.005 260);
+            
+            /* Spacing units (based on 4px grid) */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2.5rem;
+            --space-2xl: 4rem;
+
+            /* Max Widths */
+            --max-w-frame: 1024px;
+            --w-nav-rail: 200px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-surface-page);
+            color: var(--color-text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* =========================================
+           UTILITIES & LAYOUT
+           ========================================= */
+
+        .document-frame-shell {
+            max-width: var(--max-w-frame);
+            margin: 0 auto;
+            min-height: 100vh;
+            background-color: var(--color-surface-frame);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        @media (min-width: 768px) {
+            .document-frame-shell {
+                flex-direction: row;
+                padding-top: var(--space-xl); /* Space for top controls if strictly inside shell */
+            }
+        }
+
+        .top-controls-region {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--color-border-hairline);
+            background-color: var(--color-surface-frame);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+        
+        @media (min-width: 768px) {
+            .top-controls-region {
+                /* On desktop, align with shell content or sit above */
+                position: relative; 
+                border-bottom: none;
+                padding-left: 0;
+                padding-right: 0;
+                margin-bottom: var(--space-lg);
+            }
+        }
+
+        /* NAVIGATION RAIL (Desktop) */
+        .nav-rail {
+            display: none; /* Hidden on mobile */
+            width: var(--w-nav-rail);
+            flex-shrink: 0;
+            padding-right: var(--space-lg);
+            border-right: 1px solid transparent; /* Optical separation handled by space */
+        }
+
+        @media (min-width: 768px) {
+            .nav-rail {
+                display: block;
+                position: sticky;
+                top: var(--space-lg);
+                height: calc(100vh - var(--space-lg) * 2);
+                overflow-y: auto;
+                /* Hide scrollbar */
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .nav-rail::-webkit-scrollbar {
+                display: none;
+            }
+        }
+
+        .nav-item {
+            display: block;
+            padding: var(--space-xs) 0;
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.15s ease;
+            border-left: 2px solid transparent;
+            padding-left: var(--space-sm);
+            margin-left: -2px; /* Pull border flush */
+        }
+
+        .nav-item:hover {
+            color: var(--color-text-primary);
+        }
+
+        .nav-item.active {
+            font-weight: 600;
+            color: var(--color-accent-primary);
+            border-left-color: var(--color-accent-primary);
+        }
+
+        /* Hierarchy via type scale only, flat left edge */
+        .nav-item[data-depth="0"] { font-size: 0.9rem; }
+        .nav-item[data-depth="1"] { font-size: 0.85rem; color: var(--color-text-tertiary); }
+        .nav-item[data-depth="2"] { font-size: 0.8rem; color: var(--color-text-tertiary); }
+        .nav-item[data-depth="1"].active,
+        .nav-item[data-depth="2"].active { color: var(--color-accent-primary); }
+
+        .nav-section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-tertiary);
+            margin-top: var(--space-lg);
+            margin-bottom: var(--space-sm);
+            padding-left: var(--space-sm);
+            font-weight: 600;
+            cursor: default;
+        }
+
+        /* PAPER CONTENT */
+        .paper-column {
+            flex-grow: 1;
+            padding: var(--space-md);
+            padding-bottom: var(--space-2xl);
+            min-width: 0; /* Enable truncation/flex shrink */
+        }
+        
+        @media (min-width: 768px) {
+            .paper-column {
+                padding: 0;
+                padding-left: var(--space-lg);
+                padding-right: var(--space-lg); /* Gutter */
+            }
+        }
+
+        /* QUESTION NODE */
+        .question-node {
+            margin-bottom: var(--space-xl); /* Top level separation */
+        }
+
+        .question-node[data-depth="1"] { margin-bottom: var(--space-lg); }
+        .question-node[data-depth="2"] { margin-bottom: var(--space-md); }
+
+        .question-header {
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-sm);
+        }
+
+        .question-id {
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            font-size: 1rem;
+            flex-shrink: 0;
+            min-width: 1.5em;
+        }
+
+        .question-body {
+            color: var(--color-text-primary);
+            font-size: 1rem;
+            width: 100%;
+        }
+
+        .question-body p { margin-bottom: 0.75em; }
+        .question-body p:last-child { margin-bottom: 0; }
+
+        /* SOLUTION BLOCK */
+        .solution-block {
+            margin-top: var(--space-md);
+            margin-left: calc(1.5em + var(--space-sm)); /* Indent to align with text start */
+        }
+        
+        @media (max-width: 640px) {
+            .solution-block {
+                margin-left: 0; /* Remove indent on small screens for width */
+                padding-left: var(--space-sm);
+                border-left: 2px solid var(--color-border-hairline);
+            }
+        }
+
+        /* ANSWER */
+        .answer-region {
+            margin-bottom: var(--space-md);
+        }
+
+        .answer-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--space-xs);
+            display: block;
+        }
+
+        .answer-content {
+            font-size: 1rem;
+            color: var(--color-text-primary);
+        }
+
+        /* DISCLOSURE CONTROL */
+        .disclosure-control {
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            color: var(--color-accent-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: var(--space-sm);
+            transition: opacity 0.2s;
+        }
+
+        .disclosure-control:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+        
+        .disclosure-control:focus-visible {
+            outline: 2px solid var(--color-accent-primary);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* SOLUTION DETAILS REGION */
+        .solution-details-region {
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .solution-details-content {
+            padding-top: var(--space-sm);
+            padding-bottom: var(--space-md);
+        }
+
+        /* Solution Details Subsections */
+        .sd-subsection {
+            margin-bottom: var(--space-lg);
+        }
+        .sd-subsection:last-child { margin-bottom: 0; }
+
+        .sd-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--color-text-tertiary); /* Quiet label */
+            margin-bottom: var(--space-xs);
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+
+        .sd-keep-in-mind .sd-label { color: var(--color-text-secondary); } /* Slightly stronger */
+
+        .sd-body {
+            font-size: 0.95rem;
+            color: var(--color-text-secondary); /* Subordinate to Question */
+            line-height: 1.6;
+        }
+
+        /* Keep in mind specific */
+        .sd-keep-in-mind ul {
+            list-style-type: disc;
+            padding-left: 1.2em;
+        }
+        .sd-keep-in-mind li { margin-bottom: 0.25em; }
+
+        /* Alternative working separator */
+        .sd-alt-working {
+            margin-top: var(--space-lg);
+            padding-top: var(--space-lg);
+            border-top: 1px solid var(--color-border-hairline);
+        }
+
+        /* MATH CONTAINMENT (KaTeX) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5em 0;
+            scrollbar-width: thin;
+        }
+        /* ColorLab D: Math blocks usually transparent, but if underlay needed: */
+        /* .katex-display { background: var(--color-surface-wash); border-radius: 4px; padding: 0.5em; } */
+        /* Per spec 5.8.4: Inline Math transparent. Block math permitted underlay. */
+        
+        /* Tables */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid var(--color-border-hairline);
+            padding: 0.5em;
+            text-align: left;
+        }
+        th { font-weight: 600; color: var(--color-text-secondary); }
+
+        /* MOBILE DRAWER */
+        .drawer-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+        .drawer-panel {
+            position: fixed;
+            top: 0; bottom: 0; left: 0;
+            width: 280px;
+            background: var(--color-surface-frame);
+            z-index: 50;
+            transform: translateX(-100%);
+            transition: transform 0.2s ease-out;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .drawer-panel.open { transform: translateX(0); }
+
+        .drawer-header {
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--color-border-hairline);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .drawer-content {
+            overflow-y: auto;
+            flex: 1;
+            padding: var(--space-md);
+        }
+
+        /* UTILITY */
+        .hidden { display: none !important; }
+        .text-accent { color: var(--color-accent-primary); }
+        
+        /* Select Reset */
+        .paper-select {
+            appearance: none;
+            background-color: transparent;
+            border: 1px solid var(--color-border-hairline);
+            border-radius: 4px;
+            padding: var(--space-xs) var(--space-md);
+            padding-right: 2rem;
+            font-size: 0.9rem;
+            color: var(--color-text-primary);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23666' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1em;
+            cursor: pointer;
+        }
+        .paper-select:focus {
+            outline: 2px solid var(--color-accent-primary);
+            border-color: var(--color-accent-primary);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="document-frame-shell">
+        
+        <!-- TOP CONTROLS (Rendered into shell or sticky top) -->
+        <div class="top-controls-region md:absolute md:top-0 md:left-0 md:right-0 md:h-16 md:px-0 md:mt-0">
+            <!-- Mobile Menu Trigger -->
+            <button id="mobile-menu-trigger" class="md:hidden p-2 -ml-2 text-gray-600" aria-label="Jump to question">
+                <i class="ph ph-list text-xl"></i>
+            </button>
+
+            <!-- Paper Selector -->
+            <div class="flex items-center gap-3">
+                <select id="paper-selector" class="paper-select">
+                    <option disabled selected>Loading papers...</option>
+                </select>
+            </div>
+
+            <!-- Mobile "Jump to" Label (Visual only, trigger is the icon) -->
+            <span class="md:hidden text-sm font-medium text-gray-500">Jump to</span>
+        </div>
+
+        <!-- LEFT NAV RAIL (Desktop) -->
+        <nav id="desktop-nav" class="nav-rail" aria-label="Document navigation">
+            <!-- Populated via JS -->
+        </nav>
+
+        <!-- MAIN PAPER CONTENT -->
+        <main id="paper-content" class="paper-column pt-4 md:pt-20">
+            <div id="content-container">
+                <!-- Content injected here -->
+                <div class="py-20 text-center text-gray-500 animate-pulse">
+                    Loading payload...
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- MOBILE DRAWER -->
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <div id="drawer-panel" class="drawer-panel" aria-modal="true" role="dialog">
+        <div class="drawer-header">
+            <h2 class="font-semibold text-gray-700">Jump to</h2>
+            <button id="drawer-close" class="p-2 -mr-2 text-gray-500">
+                <i class="ph ph-x text-xl"></i>
+            </button>
+        </div>
+        <div id="drawer-nav-content" class="drawer-content">
+            <!-- Populated via JS (clone of desktop nav) -->
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <!-- Markdown-it (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+    <!-- KaTeX JS (No integrity) -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        // =========================================================
+        // STAGE 0: CONSTANTS (AUTHORITATIVE)
+        // =========================================================
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+
+        // =========================================================
+        // APPLICATION LOGIC
+        // =========================================================
+
+        const state = {
+            papers: [],
+            currentPaperId: null,
+            expandedMap: {}, // key: questionId, value: boolean
+            mobileNavOpen: false
+        };
+
+        // --- Markdown Renderer Config (Authoritative) ---
+        const md = window.markdownit ? window.markdownit({
+            html: true,
+            linkify: true,
+            breaks: false // MUST be false to prevent <br> in math blocks
+        }) : null;
+
+        if (md) {
+            md.inline.ruler.disable(['escape']); // Preserve TeX backslashes
+        }
+
+        // --- Initialization ---
+        async function init() {
+            try {
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error("Payload missing");
+                const payload = await response.json();
+                
+                state.papers = payload.papers || [];
+                
+                if (state.papers.length === 0) {
+                    renderError("No papers found in payload.");
+                    return;
+                }
+
+                initPaperSelector();
+                
+                // Select first paper by default
+                switchPaper(state.papers[0].key);
+
+            } catch (e) {
+                console.error(e);
+                renderError("PAPERS PAYLOAD MISSING");
+            }
+            
+            setupMobileNav();
+        }
+
+        function renderError(msg) {
+            document.getElementById('content-container').innerHTML = `
+                <div class="p-8 text-center text-red-700 bg-red-50 border border-red-100 rounded">
+                    <h2 class="font-bold mb-2">Error</h2>
+                    <p>${msg}</p>
+                </div>
+            `;
+            document.getElementById('paper-selector').innerHTML = `<option>Error</option>`;
+            document.getElementById('paper-selector').disabled = true;
+        }
+
+        function initPaperSelector() {
+            const selector = document.getElementById('paper-selector');
+            selector.innerHTML = state.papers.map(p => 
+                `<option value="${p.key}">${p.label}</option>`
+            ).join('');
+            
+            selector.addEventListener('change', (e) => {
+                switchPaper(e.target.value);
+            });
+        }
+
+        function switchPaper(paperKey) {
+            const paper = state.papers.find(p => p.key === paperKey);
+            if (!paper) return;
+
+            state.currentPaperId = paperKey;
+            
+            // Set defaults
+            const expandAll = paper.defaults?.expandedAll ?? true;
+            state.expandedMap = {}; // Reset state. 
+            // We lazily set expanded state. If not in map, fallback to expandAll.
+
+            renderNavigation(paper);
+            renderContent(paper);
+            
+            // Scroll top
+            window.scrollTo(0, 0);
+        }
+
+        // --- Navigation Rendering ---
+        function renderNavigation(paper) {
+            const navContainer = document.getElementById('desktop-nav');
+            const drawerContainer = document.getElementById('drawer-nav-content');
+            
+            const nodes = [];
+            
+            // Flatten the structure for navigation
+            // If sections exist
+            if (paper.sections) {
+                paper.sections.forEach(section => {
+                    if (section.label && section.label.trim() !== "") {
+                        nodes.push({ type: 'section', label: section.label });
+                    }
+                    if (section.questions) {
+                        section.questions.forEach(q => traverseNav(q, 0, nodes));
+                    }
+                });
+            } else if (paper.questions) {
+                paper.questions.forEach(q => traverseNav(q, 0, nodes));
+            }
+
+            const html = nodes.map(node => {
+                if (node.type === 'section') {
+                    return `<div class="nav-section-label">${node.label}</div>`;
+                }
+                return `<a href="#q-${node.id}" 
+                           class="nav-item" 
+                           data-id="${node.id}" 
+                           data-depth="${Math.min(node.depth, 2)}"
+                           onclick="handleNavClick(event, '${node.id}')">
+                           ${node.id}
+                        </a>`;
+            }).join('');
+
+            navContainer.innerHTML = html;
+            drawerContainer.innerHTML = html;
+            
+            setupScrollSpy(nodes.filter(n => n.type === 'question'));
+        }
+
+        function traverseNav(node, depth, list) {
+            list.push({ type: 'question', id: node.id, depth: depth });
+            if (node.children) {
+                node.children.forEach(child => traverseNav(child, depth + 1, list));
+            }
+        }
+
+        function handleNavClick(e, id) {
+            e.preventDefault();
+            const el = document.getElementById(`q-${id}`);
+            if (el) {
+                // Offset for sticky header/spacing
+                const yOffset = -80; 
+                const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                window.scrollTo({top: y, behavior: 'smooth'});
+                
+                // Close mobile nav
+                closeMobileNav();
+            }
+        }
+
+        // --- Content Rendering ---
+        function renderContent(paper) {
+            const container = document.getElementById('content-container');
+            let html = '';
+
+            if (paper.sections) {
+                paper.sections.forEach(section => {
+                    if (section.label && section.label.trim() !== "") {
+                        html += `
+                            <div class="mb-8 border-b border-[var(--color-border-hairline)] pb-2 mt-12 first:mt-0">
+                                <h2 class="text-lg font-bold text-[var(--color-text-secondary)]">${section.label}</h2>
+                            </div>
+                        `;
+                    }
+                    if (section.questions) {
+                        section.questions.forEach(q => {
+                            html += renderQuestionNode(q, 0, paper);
+                        });
+                    }
+                });
+            } else if (paper.questions) {
+                paper.questions.forEach(q => {
+                    html += renderQuestionNode(q, 0, paper);
+                });
+            }
+
+            container.innerHTML = html;
+            
+            // Post-render: KaTeX
+            renderMathInElement(container, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+
+        function renderQuestionNode(node, depth, paper) {
+            const isExpandedDefault = paper.defaults?.expandedAll ?? true;
+            // Check explicit state, fallback to default
+            const isExpanded = state.expandedMap[node.id] !== undefined ? state.expandedMap[node.id] : isExpandedDefault;
+            
+            const hasSolutionBlock = !!node.solutionBlock;
+            const hasAnswer = hasSolutionBlock && !!node.solutionBlock.answer;
+            const hasDetails = hasSolutionBlock && !!node.solutionBlock.solutionDetails;
+
+            let html = `<div id="q-${node.id}" class="question-node" data-depth="${depth}">`;
+
+            // 1. Question Body
+            const qBodyHtml = md ? md.render(node.question || "") : node.question;
+            
+            html += `
+                <div class="question-header">
+                    <span class="question-id">${node.id}</span>
+                    <div class="question-body">${qBodyHtml}</div>
+                </div>
+            `;
+
+            // 2. Solution Block
+            if (hasSolutionBlock) {
+                html += `<div class="solution-block">`;
+
+                // Answer
+                if (hasAnswer) {
+                    const ansHtml = md ? md.render(node.solutionBlock.answer || "") : node.solutionBlock.answer;
+                    html += `
+                        <div class="answer-region">
+                            <span class="answer-label">Answer</span>
+                            <div class="answer-content">${ansHtml}</div>
+                        </div>
+                    `;
+                }
+
+                // Solution Details (Disclosure)
+                if (hasDetails) {
+                    const detailsId = `details-${node.id}`;
+                    const labelText = isExpanded ? "Hide working" : "Show working";
+                    const iconRot = isExpanded ? "rotate-180" : "";
+                    
+                    html += `
+                        <button class="disclosure-control" 
+                                onclick="toggleDetails('${node.id}')"
+                                aria-expanded="${isExpanded}"
+                                aria-controls="${detailsId}">
+                            <span id="label-${node.id}">${labelText}</span>
+                            <i id="icon-${node.id}" class="ph ph-caret-down ${iconRot} transition-transform duration-200"></i>
+                        </button>
+                    `;
+
+                    // Details Body
+                    const details = node.solutionBlock.solutionDetails;
+                    const hiddenClass = isExpanded ? "" : "hidden";
+                    
+                    html += `<div id="${detailsId}" class="solution-details-region ${hiddenClass}">
+                                <div class="solution-details-content bg-[var(--color-surface-wash)] rounded-sm p-4">`;
+                    
+                    // Keep in mind
+                    if (details.keepInMind) {
+                        html += `
+                            <div class="sd-subsection sd-keep-in-mind">
+                                <div class="sd-label"><i class="ph ph-lightbulb"></i> Keep in mind</div>
+                                <div class="sd-body">${md.render(details.keepInMind)}</div>
+                            </div>
+                        `;
+                    }
+
+                    // Formulas used
+                    if (details.formulasUsed) {
+                        html += `
+                            <div class="sd-subsection sd-formulas">
+                                <div class="sd-label">Formulas used</div>
+                                <div class="sd-body">${md.render(details.formulasUsed)}</div>
+                            </div>
+                        `;
+                    }
+
+                    // Working
+                    if (details.working) {
+                        html += `
+                            <div class="sd-subsection sd-working">
+                                <div class="sd-label">Working</div>
+                                <div class="sd-body">${md.render(details.working)}</div>
+                            </div>
+                        `;
+                    }
+
+                    // Alternative Working
+                    if (details.alternativeWorking && Array.isArray(details.alternativeWorking)) {
+                        details.alternativeWorking.forEach((alt, idx) => {
+                            html += `
+                                <div class="sd-subsection sd-alt-working">
+                                    <div class="sd-label">Alternative working ${idx > 0 ? idx + 1 : ''}</div>
+                                    <div class="sd-body">${md.render(alt)}</div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    html += `</div></div>`; // End content / region
+                }
+
+                html += `</div>`; // End Solution Block
+            }
+
+            // 3. Children
+            if (node.children && node.children.length > 0) {
+                html += `<div class="children-container mt-4">`;
+                node.children.forEach(child => {
+                    html += renderQuestionNode(child, depth + 1, paper);
+                });
+                html += `</div>`;
+            }
+
+            html += `</div>`; // End Question Node
+            return html;
+        }
+
+        // --- Interaction Handlers ---
+
+        window.toggleDetails = function(nodeId) {
+            const paper = state.papers.find(p => p.key === state.currentPaperId);
+            const defaultExpanded = paper?.defaults?.expandedAll ?? true;
+            
+            // Current state
+            const current = state.expandedMap[nodeId] !== undefined ? state.expandedMap[nodeId] : defaultExpanded;
+            const newState = !current;
+            state.expandedMap[nodeId] = newState;
+
+            const region = document.getElementById(`details-${nodeId}`);
+            const label = document.getElementById(`label-${nodeId}`);
+            const icon = document.getElementById(`icon-${nodeId}`);
+            const btn = document.querySelector(`button[onclick="toggleDetails('${nodeId}')"]`);
+
+            if (region) {
+                if (newState) {
+                    region.classList.remove('hidden');
+                    label.textContent = "Hide working";
+                    icon.classList.add('rotate-180');
+                    btn.setAttribute('aria-expanded', 'true');
+                } else {
+                    region.classList.add('hidden');
+                    label.textContent = "Show working";
+                    icon.classList.remove('rotate-180');
+                    btn.setAttribute('aria-expanded', 'false');
+                }
+            }
+        };
+
+        // --- Mobile Nav ---
+        function setupMobileNav() {
+            const trigger = document.getElementById('mobile-menu-trigger');
+            const closeBtn = document.getElementById('drawer-close');
+            const overlay = document.getElementById('drawer-overlay');
+            const panel = document.getElementById('drawer-panel');
+
+            function open() {
+                panel.classList.add('open');
+                overlay.classList.add('open');
+                state.mobileNavOpen = true;
+            }
+            
+            function close() {
+                panel.classList.remove('open');
+                overlay.classList.remove('open');
+                state.mobileNavOpen = false;
+            }
+
+            window.closeMobileNav = close; // Global for nav items
+
+            trigger.addEventListener('click', open);
+            closeBtn.addEventListener('click', close);
+            overlay.addEventListener('click', close);
+        }
+
+        // --- Scroll Spy for Nav ---
+        function setupScrollSpy(navItems) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.id.replace('q-', '');
+                        updateActiveNav(id);
+                    }
+                });
+            }, { rootMargin: '-20% 0px -60% 0px' }); // Trigger when item is near top
+
+            navItems.forEach(item => {
+                const el = document.getElementById(`q-${item.id}`);
+                if (el) observer.observe(el);
+            });
+        }
+
+        function updateActiveNav(id) {
+            // Remove active from all
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            // Add to current
+            const activeEl = document.querySelector(`.nav-item[data-id="${id}"]`);
+            if (activeEl) {
+                activeEl.classList.add('active');
+                
+                // Optional: Scroll nav to keep active in view
+                if (window.innerWidth >= 768) {
+                    // Simple check if out of view logic could go here
+                }
+            }
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

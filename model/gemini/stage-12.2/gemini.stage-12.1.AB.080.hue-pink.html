@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AB","indexWithinVariant":"80","totalWithinVariant":"200","hueFamily":"pink","intensityMode":"","primaryHueFamily":"","secondaryHueFamily":"","dualIntensityMode":"","timestamp":"2026-01-08T17:02:00.447Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AB&quot;,&quot;indexWithinVariant&quot;:&quot;80&quot;,&quot;totalWithinVariant&quot;:&quot;200&quot;,&quot;hueFamily&quot;:&quot;pink&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;&quot;,&quot;secondaryHueFamily&quot;:&quot;&quot;,&quot;dualIntensityMode&quot;:&quot;&quot;,&quot;timestamp&quot;:&quot;2026-01-08T17:02:00.447Z&quot;}'>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RTQ Maths Paper Solution Viewer</title>
+
+<!-- Libraries (No SRI/Integrity as per Stage 6 rules) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+<style>
+    /* STAGE 6 ADD-ON: COLORLAB B - PINK THEME (LIGHT ONLY) */
+    :root {
+        /* Base Palette (Warm/Soft Neutral Base per Stage 5, tinted Pink per ColorLab B) */
+        --c-bg-app: #ffffff;
+        --c-bg-subtle: #fdf2f8; /* Pink 50 - Surface differentiation */
+        --c-bg-nav-drawer: #ffffff;
+        
+        /* Typography */
+        --c-text-primary: #334155; /* Slate 700 - readable, not harsh black */
+        --c-text-secondary: #64748b; /* Slate 500 - supporting text */
+        --c-text-tertiary: #94a3b8; /* Slate 400 - quietest */
+        
+        /* Accents (Pink Family) - Used for links, focus, active states, toggles */
+        --c-accent: #db2777; /* Pink 600 */
+        --c-accent-hover: #be185d; /* Pink 700 */
+        --c-accent-subtle: #fbcfe8; /* Pink 200 - focus rings, borders */
+
+        /* Borders & Dividers */
+        --c-divider: #e2e8f0; /* Slate 200 - quiet hairline */
+        
+        /* Layout Metrics */
+        --w-nav: 240px;
+        --w-paper-max: 800px;
+        --sp-base: 1rem;
+        --sp-l: 2rem;
+        --sp-xl: 4rem;
+        
+        /* Typography Scale */
+        --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* RESET & BASE */
+    *, *::before, *::after { box-sizing: border-box; }
+    
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-sans);
+        background-color: var(--c-bg-app);
+        color: var(--c-text-primary);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-y: scroll; /* Force scrollbar to avoid jumping */
+    }
+
+    button {
+        font-family: inherit;
+        border: none;
+        background: none;
+        cursor: pointer;
+        padding: 0;
+        color: inherit;
+    }
+
+    button:focus-visible, a:focus-visible, select:focus-visible {
+        outline: 2px solid var(--c-accent);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
+
+    /* SHELL STRUCTURE (Desktop: Grid, Mobile: Stack) */
+    #app-shell {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    @media (min-width: 1024px) {
+        #app-shell {
+            display: grid;
+            grid-template-columns: var(--w-nav) 1fr;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+    }
+
+    /* TOP CONTROLS (Mobile Header / Desktop Top Area) */
+    .top-controls {
+        padding: var(--sp-base);
+        border-bottom: 1px solid var(--c-divider);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--c-bg-app);
+        position: sticky;
+        top: 0;
+        z-index: 20;
+    }
+
+    @media (min-width: 1024px) {
+        .top-controls {
+            /* On desktop, this lives inside the paper column logically, or sits above. 
+               We place it in the right column flow or fixed. 
+               Design brief says: "Paper Selector control has a fixed location in the top control area... 
+               visually aligned with DocumentFrameShell". 
+               Let's put it at the top of the content column flow for simplicity in grid. */
+            display: none; /* We will render a desktop specific header inside the paper column */
+        }
+    }
+
+    .desktop-header {
+        display: none;
+        padding: var(--sp-l) 0 var(--sp-base) 0;
+        margin-bottom: var(--sp-l);
+        border-bottom: 1px solid var(--c-divider);
+    }
+    @media (min-width: 1024px) {
+        .desktop-header { display: flex; align-items: center; gap: var(--sp-base); }
+    }
+
+    /* NAVIGATION RAIL (Desktop) */
+    .nav-rail {
+        display: none;
+        background: var(--c-bg-app);
+        border-right: 1px solid var(--c-divider);
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        overflow-y: auto;
+        padding: var(--sp-l) var(--sp-base);
+        /* Scrollbar hiding */
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .nav-rail::-webkit-scrollbar { display: none; }
+
+    @media (min-width: 1024px) {
+        .nav-rail { display: block; }
+    }
+
+    .nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .nav-section-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--c-text-tertiary);
+        margin-top: var(--sp-base);
+        margin-bottom: 0.25rem;
+        padding-left: 0.5rem;
+        font-weight: 600;
+        pointer-events: none;
+    }
+
+    .nav-item {
+        display: block;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        color: var(--c-text-secondary);
+        text-decoration: none;
+        border-radius: 4px;
+        transition: color 0.1s, background-color 0.1s;
+    }
+
+    .nav-item:hover {
+        color: var(--c-text-primary);
+        background-color: var(--c-bg-subtle);
+    }
+
+    .nav-item.active {
+        font-weight: 700;
+        color: var(--c-accent); /* Accent allowed for nav marker per Stage 5 Override */
+    }
+    
+    /* Sub-question hierarchy via type scale only */
+    .nav-item[data-depth="1"] { font-size: 0.85rem; }
+    .nav-item[data-depth="2"] { font-size: 0.8rem; }
+
+    /* PAPER CONTENT REGION */
+    .paper-region {
+        padding: var(--sp-base);
+        padding-bottom: var(--sp-xl);
+    }
+
+    @media (min-width: 1024px) {
+        .paper-region {
+            padding: 0 var(--sp-l) var(--sp-xl) var(--sp-l);
+            max-width: var(--w-paper-max);
+        }
+    }
+
+    /* QUESTION NODE STRUCTURE */
+    .question-node {
+        margin-bottom: var(--sp-xl); /* Strong separation between top-level */
+        position: relative;
+    }
+
+    /* Sub-questions */
+    .children-container {
+        margin-top: var(--sp-base);
+        /* Indentation adaptable */
+        padding-left: var(--sp-base); 
+        border-left: 1px solid transparent; /* Alignment aid, invisible */
+    }
+    @media (min-width: 640px) {
+        .children-container { padding-left: var(--sp-l); }
+    }
+
+    .children-container .question-node {
+        margin-bottom: var(--sp-l); /* Weaker separation for children */
+    }
+
+    /* TEXT HIERARCHY */
+    .q-id {
+        font-weight: 700;
+        color: var(--c-text-secondary);
+        margin-right: 0.5em;
+        font-size: 0.9em;
+    }
+
+    .q-body {
+        margin-bottom: var(--sp-base);
+        color: var(--c-text-primary);
+    }
+    
+    /* Markdown Content Styling */
+    .md-content p { margin: 0 0 0.75em 0; }
+    .md-content p:last-child { margin-bottom: 0; }
+    .md-content ul, .md-content ol { margin: 0 0 0.75em 1.5em; padding: 0; }
+    .md-content table { 
+        border-collapse: collapse; 
+        width: 100%; 
+        margin: 1em 0; 
+        font-size: 0.9em;
+    }
+    .md-content th, .md-content td {
+        border: 1px solid var(--c-divider);
+        padding: 0.5em;
+        text-align: left;
+    }
+    .md-content th { font-weight: 600; background: var(--c-bg-subtle); }
+
+    /* SOLUTION BLOCK */
+    .solution-block {
+        margin-top: var(--sp-base);
+    }
+
+    /* ANSWER */
+    .answer-region {
+        margin-bottom: var(--sp-base);
+    }
+    .answer-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--c-text-secondary);
+        letter-spacing: 0.05em;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+    .answer-content {
+        font-weight: 500;
+    }
+
+    /* SOLUTION DETAILS */
+    .solution-details-container {
+        /* No framing, relying on spacing and hierarchy */
+    }
+
+    .toggle-control {
+        font-size: 0.875rem;
+        color: var(--c-accent);
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.25em;
+        margin-bottom: 0.5rem;
+    }
+    .toggle-control:hover { color: var(--c-accent-hover); text-decoration: underline; }
+    
+    .sd-region {
+        display: none;
+        margin-top: 0.5rem;
+        padding-left: 0.5rem; 
+        border-left: 2px solid var(--c-divider); /* Subtle hairline guide for region */
+    }
+    .sd-region.expanded { display: block; }
+    
+    /* Subtle wash allowed by Stage 3/5 under density */
+    /* .sd-region { background: var(--c-bg-subtle); padding: 1rem; border-left: none; } */
+    /* Implementation choice: Keep it clean, use spacing + hairline left marker per option above */
+
+    .sd-subsection {
+        margin-top: var(--sp-base);
+    }
+    .sd-subsection:first-child { margin-top: 0; }
+
+    .sd-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--c-text-secondary);
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+
+    .sd-body {
+        font-size: 0.95em;
+        color: var(--c-text-primary); /* Readable contrast, not washed out */
+    }
+
+    /* Internal Working Rhythm */
+    .sd-body .katex-display { margin: 0.75em 0; }
+    
+    /* KATEX CONTAINMENT (LOCKED) */
+    .katex-display {
+        overflow-x: auto;
+        overflow-y: hidden;
+        max-width: 100%;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px; /* Scrollbar clearance */
+    }
+    /* No inline background */
+    .katex { background: transparent !important; }
+
+    /* MOBILE DRAWER */
+    .drawer-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 40;
+        display: none;
+    }
+    .drawer {
+        position: fixed;
+        top: 0; right: 0; bottom: 0;
+        width: 80%;
+        max-width: 300px;
+        background: var(--c-bg-nav-drawer);
+        z-index: 50;
+        transform: translateX(100%);
+        transition: transform 0.2s ease-out;
+        box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+    }
+    .drawer.open { transform: translateX(0); }
+    
+    .drawer-header {
+        padding: var(--sp-base);
+        border-bottom: 1px solid var(--c-divider);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+    }
+    .drawer-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--sp-base);
+    }
+
+    /* ERROR STATE */
+    .error-msg {
+        color: var(--c-text-secondary);
+        font-weight: 700;
+        text-align: center;
+        margin-top: var(--sp-xl);
+        font-size: 1.25rem;
+        letter-spacing: 0.05em;
+    }
+
+    /* UTILITIES */
+    .hidden { display: none !important; }
+    .flex-row { display: flex; align-items: center; gap: 0.5rem; }
+</style>
+</head>
+<body>
+
+<div id="app-shell">
+    <!-- MOBILE CONTROLS -->
+    <div class="top-controls" id="mobile-controls">
+        <select id="mobile-paper-select" aria-label="Select Paper"></select>
+        <button id="jump-to-trigger" aria-label="Jump to question">Jump to</button>
+    </div>
+
+    <!-- DESKTOP NAV -->
+    <nav class="nav-rail" id="desktop-nav" aria-label="Document Navigation">
+        <!-- Content injected by JS -->
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="paper-column">
+        <!-- DESKTOP HEADER (Paper Selector) -->
+        <header class="desktop-header">
+            <label for="desktop-paper-select" style="font-weight:600; font-size:0.875rem; color:var(--c-text-secondary)">Paper:</label>
+            <select id="desktop-paper-select" style="font-size:0.9rem; padding:0.25rem;"></select>
+        </header>
+
+        <div id="paper-content" class="paper-region">
+            <!-- Content injected by JS -->
+        </div>
+    </main>
+</div>
+
+<!-- MOBILE DRAWER -->
+<div class="drawer-overlay" id="drawer-overlay"></div>
+<div class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-header">
+        <span>Jump to</span>
+        <button id="drawer-close" aria-label="Close navigation">Close</button>
+    </div>
+    <div class="drawer-content" id="drawer-nav-list">
+        <!-- Content injected by JS -->
+    </div>
+</div>
+
+<script>
+/** 
+ * STAGE 0: CONSTANTS 
+ */
+const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+// STAGE 6 ADD-ON: ColorLab B Parameter
+const RTQ_COLORLAB_FORCE_HUE_FAMILY = "pink";
+
+/**
+ * STATE & GLOBALS
+ */
+let state = {
+    papers: [],
+    activePaperKey: null,
+    activePaper: null,
+    expandedMap: {} // { questionId: boolean }
+};
+
+// Markdown-it Instance (Stage 6 Config)
+const md = window.markdownit ? window.markdownit({
+    html: true,       // Enable inline SVG
+    linkify: true,
+    breaks: false     // Critical: false to prevent <br> in math
+}) : null;
+
+if (md) {
+    md.inline.ruler.disable(['escape']); // Critical: Preserve TeX backslashes
+}
+
+/**
+ * INIT
+ */
+async function init() {
+    try {
+        const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+        if (!response.ok) throw new Error("Payload missing");
+        const data = await response.json();
+        
+        state.papers = data.papers || [];
+        if (state.papers.length === 0) throw new Error("No papers");
+
+        // Init Selector
+        populateSelectors();
+        
+        // Load first paper or restore ?
+        loadPaper(state.papers[0].key);
+
+    } catch (e) {
+        console.error(e);
+        renderError("PAPERS PAYLOAD MISSING");
+    }
+
+    setupEventListeners();
+}
+
+/**
+ * CORE RENDERING
+ */
+function loadPaper(key) {
+    const paper = state.papers.find(p => p.key === key);
+    if (!paper) return;
+
+    state.activePaperKey = key;
+    state.activePaper = paper;
+    state.expandedMap = {}; // Reset expansion state on paper switch
+
+    // Determine default expansion
+    const defaultExpanded = paper.defaults?.expandedAll !== false;
+
+    // Helper to init state recursively
+    const initExpState = (nodes) => {
+        nodes.forEach(n => {
+            if (n.solutionBlock?.solutionDetails) {
+                state.expandedMap[n.id] = defaultExpanded;
+            }
+            if (n.children) initExpState(n.children);
+        });
+    };
+
+    if (paper.questions) initExpState(paper.questions);
+    if (paper.sections) {
+        paper.sections.forEach(s => initExpState(s.questions));
+    }
+
+    renderPaperContent();
+    renderNavigation();
+    
+    // Sync Selectors
+    document.getElementById('mobile-paper-select').value = key;
+    document.getElementById('desktop-paper-select').value = key;
+    
+    // Scroll to top
+    window.scrollTo(0,0);
+}
+
+function renderError(msg) {
+    document.getElementById('paper-content').innerHTML = `<div class="error-msg">${msg}</div>`;
+}
+
+function populateSelectors() {
+    const opts = state.papers.map(p => `<option value="${p.key}">${p.label}</option>`).join('');
+    document.getElementById('mobile-paper-select').innerHTML = opts;
+    document.getElementById('desktop-paper-select').innerHTML = opts;
+}
+
+/**
+ * PAPER CONTENT RENDERER
+ */
+function renderPaperContent() {
+    const container = document.getElementById('paper-content');
+    const paper = state.activePaper;
+    let html = '';
+
+    if (paper.sections) {
+        paper.sections.forEach(sec => {
+            if (sec.label && sec.label.trim().length > 0) {
+                html += renderSectionHeader(sec.label);
+            }
+            html += renderQuestionList(sec.questions, 0);
+        });
+    } else {
+        html += renderQuestionList(paper.questions || [], 0);
+    }
+
+    container.innerHTML = html;
+    
+    // Post-Render: KaTeX
+    renderMathInElement(container, {
+        delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+        ],
+        throwOnError: false
+    });
+}
+
+function renderSectionHeader(label) {
+    return `
+        <div class="section-block">
+            <h2 style="font-size:1.25rem; border-bottom:1px solid var(--c-divider); padding-bottom:0.5rem; margin-bottom:2rem; color:var(--c-text-primary);">${label}</h2>
+        </div>
+    `;
+}
+
+function renderQuestionList(nodes, depth) {
+    if (!nodes || nodes.length === 0) return '';
+    return nodes.map(node => renderQuestionNode(node, depth)).join('');
+}
+
+function renderQuestionNode(node, depth) {
+    // 1. Question Body
+    const qBody = renderMarkdown(node.question);
+    
+    // 2. Solution Block
+    let solutionBlockHtml = '';
+    if (node.solutionBlock) {
+        // Answer
+        let answerHtml = '';
+        if (node.solutionBlock.answer) {
+            answerHtml = `
+                <div class="answer-region">
+                    <span class="answer-label">Answer</span>
+                    <div class="answer-content md-content">${renderMarkdown(node.solutionBlock.answer)}</div>
+                </div>
+            `;
+        }
+
+        // Solution Details
+        let detailsHtml = '';
+        if (node.solutionBlock.solutionDetails) {
+            const sd = node.solutionBlock.solutionDetails;
+            const isExpanded = state.expandedMap[node.id];
+            
+            // Subsections
+            const keepInMind = sd.keepInMind ? renderSubsection('Keep in mind', sd.keepInMind) : '';
+            const formulas = sd.formulasUsed ? renderSubsection('Formulas used', sd.formulasUsed) : '';
+            const working = sd.working ? renderSubsection('Working', sd.working) : '';
+            let altWorking = '';
+            if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                altWorking = sd.alternativeWorking.map(aw => renderSubsection('Alternative working', aw)).join('');
+            } else if (sd.alternativeWorking) {
+                // Handle case if payload string (robustness)
+                altWorking = renderSubsection('Alternative working', sd.alternativeWorking);
+            }
+
+            const btnText = isExpanded ? "Hide working" : "Show working";
+            const regionClass = isExpanded ? "sd-region expanded" : "sd-region";
+            const chevron = isExpanded ? "▲" : "▼"; 
+
+            detailsHtml = `
+                <div class="solution-details-container">
+                    <button class="toggle-control" onclick="toggleSolution('${node.id}')" aria-expanded="${isExpanded}">
+                        <span>${btnText}</span>
+                        <span style="font-size:0.7em;">${chevron}</span>
+                    </button>
+                    <div class="${regionClass}" id="sd-${node.id}">
+                        ${keepInMind}
+                        ${formulas}
+                        ${working}
+                        ${altWorking}
+                    </div>
+                </div>
+            `;
+        }
+        
+        solutionBlockHtml = `
+            <div class="solution-block">
+                ${answerHtml}
+                ${detailsHtml}
+            </div>
+        `;
+    }
+
+    // 3. Children
+    let childrenHtml = '';
+    if (node.children && node.children.length > 0) {
+        childrenHtml = `
+            <div class="children-container">
+                ${renderQuestionList(node.children, depth + 1)}
+            </div>
+        `;
+    }
+
+    return `
+        <div class="question-node" id="q-${node.id}" data-depth="${depth}">
+            <div class="flex-row" style="align-items:baseline;">
+                <span class="q-id">${node.id}</span>
+                <div class="q-body md-content">${qBody}</div>
+            </div>
+            ${solutionBlockHtml}
+            ${childrenHtml}
+        </div>
+    `;
+}
+
+function renderSubsection(label, markdown) {
+    return `
+        <div class="sd-subsection">
+            <span class="sd-label">${label}</span>
+            <div class="sd-body md-content">${renderMarkdown(markdown)}</div>
+        </div>
+    `;
+}
+
+function renderMarkdown(text) {
+    if (!text) return '';
+    return md ? md.render(text) : text;
+}
+
+/**
+ * NAVIGATION RENDERER
+ */
+function renderNavigation() {
+    const paper = state.activePaper;
+    let itemsHtml = '';
+
+    if (paper.sections) {
+        paper.sections.forEach(sec => {
+            if (sec.label && sec.label.trim().length > 0) {
+                itemsHtml += `<div class="nav-section-label">${sec.label}</div>`;
+            }
+            itemsHtml += generateNavItems(sec.questions, 0);
+        });
+    } else {
+        itemsHtml += generateNavItems(paper.questions || [], 0);
+    }
+
+    const navHtml = `<div class="nav-list">${itemsHtml}</div>`;
+    
+    document.getElementById('desktop-nav').innerHTML = navHtml;
+    document.getElementById('drawer-nav-list').innerHTML = navHtml;
+}
+
+function generateNavItems(nodes, depth) {
+    if (!nodes) return '';
+    return nodes.map(node => {
+        let html = `
+            <a href="#q-${node.id}" class="nav-item" data-depth="${depth}" onclick="handleNavClick(event, 'q-${node.id}')">
+                ${node.id}
+            </a>
+        `;
+        if (node.children) {
+            html += generateNavItems(node.children, depth + 1);
+        }
+        return html;
+    }).join('');
+}
+
+/**
+ * INTERACTIONS
+ */
+window.toggleSolution = (id) => {
+    state.expandedMap[id] = !state.expandedMap[id];
+    // Re-render ONLY content to preserve scroll is hard with full re-render.
+    // Better: minimal DOM manipulation for toggle.
+    const region = document.getElementById(`sd-${id}`);
+    const btn = region.previousElementSibling;
+    
+    if (state.expandedMap[id]) {
+        region.classList.add('expanded');
+        btn.querySelector('span').innerText = "Hide working";
+        btn.setAttribute('aria-expanded', 'true');
+        btn.children[1].innerText = "▲";
+    } else {
+        region.classList.remove('expanded');
+        btn.querySelector('span').innerText = "Show working";
+        btn.setAttribute('aria-expanded', 'false');
+        btn.children[1].innerText = "▼";
+    }
+};
+
+window.handleNavClick = (e, targetId) => {
+    e.preventDefault();
+    const target = document.getElementById(targetId);
+    if (target) {
+        // Mobile: close drawer
+        closeDrawer();
+        
+        // Scroll
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // Active state update
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll(`a[href="#${targetId}"]`).forEach(el => el.classList.add('active'));
+    }
+};
+
+function setupEventListeners() {
+    // Selectors
+    const onSelect = (e) => loadPaper(e.target.value);
+    document.getElementById('mobile-paper-select').addEventListener('change', onSelect);
+    document.getElementById('desktop-paper-select').addEventListener('change', onSelect);
+
+    // Mobile Drawer
+    document.getElementById('jump-to-trigger').addEventListener('click', openDrawer);
+    document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+    document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
+}
+
+function openDrawer() {
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('drawer-overlay').style.display = 'block';
+    document.getElementById('drawer').setAttribute('aria-hidden', 'false');
+}
+
+function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawer-overlay').style.display = 'none';
+    document.getElementById('drawer').setAttribute('aria-hidden', 'true');
+}
+
+// Kickoff
+init();
+
+</script>
+</body>
+</html>

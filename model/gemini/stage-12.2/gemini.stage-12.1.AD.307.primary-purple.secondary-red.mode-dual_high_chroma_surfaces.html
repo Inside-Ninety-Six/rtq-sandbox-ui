@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- RTQ_RUN {"generator":"rtq-prototype-batch","model":"gemini-3-pro-preview","prefix":"gemini.stage-12.1","variant":"AD","indexWithinVariant":"307","totalWithinVariant":"440","hueFamily":"","intensityMode":"","primaryHueFamily":"purple","secondaryHueFamily":"red","dualIntensityMode":"dual_high_chroma_surfaces","timestamp":"2026-01-10T17:30:19.532Z"} -->
+  <meta name="rtq-run" content='{&quot;generator&quot;:&quot;rtq-prototype-batch&quot;,&quot;model&quot;:&quot;gemini-3-pro-preview&quot;,&quot;prefix&quot;:&quot;gemini.stage-12.1&quot;,&quot;variant&quot;:&quot;AD&quot;,&quot;indexWithinVariant&quot;:&quot;307&quot;,&quot;totalWithinVariant&quot;:&quot;440&quot;,&quot;hueFamily&quot;:&quot;&quot;,&quot;intensityMode&quot;:&quot;&quot;,&quot;primaryHueFamily&quot;:&quot;purple&quot;,&quot;secondaryHueFamily&quot;:&quot;red&quot;,&quot;dualIntensityMode&quot;:&quot;dual_high_chroma_surfaces&quot;,&quot;timestamp&quot;:&quot;2026-01-10T17:30:19.532Z&quot;}'>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTQ Maths Paper Solution Viewer</title>
+
+    <!-- 
+        STAGE 6 BASELINE IMPLEMENTATION 
+        - Loads payload from RTQ_PAPERS_PAYLOAD_PATH
+        - Real KaTeX rendering (SRI disabled)
+        - ColorLab D (Dual-Accent, Light Mode, Mode 3)
+    -->
+
+    <!-- Tailwind CSS (Prototyping) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- KaTeX (SRI Disabled per Stage 6.0.7b) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Markdown-it -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+
+    <!-- Configuration -->
+    <script>
+        // STAGE 0: CANONICAL CONSTANTS
+        const RTQ_PAPERS_PAYLOAD_PATH = "../../../payload/rtq.papers.payload.v2.json";
+        const RTQ_SHADCN_TOKEN_PROFILES_PATH = "../../../payload/rtq.shadcn.token.profiles.v1.json";
+
+        // Tailwind Config with OKLCH variables for ColorLab D
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        page: 'var(--col-page)',
+                        frame: 'var(--col-frame)',
+                        paper: 'var(--col-paper)', // Optional, context usually shared with frame
+                        'sol-wash': 'var(--col-sol-wash)',
+                        primary: 'var(--col-text-primary)',
+                        secondary: 'var(--col-text-secondary)',
+                        accent: 'var(--col-accent-primary)',
+                        'accent-sec': 'var(--col-accent-secondary)',
+                        divider: 'var(--col-divider)',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    spacing: {
+                        'nav-w': '240px',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 
+           ColorLab D - Mode: dual_high_chroma_surfaces (Light Only)
+           Primary Hue: Blue (250)
+           Secondary Hue: Amber (80)
+           
+           Numeric Rules Compliance:
+           - 2+ major surfaces C in [0.06..0.12] -> Page & Frame
+           - Remaining surface C in [0.03..0.07] -> Paper (if distinct) or unused
+           - Solution Wash C in [0.05..0.10]
+           - Text Primary C <= 0.015
+           - Primary Accent C in [0.12..0.20]
+           - Secondary Accent C in [0.10..0.18]
+        */
+        :root {
+            /* Palette Definition */
+            
+            /* Page Background: Chromatic Blue-ish */
+            /* L=0.92, C=0.06, H=250 */
+            --col-page: oklch(0.92 0.06 250);
+            
+            /* Frame Background (The "Sheet"): Chromatic Lighter Blue */
+            /* L=0.97, C=0.06, H=250 */
+            --col-frame: oklch(0.97 0.06 250);
+            
+            /* Paper Surface: Not distinctly used as a separate card, shares Frame, 
+               but we define a variable if needed for specific isolation. */
+            --col-paper: oklch(0.98 0.03 250);
+
+            /* Solution Details Wash: Chromatic */
+            /* L=0.94, C=0.08, H=250 */
+            --col-sol-wash: oklch(0.94 0.08 250);
+
+            /* Text */
+            /* Primary: L=0.20, C=0.015, H=250 */
+            --col-text-primary: oklch(0.20 0.015 250);
+            /* Secondary: L=0.45, C=0.015, H=250 */
+            --col-text-secondary: oklch(0.45 0.015 250);
+
+            /* Accents */
+            /* Primary (Links, Focus, Toggle): L=0.55, C=0.18, H=250 (Blue) */
+            --col-accent-primary: oklch(0.55 0.18 250);
+            
+            /* Secondary (Nav Marker): L=0.70, C=0.16, H=80 (Amber) */
+            --col-accent-secondary: oklch(0.70 0.16 80);
+
+            /* Dividers: Neutral/Low Chroma */
+            --col-divider: oklch(0.90 0.02 250);
+        }
+
+        /* Utility: Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* KaTeX Display Containment (Locked) */
+        .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            max-width: 100%;
+            padding: 0.5rem 0;
+            margin: 0.5rem 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--col-divider) transparent;
+        }
+
+        /* Markdown Content Typography */
+        .md-content p { margin-bottom: 0.75em; line-height: 1.6; }
+        .md-content p:last-child { margin-bottom: 0; }
+        .md-content ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.75em; }
+        .md-content ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.75em; }
+        /* Tables: Minimal, structural */
+        .md-content table { border-collapse: collapse; margin-bottom: 1em; width: 100%; display: block; overflow-x: auto; }
+        .md-content th, .md-content td { border: 1px solid var(--col-divider); padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+        .md-content th { font-weight: 600; color: var(--col-text-primary); }
+        /* Images/SVG */
+        .md-content img, .md-content svg { max-width: 100%; height: auto; display: block; }
+        
+        /* Focus Visibility */
+        :focus-visible {
+            outline: 2px solid var(--col-accent-primary);
+            outline-offset: 2px;
+        }
+
+        /* Navigation Drawer Animation */
+        #mobile-drawer { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .drawer-open { transform: translateX(0); }
+        .drawer-closed { transform: translateX(-100%); }
+    </style>
+</head>
+<body class="bg-page text-primary font-sans antialiased h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Controls Region -->
+    <header class="flex-none bg-frame border-b border-divider z-20 relative">
+        <div class="max-w-6xl mx-auto h-16 px-4 md:px-8 flex items-center justify-between">
+            <!-- Paper Selector -->
+            <div class="flex items-center gap-3">
+                <label for="paper-select" class="text-sm font-medium text-secondary hidden sm:block">Paper:</label>
+                <select id="paper-select" class="bg-page border border-divider rounded px-3 py-1.5 text-sm text-primary focus:border-accent focus:ring-0 cursor-pointer">
+                    <option value="" disabled selected>Loading papers...</option>
+                </select>
+            </div>
+
+            <!-- Mobile Jump To Trigger -->
+            <button id="mobile-jump-trigger" class="md:hidden text-sm font-medium text-accent hover:text-primary transition-colors px-3 py-2">
+                Jump to
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area (Continuous Vertical Scroll) -->
+    <div class="flex-1 overflow-y-auto w-full relative" id="main-scroller">
+        <!-- DocumentFrameShell -->
+        <div class="max-w-6xl mx-auto min-h-full flex bg-frame shadow-sm relative">
+            
+            <!-- Desktop Navigation Rail (Sticky) -->
+            <nav class="hidden md:block w-nav-w flex-none sticky top-0 h-[calc(100vh-4rem)] border-r border-divider overflow-y-auto no-scrollbar py-8 pl-6 pr-4" aria-label="Paper navigation">
+                <div id="desktop-nav-list" class="space-y-1">
+                    <!-- Injected via JS -->
+                </div>
+            </nav>
+
+            <!-- Paper Document Column -->
+            <main class="flex-1 py-10 px-4 md:px-12 lg:px-16" id="paper-content">
+                <div id="paper-render-target" class="max-w-3xl mx-auto pb-32">
+                    <!-- Content Injected via JS -->
+                    <div class="text-secondary italic text-center pt-20">Loading payload...</div>
+                </div>
+            </main>
+
+        </div>
+    </div>
+
+    <!-- Mobile Navigation Drawer -->
+    <div id="drawer-scrim" class="fixed inset-0 bg-black/20 z-30 hidden opacity-0 transition-opacity duration-300 md:hidden"></div>
+    <div id="mobile-drawer" class="fixed inset-y-0 left-0 w-72 bg-frame z-40 shadow-xl transform -translate-x-full md:hidden flex flex-col">
+        <div class="h-16 border-b border-divider flex items-center justify-between px-6 flex-none">
+            <span class="font-bold text-primary">Jump to</span>
+            <button id="drawer-close" class="text-secondary hover:text-primary p-2">✕</button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6" id="mobile-nav-list">
+            <!-- Injected via JS -->
+        </div>
+    </div>
+
+    <script>
+        // --- Markdown Renderer Setup (Stage 6 Config) ---
+        const md = window.markdownit ? window.markdownit({
+            html: true,       // Enable inline SVG passthrough
+            linkify: true,
+            breaks: false     // MUST be false to avoid breaking math
+        }) : null;
+
+        if (md) {
+            // Disable escape rule to preserve TeX backslashes
+            md.inline.ruler.disable(['escape']);
+        }
+
+        // --- State ---
+        let APP_DATA = {
+            papers: [],
+            currentPaper: null,
+            expandedWorkings: {} // Map: questionId -> boolean
+        };
+
+        // --- DOM Elements ---
+        const els = {
+            paperSelect: document.getElementById('paper-select'),
+            desktopNav: document.getElementById('desktop-nav-list'),
+            mobileNav: document.getElementById('mobile-nav-list'),
+            paperTarget: document.getElementById('paper-render-target'),
+            drawer: document.getElementById('mobile-drawer'),
+            scrim: document.getElementById('drawer-scrim'),
+            jumpTrigger: document.getElementById('mobile-jump-trigger'),
+            drawerClose: document.getElementById('drawer-close'),
+            mainScroller: document.getElementById('main-scroller')
+        };
+
+        // --- Initialization ---
+        async function init() {
+            try {
+                // Fetch Payload from Canonical Path
+                const response = await fetch(RTQ_PAPERS_PAYLOAD_PATH);
+                if (!response.ok) throw new Error("Payload missing");
+                const payload = await response.json();
+                
+                if (!payload.papers || !Array.isArray(payload.papers)) throw new Error("Invalid schema");
+
+                APP_DATA.papers = payload.papers;
+                renderPaperSelector();
+                
+                // Load first paper by default
+                if (APP_DATA.papers.length > 0) {
+                    loadPaper(APP_DATA.papers[0].key);
+                }
+            } catch (e) {
+                console.error(e);
+                els.paperTarget.innerHTML = `<div class="p-8 text-center font-bold text-primary">PAPERS PAYLOAD MISSING</div>`;
+            }
+        }
+
+        function renderPaperSelector() {
+            els.paperSelect.innerHTML = APP_DATA.papers.map(p => 
+                `<option value="${p.key}">${p.label}</option>`
+            ).join('');
+            
+            els.paperSelect.addEventListener('change', (e) => loadPaper(e.target.value));
+        }
+
+        function loadPaper(key) {
+            const paper = APP_DATA.papers.find(p => p.key === key);
+            if (!paper) return;
+
+            APP_DATA.currentPaper = paper;
+            APP_DATA.expandedWorkings = {}; // Reset local state
+            
+            // Apply defaults
+            const defaultExpanded = paper.defaults?.expandedAll !== false;
+            
+            // Initial render
+            renderNav(paper);
+            renderContent(paper, defaultExpanded);
+            
+            // Render Math
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false}
+                ],
+                throwOnError: false
+            });
+
+            // Scroll to top
+            els.mainScroller.scrollTop = 0;
+        }
+
+        // --- Navigation Rendering ---
+        function renderNav(paper) {
+            // Flatten items for list generation
+            const html = generateNavHTML(paper);
+            els.desktopNav.innerHTML = html;
+            els.mobileNav.innerHTML = html;
+            
+            // Attach Click Handlers
+            document.querySelectorAll('[data-nav-target]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetId = btn.getAttribute('data-nav-target');
+                    const targetEl = document.getElementById(`q-${targetId}`);
+                    if (targetEl) {
+                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        closeDrawer();
+                        // Update active state visual (simple implementation)
+                        updateActiveNav(targetId);
+                    }
+                });
+            });
+        }
+
+        function generateNavHTML(paper) {
+            // Handle Sections vs Flat
+            if (paper.sections) {
+                return paper.sections.map(section => {
+                    const labelHtml = (section.label && section.label.trim()) 
+                        ? `<div class="text-xs font-semibold text-secondary uppercase tracking-wider mb-2 mt-6 first:mt-0 select-none">${section.label}</div>`
+                        : `<div class="mt-4 first:mt-0"></div>`;
+                    
+                    const itemsHtml = section.questions.map(q => renderNavNode(q)).join('');
+                    return `<div>${labelHtml}<div class="flex flex-col gap-1">${itemsHtml}</div></div>`;
+                }).join('<div class="h-px bg-divider my-4 w-8"></div>'); // Separator between sections
+            } else {
+                return `<div class="flex flex-col gap-1 mt-2">${paper.questions.map(q => renderNavNode(q)).join('')}</div>`;
+            }
+        }
+
+        function renderNavNode(node, depth = 0) {
+            let html = `
+                <button 
+                    class="text-left py-1 px-2 text-sm rounded transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 nav-item group" 
+                    data-nav-target="${node.id}"
+                    id="nav-btn-${node.id}"
+                >
+                    <span class="block ${depth > 0 ? 'text-xs text-secondary group-hover:text-accent' : 'font-medium text-primary group-hover:text-accent'}">
+                        ${node.id}
+                    </span>
+                </button>
+            `;
+            
+            if (node.children && node.children.length > 0) {
+                html += node.children.map(child => renderNavNode(child, depth + 1)).join('');
+            }
+            return html;
+        }
+
+        function updateActiveNav(activeId) {
+            // Reset all
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('text-accent', 'font-bold');
+                // Remove secondary marker if used
+                const marker = el.querySelector('.active-marker');
+                if (marker) marker.remove();
+            });
+
+            // Set active
+            const activeBtn = document.getElementById(`nav-btn-${activeId}`);
+            if (activeBtn) {
+                activeBtn.classList.add('text-accent');
+                const span = activeBtn.querySelector('span');
+                span.classList.remove('font-medium', 'text-secondary');
+                span.classList.add('font-bold');
+                
+                // Add marker (ColorLab D: Secondary Accent allowed for nav marker)
+                span.innerHTML += ` <span class="active-marker inline-block w-1.5 h-1.5 rounded-full bg-accent-sec ml-1 mb-0.5"></span>`;
+            }
+        }
+
+        // --- Content Rendering ---
+        function renderContent(paper, defaultExpanded) {
+            let html = '';
+            if (paper.sections) {
+                html = paper.sections.map(sec => {
+                    const header = (sec.label && sec.label.trim()) 
+                        ? `<div class="border-b border-divider pb-2 mb-8 mt-12 first:mt-0">
+                               <h2 class="text-xl font-semibold text-primary">${sec.label}</h2>
+                           </div>`
+                        : `<div class="mt-8 first:mt-0"></div>`;
+                    return header + `<div class="space-y-12">${sec.questions.map(q => renderQuestionNode(q, defaultExpanded)).join('')}</div>`;
+                }).join('');
+            } else {
+                html = `<div class="space-y-12">${paper.questions.map(q => renderQuestionNode(q, defaultExpanded)).join('')}</div>`;
+            }
+            els.paperTarget.innerHTML = html;
+
+            // Hydrate Toggle Buttons
+            hydrateToggles();
+        }
+
+        function renderQuestionNode(node, defaultExpanded, depth = 0) {
+            // Check if solution details exist to determine toggle need
+            const hasDetails = node.solutionBlock?.solutionDetails;
+            const expanded = APP_DATA.expandedWorkings[node.id] ?? defaultExpanded;
+            
+            // Markdown rendering
+            const qBodyHtml = md.render(node.question || '');
+
+            // Solution Block
+            let solutionBlockHtml = '';
+            if (node.solutionBlock) {
+                // Answer
+                let answerHtml = '';
+                if (node.solutionBlock.answer) {
+                    answerHtml = `
+                        <div class="mb-4">
+                            <span class="text-sm font-bold text-secondary uppercase tracking-wide block mb-1">Answer</span>
+                            <div class="text-primary font-medium md-content">${md.render(node.solutionBlock.answer)}</div>
+                        </div>
+                    `;
+                }
+
+                // Solution Details
+                let detailsHtml = '';
+                let toggleHtml = '';
+                
+                if (hasDetails) {
+                    const sd = node.solutionBlock.solutionDetails;
+                    
+                    toggleHtml = `
+                        <button class="toggle-work-btn text-accent hover:text-primary font-medium text-sm flex items-center gap-1 transition-colors mt-3 mb-2 focus:outline-none" data-qid="${node.id}">
+                            <span>${expanded ? 'Hide working' : 'Show working'}</span>
+                            <svg class="w-4 h-4 transform transition-transform ${expanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                    `;
+
+                    // Internal Parts
+                    const parts = [];
+                    
+                    if (sd.keepInMind) {
+                        parts.push(`
+                            <div class="mb-6">
+                                <div class="text-sm font-bold text-primary mb-2 flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Keep in mind
+                                </div>
+                                <div class="text-sm text-secondary md-content">${md.render(sd.keepInMind)}</div>
+                            </div>
+                        `);
+                    }
+
+                    if (sd.formulasUsed) {
+                        parts.push(`
+                            <div class="mb-6">
+                                <div class="text-sm font-bold text-secondary mb-1">Formulas used</div>
+                                <div class="text-sm text-secondary md-content">${md.render(sd.formulasUsed)}</div>
+                            </div>
+                        `);
+                    }
+
+                    if (sd.working) {
+                        parts.push(`
+                            <div class="mb-6">
+                                <div class="text-sm font-bold text-secondary mb-2">Working</div>
+                                <div class="text-base text-primary md-content leading-relaxed space-y-4">${md.render(sd.working)}</div>
+                            </div>
+                        `);
+                    }
+
+                    if (sd.alternativeWorking && Array.isArray(sd.alternativeWorking)) {
+                        sd.alternativeWorking.forEach((alt, idx) => {
+                            parts.push(`
+                                <div class="pt-6 border-t border-divider mt-6">
+                                    <div class="text-sm font-bold text-secondary mb-2">Alternative working</div>
+                                    <div class="text-base text-primary md-content leading-relaxed space-y-4">${md.render(alt)}</div>
+                                </div>
+                            `);
+                        });
+                    }
+
+                    detailsHtml = `
+                        <div id="details-${node.id}" class="${expanded ? 'block' : 'hidden'} bg-sol-wash rounded-sm p-4 mt-2 border-l-2 border-divider/50">
+                            ${parts.join('')}
+                        </div>
+                    `;
+                }
+
+                solutionBlockHtml = `
+                    <div class="mt-4 pt-4"> <!-- Spacing from question -->
+                        ${answerHtml}
+                        ${toggleHtml}
+                        ${detailsHtml}
+                    </div>
+                `;
+            }
+
+            // Children
+            let childrenHtml = '';
+            if (node.children && node.children.length > 0) {
+                childrenHtml = `
+                    <div class="mt-6 ml-0 md:ml-4 pl-4 border-l border-divider space-y-6">
+                        ${node.children.map(child => renderQuestionNode(child, defaultExpanded, depth + 1)).join('')}
+                    </div>
+                `;
+            }
+
+            return `
+                <div id="q-${node.id}" class="scroll-mt-24 group">
+                    <!-- Question Body -->
+                    <div class="flex gap-4">
+                        <div class="flex-none pt-1 w-12 text-right">
+                            <span class="text-sm font-bold text-secondary group-hover:text-primary transition-colors">${node.id}</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-lg text-primary md-content font-medium">
+                                ${qBodyHtml}
+                            </div>
+                            
+                            <!-- Solution Block -->
+                            ${solutionBlockHtml}
+                        </div>
+                    </div>
+                    
+                    <!-- Recursive Children -->
+                    ${childrenHtml}
+                </div>
+            `;
+        }
+
+        function hydrateToggles() {
+            document.querySelectorAll('.toggle-work-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const qid = btn.getAttribute('data-qid');
+                    const detailsEl = document.getElementById(`details-${qid}`);
+                    const span = btn.querySelector('span');
+                    const icon = btn.querySelector('svg');
+                    
+                    const isHidden = detailsEl.classList.contains('hidden');
+                    
+                    if (isHidden) {
+                        detailsEl.classList.remove('hidden');
+                        span.textContent = "Hide working";
+                        icon.classList.add('rotate-180');
+                        APP_DATA.expandedWorkings[qid] = true;
+                    } else {
+                        detailsEl.classList.add('hidden');
+                        span.textContent = "Show working";
+                        icon.classList.remove('rotate-180');
+                        APP_DATA.expandedWorkings[qid] = false;
+                    }
+                });
+            });
+        }
+
+        // --- Mobile Drawer Logic ---
+        function openDrawer() {
+            els.scrim.classList.remove('hidden');
+            // Trigger reflow
+            void els.scrim.offsetWidth; 
+            els.scrim.classList.remove('opacity-0');
+            
+            els.drawer.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                els.drawer.classList.remove('-translate-x-full');
+            });
+        }
+
+        function closeDrawer() {
+            els.drawer.classList.add('-translate-x-full');
+            els.scrim.classList.add('opacity-0');
+            
+            setTimeout(() => {
+                els.scrim.classList.add('hidden');
+                els.drawer.classList.add('hidden');
+            }, 300);
+        }
+
+        els.jumpTrigger.addEventListener('click', openDrawer);
+        els.drawerClose.addEventListener('click', closeDrawer);
+        els.scrim.addEventListener('click', closeDrawer);
+
+        // --- Run ---
+        init();
+
+    </script>
+</body>
+</html>
